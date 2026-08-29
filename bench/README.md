@@ -164,32 +164,48 @@ runtime (GC, strings, JSON); React's fixed cost is react+react-dom.
 
 # nativetron (wasm) vs React — in-browser runtime
 
-Headless Chrome (CDP), 2000 real DOM clicks through each stack's own event path.
+Headless Chrome (CDP). 100 interleaved trials x 2000 real DOM clicks each.
+Per-click microseconds; both stacks driven through their own event path.
 
-| metric | nativetron | react | react / nativetron |
-|---|---|---|---|
-| total, 2000 clicks | 12.5 ms | 11.8 ms | 0.94× |
-| per click | 6.25 µs | 5.9 µs | 0.94× |
-| JS heap after | 2.52 MB | 1.97 MB | 0.78× |
-| JS heap delta | 0.42 MB | 0.72 MB | — |
-| wasm linear memory | 1.44 MB | — | — |
-| module size | 83.7 KB | 189.7 KB | — |
-| final DOM state | count: 2200 | count: 2200 | — |
+| statistic | nativetron | react |
+|---|---|---|
+| median | 4.05 µs | 4.30 µs |
+| mean | 4.25 µs | 4.29 µs |
+| stddev | 0.52 µs | 0.22 µs |
+| min | 3.75 µs | 3.95 µs |
+| p95 | 4.85 µs | 4.70 µs |
+| max | 7.60 µs | 4.95 µs |
 
-### Reading these numbers honestly
+| paired comparison | value |
+|---|---|
+| median paired diff (nt - react) | -0.05 µs |
+| nativetron faster in | 58/100 trials |
+| sign-test p (approx) | 0.103 |
 
-- **Per-click latency is a wash** (nativetron 5.9-6.5 us, React 5.5-7.0 us across
-  runs; run-to-run variance ~20% swamps the difference). A counter does no real
-  work, so this measures *bridge overhead*, not compiled-logic speed: every click
-  costs a JSON stringify in wasm, a JSON.parse in JS, plus a JSON event in.
-  React mutates the DOM in-engine with no serialization.
-- **Total memory still favours React**: nativetron 2.5 MB JS heap + 1.4 MB wasm
-  linear memory ~= 3.9 MB vs React 2.0 MB.
-- **Module size favours nativetron**: 83.7 KB vs 189.7 KB.
-- Fixes applied while measuring: wasm stack 16 MB -> 1 MB (linear memory
-  16.4 MB -> 1.4 MB), and -Oz/gc-sections/strip-all (1.88 MB -> 83.7 KB).
+| memory / size | nativetron | react |
+|---|---|---|
+| JS heap | 2.43 MB | 3.78 MB |
+| wasm linear memory | 1.44 MB | — |
+| module size | 83.7 KB | 189.7 KB |
+| final DOM state | count: 200500 | count: 200500 |
 
-Next to move these numbers: replace the DOM Host ABI's JSON wire format with the
-planned binary command buffer in linear memory (kills both JSON hops), and
-benchmark a compute-heavy workload (large list diff/sort) where AOT compilation
-should actually pay off.
+### Verdict (100 interleaved trials, 200,000 clicks per stack)
+
+- **Speed: statistically indistinguishable.** Median paired difference is
+  -0.05 us (~1% in nativetron's favour); nativetron won 58/100 trials,
+  sign-test p = 0.10 — not significant. Anyone reporting a winner here is
+  reporting noise.
+- **Tail latency is worse for nativetron**: stddev 0.52 vs 0.22 us, max 7.60 vs
+  4.95 us. Likely allocation churn from the JSON hop (a string per click in wasm,
+  parsed again in JS).
+- **Memory is a wash** once wasm linear memory is counted: 2.43 MB JS heap +
+  1.44 MB wasm = 3.87 MB vs React's 3.78 MB.
+- **Module size is a clear nativetron win**: 83.7 KB vs 189.7 KB (2.3x).
+
+The counter workload does ~no work per click, so this benchmark measures the
+DOM Host ABI's *bridge overhead*, not compiled-logic throughput. To move it:
+replace the JSON wire format with the planned binary command buffer in linear
+memory, and add a compute-heavy workload (large list diff/sort) where AOT
+compilation can actually pay off.
+
+Run: `TRIALS=100 node bench/run-web-runtime.mjs`
