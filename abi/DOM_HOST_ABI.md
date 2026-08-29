@@ -1,87 +1,50 @@
-# DOM Host ABI (v0)
+# DOM Host ABI
 
-The single contract between a nativetron **reconciler** (compiled TS) and a
-**DOM host** (the environment that owns the real DOM). Every backend implements
-this same ABI:
+The protocol between a reconciler (compiled TypeScript) and a DOM host (the
+environment owning the real DOM). `host/dom-host.js` implements it for both the
+native webview and the browser.
 
-- **webview host** (today): C++ core + injected JS runtime (`host/dom-host.js`).
-- **browser-wasm host** (Phase 3): the same JS runtime, driven by a compiled
-  wasm reactor over the host-import ABI.
+Node ids are `u32`. Id 0 is the mount root (`#nt-root`); the reconciler
+allocates the rest.
 
-Because the reconciler only ever speaks this ABI, the framework is written once
-and runs on any host.
+## Operations
 
-## Node ids
+| opcode | name | arguments |
+|---|---|---|
+| 1 | CREATE_ELEMENT | id, tag |
+| 2 | CREATE_TEXT | id, text |
+| 3 | SET_TEXT | id, text |
+| 4 | SET_ATTR | id, name, value |
+| 5 | REMOVE_ATTR | id, name |
+| 6 | APPEND | parent, child |
+| 7 | INSERT_BEFORE | parent, child, ref |
+| 8 | REMOVE | id |
+| 9 | LISTEN | id, type, slot |
+| 10 | UNLISTEN | id, type |
+| 11 | SET_PROP | id, name, value |
+| 12 | INTERN | id, value |
 
-Opaque `u32`. Id `0` is the reserved mount root (`#nt-root`). The reconciler
-allocates all other ids.
+Operations are sent in batches and applied in order.
 
-## Command stream (reconciler → host)
+## JSON encoding
 
-A **batch** is a JSON array of ops; each op is `[opcode, ...args]`. Batches are
-applied in order via `host.apply(batch)`.
+Used by the native webview, whose bridge is `eval`. A batch is a JSON array of
+`[opcode, ...args]`, applied with `window.__nt.apply(batch)`. Strings are inline;
+INTERN is unused.
 
-| opcode | name | args | effect |
-|---|---|---|---|
-| 1 | CREATE_ELEMENT | id, tag | `nodes[id] = createElement(tag)` |
-| 2 | CREATE_TEXT | id, text | `nodes[id] = createTextNode(text)` |
-| 3 | SET_TEXT | id, text | `nodes[id].textContent = text` |
-| 4 | SET_ATTR | id, name, value | `setAttribute` |
-| 5 | REMOVE_ATTR | id, name | `removeAttribute` |
-| 6 | APPEND | parent, child | `parent.appendChild(child)` |
-| 7 | INSERT_BEFORE | parent, child, ref | `parent.insertBefore(child, ref)` |
-| 8 | REMOVE | id | detach + free `nodes[id]` |
-| 9 | LISTEN | id, type | delegate a DOM listener; fires an event msg |
-| 10 | UNLISTEN | id, type | remove the delegated listener |
-| 11 | SET_PROP | id, name, value | `nodes[id][name] = value` (e.g. input value) |
+Events arrive as `{"n": nodeId, "t": type, "value": optional}`. The host sends
+`{"n": 0, "t": "__ready"}` once the document is ready.
 
-Wire format is JSON for v0; the opcode semantics are stable, so a future binary
-encoding is a drop-in that does not change the reconciler.
+## Binary encoding
 
-## Event stream (host → reconciler)
+Used by the browser wasm lane, applied with `window.__nt.applyBin(bytes)`.
+Little-endian: `u8` opcode, `u32` ids, strings as `u32` byte length followed by
+UTF-8 bytes. The host receives a zero-copy view of linear memory and must not
+retain it.
 
-On a listened event the host posts one JSON message:
+INTERN registers a string once. CREATE_ELEMENT, SET_ATTR, LISTEN and SET_PROP
+carry a `u32` intern id for tag, attribute, event type and property names. Text
+content is inline.
 
-```json
-{ "n": <nodeId>, "t": "<type>", "value": "<optional input value>" }
-```
-
-Control message `{ "n": 0, "t": "__ready" }` is sent once the document is ready;
-the reconciler flushes its initial batch in response.
-
-## v1: binary encoding (wasm lane)
-
-v0's JSON wire format costs a stringify in the guest and a `JSON.parse` in the
-host on every interaction. v1 encodes the same opcodes as bytes written straight
-into linear memory; the host decodes with `DataView` + `TextDecoder` and applies
-via `window.__nt.applyBin(bytes)`. Opcode semantics are unchanged.
-
-Layout, little-endian: `u8 opcode`, node ids as `u32`, strings as `u32 length`
-followed by that many UTF-8 bytes.
-
-| opcode | payload |
-|---|---|
-| 1 CREATE_ELEMENT | u32 id, str tag |
-| 2 CREATE_TEXT | u32 id, str text |
-| 3 SET_TEXT | u32 id, str text |
-| 4 SET_ATTR | u32 id, str name, str value |
-| 6 APPEND | u32 parent, u32 child |
-| 9 LISTEN | u32 id, str type, u32 slot |
-
-Events skip serialization entirely: `LISTEN` carries a handler `slot`, and the
-host calls the exported `onEvent(slot)` (or `onEventValue(slot, value)` when the
-target has a value) with scalars only.
-
-The bytes are borrowed for the duration of the call (the glue hands the host a
-zero-copy `subarray` of linear memory); the host must not retain them.
-
-Both encodings are live: the native webview lane uses v0 JSON (its bridge is
-`eval`, which is text anyway); the wasm lane uses v1.
-
-## v1.1: interned names
-
-Tag names, attribute names, event types and property names repeat constantly, so
-the binary lane interns them: opcode `12 INTERN (u32 id, str value)` registers a
-string once, and CREATE_ELEMENT / SET_ATTR / LISTEN / SET_PROP then carry a
-`u32` intern id in place of an inline string. Text content stays inline (it is
-almost always unique). The JSON lane is unchanged.
+Events call exported functions directly: `onEvent(slot)`, or
+`onEventValue(slot, value)` when the target has a value. LISTEN carries the slot.
