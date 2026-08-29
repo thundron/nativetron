@@ -1,7 +1,4 @@
 #!/usr/bin/env node
-// nativetron vs Electron: disk, RAM (process-tree RSS), cold-start-to-paint, CPU.
-// Electron is taken from ~/Library/Caches/electron, extracted to /tmp, and
-// de-quarantined (XProtect deletes fresh quarantined Electron.app). n/a if none.
 import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { existsSync, readdirSync, statSync, mkdirSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
@@ -20,9 +17,7 @@ const kb = (n) => `${n.toLocaleString()} KB`;
 const mb = (bytes) => `${(bytes / 1048576).toFixed(1)} MB`;
 const median = (xs) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)];
 
-// ---- disk ------------------------------------------------------------------
 function dirSizeBytes(p) {
-  // du -sk gives KB (apparent-on-disk); portable on macOS.
   const out = sh("du", ["-sk", p]);
   return parseInt(out.split(/\s+/)[0], 10) * 1024;
 }
@@ -36,7 +31,6 @@ function statSyncSafe(p) {
   try { return statSync(p); } catch { return null; }
 }
 
-// ---- electron resolution (cache -> temp -> de-quarantine) ------------------
 function resolveElectron() {
   const cacheRoot = join(homedir(), "Library", "Caches", "electron");
   if (!existsSync(cacheRoot)) return null;
@@ -60,14 +54,12 @@ function resolveElectron() {
     mkdirSync(dest, { recursive: true });
     execFileSync("ditto", ["-x", "-k", newest.zip, dest]);
   }
-  // strip quarantine before the .app is scanned/executed
   try { execFileSync("xattr", ["-dr", "com.apple.quarantine", app]); } catch {}
   if (!existsSync(bin)) return null;
   const version = sh(bin, ["--version"]).replace(/^v/, "");
   return { bin, app, version };
 }
 
-// ---- process tree sampling -------------------------------------------------
 function treePids(root) {
   const out = [root];
   let kids = [];
@@ -92,7 +84,6 @@ function sampleTree(root) {
   return { cpu, rss, procs: pids.length };
 }
 
-// ---- measurements ----------------------------------------------------------
 function measureStartup(spawnCmd, spawnArgs) {
   const walls = []; // app self-quits on paint; spawnSync blocks to exit
 
@@ -132,7 +123,6 @@ async function measureRuntime(spawnCmd, spawnArgs) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// ---- run -------------------------------------------------------------------
 const nt = {
   main: join(REPO, "build", "main"),
   renderer: join(REPO, "build", "renderer"),
@@ -151,11 +141,9 @@ log(`electron: ${electron ? "v" + electron.version + " (cached, de-quarantined)"
 log(`date: ${new Date().toISOString()}`);
 log("");
 
-// disk
 const ntDisk = ntBuilt ? fileSize(nt.main) + fileSize(nt.renderer) + fileSize(nt.core) : 0;
 const elDisk = electron ? dirSizeBytes(electron.app) : 0;
 
-// startup + runtime
 let ntStart = null, ntRun = null, elStart = null, elRun = null;
 if (ntBuilt) {
   log("measuring nativetron (build/renderer)…");
@@ -171,7 +159,6 @@ if (electron) {
 }
 log("");
 
-// table
 const ratio = (a, b) => (a && b ? `${(b / a).toFixed(1)}×` : "n/a");
 const cell = (v) => (v == null ? "n/a" : v);
 log(`## Results\n`);
@@ -190,7 +177,6 @@ log(`system-spawned (not a child) and may be undercounted; Electron's helpers ar
 log(`children and fully counted. Disk = what each app ships (nativetron binaries`);
 log(`vs the Electron.app runtime); nativetron reuses the OS WebKit, not shipped._`);
 
-// persist a machine-readable snapshot next to the harness
 writeFileSync(join(ROOT, "last-run.json"), JSON.stringify({
   date: new Date().toISOString(),
   electron: electron?.version ?? null,

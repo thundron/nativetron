@@ -1,12 +1,3 @@
-// nativetron DOM host runtime (DOM Host ABI v0).
-// Environment-agnostic: injected into the webview today; loaded as-is by the
-// browser-wasm host in Phase 3. It owns the real DOM, applies command batches,
-// and posts events back to the reconciler.
-//
-// Transport hooks (provided by the embedding host):
-//   window.__nt_send(jsonString)   reconciler <- host   (events)
-//   window.__nt.apply(batch)       reconciler -> host   (commands)
-// For the webview host, __nt_send is wired to the bound __nt_ipc below.
 (function () {
   var nodes = {};
   var handlers = {};

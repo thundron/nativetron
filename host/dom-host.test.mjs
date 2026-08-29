@@ -1,6 +1,3 @@
-// Headless conformance test for the DOM Host ABI v0 host runtime.
-// Runs host/dom-host.js against a minimal mock DOM (no browser) and asserts
-// that command batches build the expected tree and events round-trip.
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -10,7 +7,6 @@ import assert from "node:assert/strict";
 const here = dirname(fileURLToPath(import.meta.url));
 const src = readFileSync(join(here, "dom-host.js"), "utf8");
 
-// --- tiny mock DOM ---------------------------------------------------------
 function makeNode(kind, tag) {
   return {
     kind, tag, children: [], attrs: {}, _text: "", listeners: {},
@@ -50,10 +46,8 @@ vm.createContext(sandbox);
 vm.runInContext(src, sandbox);
 const nt = sandbox.window.__nt;
 
-// __ready fires synchronously since readyState==="complete"
 assert.deepEqual(sent.shift(), { n: 0, t: "__ready" }, "ready control message");
 
-// --- apply a batch (same opcodes the renderer emits) -----------------------
 const [H1, H1T, BTN, BLBL, OUT, OUTT] = [1, 2, 3, 4, 5, 6];
 nt.apply([
   [1, H1, "h1"], [2, H1T, "Hello"], [6, H1, H1T], [6, 0, H1],
@@ -69,15 +63,12 @@ assert.equal(root.children[1].tag, "button");
 assert.equal(root.children[1].attrs.style, "x");
 assert.equal(root.children[2].children[0].textContent, "count: 0");
 
-// --- event round-trip: simulate a click ------------------------------------
 root.children[1].listeners.click[0]({ target: {} });
 assert.deepEqual(sent.shift(), { n: BTN, t: "click" }, "click event posted");
 
-// --- SET_TEXT (what the native handler emits on click) ---------------------
 nt.apply([[3, OUTT, "count: 1"]]);
 assert.equal(root.children[2].children[0].textContent, "count: 1", "SET_TEXT applied");
 
-// --- input value + SET_PROP + UNLISTEN -------------------------------------
 const INP = 7;
 nt.apply([[1, INP, "input"], [6, 0, INP], [11, INP, "value", "hi"], [9, INP, "input"]]);
 assert.equal(root.children[3].value, "hi", "SET_PROP set value");
@@ -86,7 +77,6 @@ assert.deepEqual(sent.shift(), { n: INP, t: "input", value: "typed" }, "input ev
 nt.apply([[10, INP, "input"]]);
 assert.equal(root.children[3].listeners.input.length, 0, "UNLISTEN removed handler");
 
-// binary encoding (ABI v1 + interned names)
 const root2 = makeNode("element", "div");
 document.getElementById = (id) => (id === "nt-root" ? root2 : null);
 const enc = [];
@@ -120,4 +110,4 @@ enc.push(8); pushU32(13);
 nt.applyBin(new Uint8Array(enc));
 assert.equal(root2.children.length, 1, "binary REMOVE");
 
-console.log("DOM Host ABI v0 (json) + v1 (binary): all conformance checks passed");
+console.log("DOM Host ABI: json and binary conformance checks passed");
