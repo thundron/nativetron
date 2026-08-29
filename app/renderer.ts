@@ -7,13 +7,14 @@ import {
   newId,
   createElement,
   createText,
-  setText,
   setAttr,
   append,
   on,
+  bindText,
   mount,
   run,
 } from "../framework/dom.js";
+import { signal } from "../framework/reactive.js";
 
 mount("nativetron", 520, 360);
 
@@ -47,11 +48,13 @@ createText(outText, "count: 0");
 append(out, outText);
 append(ROOT, out);
 
-// native state + event handling
-let count = 0;
+// native reactive state: the counter is a signal, and the text node is bound to
+// it. The click handler only mutates state — no manual setText. bindText runs an
+// effect that re-emits SET_TEXT whenever `count` changes.
+const count = signal<number>(0);
+bindText(outText, () => `count: ${count.get()}`);
 on(btn, "click", () => {
-  count++;
-  setText(outText, `count: ${count}`);
+  count.set(count.get() + 1);
 });
 
 run();

@@ -1,6 +1,7 @@
 // nativetron reconciler-side client for the DOM Host ABI v0.
 // Compiled to native. Emits batched DOM ops to the host and routes events back.
 import { HOST_JS } from "./host-embed.generated.js";
+import { effect } from "./reactive.js";
 
 // ---- FFI into the native core (see ffi/nativetron.ffi.json) ----------------
 declare function ntInit(): void;
@@ -34,6 +35,23 @@ export function flush(): void {
   if (batch.length === 0) return;
   ntEval(`window.__nt.apply(${JSON.stringify(batch)})`);
   batch = [];
+}
+
+// ---- reactive text binding -------------------------------------------------
+// Bind a text node's content to a reactive `compute`. Runs an effect that emits
+// a SET_TEXT op whenever any signal read inside `compute` changes.
+//
+// The first run happens synchronously here (during UI construction), so it just
+// enqueues the SET_TEXT into the pending batch alongside the other build ops —
+// the initial flush is driven by the host's `__ready` message. Later runs (from
+// a signal change while the app is live) enqueue a SET_TEXT and flush it right
+// away so the DOM updates immediately.
+let building = true;
+export function bindText(nodeId: number, compute: () => string): void {
+  effect(() => {
+    setText(nodeId, compute());
+    if (!building) flush();
+  });
 }
 
 // ---- events ----------------------------------------------------------------
@@ -75,6 +93,7 @@ export function mount(title: string, w: number, h: number): void {
     const args = JSON.parse(req) as string[];
     const ev = JSON.parse(args[0]) as NtEvent;
     if (ev.t === "__ready") {
+      building = false; // the app is live: later effect runs flush immediately
       flush(); // send the initial UI once the document is ready
       return;
     }

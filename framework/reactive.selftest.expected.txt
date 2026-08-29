@@ -1,0 +1,9 @@
+effect run #1: a=1
+effect run #2: a=2
+effect run #3: a=3
+after b.set: runs=3
+effect run #4: a=4
+computed doubled=8
+effect run #5: a=5
+computed doubled=10
+total effect runs=5

@@ -32,3 +32,12 @@ echo "[3/3] main.ts -> build/main (native)"
 node "$SCRIPTC" build app/main.ts --backend c -o build/main
 
 echo "OK -> $ROOT/build/main (spawns build/renderer)"
+
+# ---------------------------------------------------------------------------
+# Optional: headless NATIVE self-test of the compile-time-reactive core (no GUI,
+# no FFI). Proves signals/effects work and matches the recorded expected output.
+# Not part of the default build. Run manually with:
+#
+#   node "$SCRIPTC" build framework/reactive.selftest.ts --backend c \
+#     -o build/reactive-selftest && ./build/reactive-selftest \
+#     | diff - framework/reactive.selftest.expected.txt && echo "reactive selftest OK"
