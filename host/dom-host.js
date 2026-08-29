@@ -82,7 +82,19 @@
     var dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     var o = 0;
     var u32 = function () { var v = dv.getUint32(o, true); o += 4; return v; };
-    var s = function () { var n = u32(); var r = td.decode(bytes.subarray(o, o + n)); o += n; return r; };
+    var s = function () {
+      var n = u32();
+      var end = o + n, r;
+      if (n < 64) {
+        r = "";
+        var ascii = true;
+        for (var q = o; q < end; q++) { var c = bytes[q]; if (c > 127) { ascii = false; break; } r += String.fromCharCode(c); }
+        if (ascii) { o = end; return r; }
+      }
+      r = td.decode(bytes.subarray(o, end));
+      o = end;
+      return r;
+    };
     while (o < bytes.byteLength) {
       var code = dv.getUint8(o); o += 1;
       switch (code) {

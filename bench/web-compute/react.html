@@ -1,0 +1,13 @@
+<!doctype html><html><head><meta charset="utf-8"><title>react compute</title></head>
+<body><div id="nt-root"></div>
+<script type="module">
+await import("./react-bundle.js");
+window.__setup = async (n) => { window.__mount(n); return document.getElementById("nt-root").children.length; };
+window.__trial = () => { const t0 = performance.now(); window.__forceUpdate(); return +(performance.now() - t0).toFixed(3); };
+window.__stats = () => ({
+  rows: document.getElementById("nt-root").children.length,
+  sample: document.getElementById("nt-root").children[0].textContent,
+  jsHeapMB: performance.memory ? +(performance.memory.usedJSHeapSize / 1048576).toFixed(2) : 0,
+});
+window.__benchReady = true;
+</script></body></html>

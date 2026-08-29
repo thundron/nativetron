@@ -211,3 +211,64 @@ Per-click microseconds; both stacks driven through their own event path.
 
 Still true: a counter does ~no work per click, so this measures bridge cost. A
 compute-heavy workload is needed to test AOT throughput itself.
+
+## Browser compute-heavy (10k rows)
+
+# nativetron (wasm) vs React — compute-heavy workload
+
+10000 rows. One update = 10000 arithmetic ops + sort of 10000 + 10000 string builds
++ 10000 DOM text updates. 30 interleaved trials, synchronous render both sides.
+
+| statistic (ms per update) | nativetron | react |
+|---|---|---|
+| median | 11.95 | 4.85 |
+| mean | 12.14 | 5.01 |
+| stddev | 0.48 | 0.56 |
+| min | 11.70 | 4.50 |
+| p95 | 13.50 | 6.40 |
+| max | 13.90 | 6.80 |
+
+| paired | value |
+|---|---|
+| median paired diff (nt - react) | 7.10 ms |
+| speedup (react / nativetron, medians) | 0.41× |
+| nativetron faster in | 0/30 trials |
+| sign-test p (approx) | <0.001 |
+
+| context | nativetron | react |
+|---|---|---|
+| rows rendered | 10000 | 10000 |
+| JS heap | 9.06 MB | 15.14 MB |
+| wasm linear memory | 7.38 MB | — |
+| module size | 59.9 KB | 189.8 KB |
+| first row after run | "row 348 3" | "row 348 3" |
+
+### Reading the compute result honestly
+
+React wins this workload ~2.5x, and the reason is instructive:
+
+| phase (10k rows, measured natively) | nativetron |
+|---|---|
+| arithmetic | 0.2 ms (parity with V8) |
+| sort (10k, closure comparator) | 2.7 ms |
+| string building | 1.1 ms |
+| encode + host decode + DOM text | ~8 ms |
+
+- **V8's built-ins are optimised C++.** Its sort is TimSort in C++ with an
+  inlined comparator (~0.3 ms); our compiled merge sort pays a real closure call
+  per comparison (~20 ns x 133k). Same for string concat. AOT compilation does
+  not automatically beat a mature engine's native built-ins.
+- **Our DOM path serialises 10k strings** (UTF-8 encode in wasm, decode in JS)
+  where React mutates text nodes directly. An ASCII fast path in the host decoder
+  bought 13% (13.9 -> 12.1 ms).
+- **Arithmetic is at parity**, which is the honest scope of the AOT win here.
+
+Fixed along the way: scriptc lowered `Array.sort` to an **O(n^2) insertion
+sort**. Replacing it with a stable bottom-up merge sort took this benchmark from
+524.8 ms to 12.1 ms per update (43x). That bug was only visible because of this
+workload.
+
+**Correction to the earlier thesis:** "compute-heavy work favours AOT" does not
+hold for workloads dominated by engine built-ins (sort, string ops, DOM). Where
+nativetron does win is the interaction path (1.79x vs React), module size (3.2x),
+and the desktop metrics. Claiming a general compute win would be wrong.
