@@ -169,33 +169,31 @@ Per-click microseconds; both stacks driven through their own event path.
 
 | statistic | nativetron | react |
 |---|---|---|
-| median | 2.25 µs | 4.25 µs |
-| mean | 2.34 µs | 4.23 µs |
-| stddev | 0.34 µs | 0.21 µs |
-| min | 1.95 µs | 3.90 µs |
-| p95 | 2.90 µs | 4.50 µs |
-| max | 3.90 µs | 4.95 µs |
+| median | 1.50 µs | 2.85 µs |
+| mean | 1.62 µs | 2.88 µs |
+| stddev | 0.37 µs | 0.28 µs |
+| min | 1.25 µs | 2.55 µs |
+| p95 | 2.05 µs | 3.30 µs |
+| max | 4.15 µs | 4.85 µs |
 
 | paired comparison | value |
 |---|---|
-| median paired diff (nt - react) | -2.00 µs |
+| median paired diff (nt - react) | -1.30 µs |
 | nativetron faster in | 100/100 trials |
 | sign-test p (approx) | <0.001 |
 
 | memory / size | nativetron | react |
 |---|---|---|
-| JS heap | 2.18 MB | 3.84 MB |
+| JS heap | 2.19 MB | 1.69 MB |
 | wasm linear memory | 1.38 MB | — |
-| module size | 63.2 KB | 189.7 KB |
+| module size | 54.6 KB | 189.7 KB |
 | final DOM state | count: 200500 | count: 200500 |
 
 ### Verdict: interaction path
 
-nativetron is **1.89x faster** (median 2.25 vs 4.25 us) and won **100/100**
-interleaved trials, p < 0.001. Tail latency is also better (max 3.90 vs 4.95 us).
-This is the workload the architecture is built for: the event goes
-DOM click -> wasm handler (scalars only, no serialisation) -> compiled signal
-update -> one small binary batch.
+**1.90x faster than React** (median 1.50 vs 2.85 us), **100/100** interleaved
+trials, p < 0.001. Tail is better too (max 4.15 vs 4.85 us). Events cross as
+scalars (handler slot), so no serialisation happens on this path at all.
 
 ## Browser compute-heavy (10k rows)
 
@@ -206,17 +204,17 @@ update -> one small binary batch.
 
 | statistic (ms per update) | nativetron | react |
 |---|---|---|
-| median | 11.95 | 4.80 |
-| mean | 12.06 | 4.96 |
-| stddev | 0.44 | 0.50 |
-| min | 11.60 | 4.50 |
-| p95 | 13.40 | 6.40 |
-| max | 13.40 | 6.40 |
+| median | 6.80 | 3.50 |
+| mean | 6.89 | 3.61 |
+| stddev | 0.34 | 0.41 |
+| min | 6.40 | 3.10 |
+| p95 | 7.40 | 4.70 |
+| max | 8.10 | 4.70 |
 
 | paired | value |
 |---|---|
-| median paired diff (nt - react) | 7.15 ms |
-| speedup (react / nativetron, medians) | 0.40× |
+| median paired diff (nt - react) | 3.30 ms |
+| speedup (react / nativetron, medians) | 0.51× |
 | nativetron faster in | 0/30 trials |
 | sign-test p (approx) | <0.001 |
 
@@ -225,34 +223,23 @@ update -> one small binary batch.
 | rows rendered | 10000 | 10000 |
 | JS heap | 9.06 MB | 15.14 MB |
 | wasm linear memory | 7.38 MB | — |
-| module size | 59.9 KB | 189.8 KB |
+| module size | 51.4 KB | 189.8 KB |
 | first row after run | "row 348 3" | "row 348 3" |
 
 ### Verdict: bulk-update path
 
-React wins this one ~2.5x, and after three compiler optimisations the number
-barely moved (13.90 -> 11.95 ms), which localises the cost precisely:
+React wins ~1.9x (6.80 vs 3.50 ms). Compute is ~3 ms of ours (arithmetic at
+parity with V8); the rest is encoding 10k strings and applying 10k text writes.
+React spends ~3 ms of its 3.5 ms on the same text writes, so our real overhead is
+the serialisation tax of running outside the engine.
 
-| phase (10k rows) | cost |
-|---|---|
-| arithmetic | 0.2 ms (parity with V8) |
-| sort | ~1.8 ms (was 2.7 ms) |
-| string building | ~1.1 ms |
-| **encode + decode + 10k DOM text sets** | **~8 ms** |
+Optimisations tried and **rejected** on evidence: a hand-rolled ASCII UTF-8
+encoder in the guest measured 7% *slower* than `Buffer.from` (A/B, same session),
+because the runtime's encoder is a memcpy path while the TS loop pays per-char
+bounds checks.
 
-React spends ~4 ms of its 4.8 ms on the same 10k text-node writes. Our extra
-~4 ms is the **serialisation tax**: 10k strings UTF-8-encoded in wasm and decoded
-in JS. That tax is structural to running compiled code outside the engine, not a
-missing optimisation.
+### Measurement note
 
-**Honest conclusion:** the architecture wins where interactions are small and
-frequent (the normal case for an app), and pays a real tax on bulk DOM rewrites.
-
-Compiler fixes found by this benchmark (all on the scriptc fork):
-1. `Array.sort` was an **O(n^2) insertion sort** -> stable merge sort
-   (100k numeric sort: 387 -> 31 ms).
-2. `(a,b) => a-b` comparators now **inline** instead of an indirect closure call.
-3. Array receivers **borrow** for indexed access, removing retain/release traffic
-   in every loop (31 -> 15 ms on the same sort; helps all array code).
-Net: 100k numeric sort 387 -> 15 ms (**26x**), vs V8's 8 ms.
-Validated: 197/197 comparable corpus tests still match Node byte-for-byte.
+All numbers above were re-taken with the machine on **AC power**. Earlier
+readings drifted up to 27% on battery *with no code change* — including React's,
+which is the tell. Always compare within a single interleaved run.
