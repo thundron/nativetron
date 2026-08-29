@@ -118,17 +118,37 @@ glue emission, size (1.88 MB -> 63 KB), plus three perf fixes found by
 benchmarking — O(n^2) `Array.sort` -> merge sort, comparator inlining, and array
 receiver borrowing (100k numeric sort 387 -> 15 ms).
 
-## Not built yet (the gap between "architecture" and "framework")
+## Component model (framework/ui.ts)
 
-The architecture is proven end to end; the developer-facing suite is not:
+Composable elements with reactive bindings and keyed lists, shared by both hosts:
 
-- **No component model**: node ids are allocated by hand, no JSX, no props or
-  children, no composition.
-- **No list rendering**: the reconciler only appends. REMOVE / INSERT_BEFORE /
-  UNLISTEN are specced in the ABI but unused, so there is no keyed diff.
+```ts
+function Counter(): El {
+  return el("section", [
+    el("h2", [txt("Counter")]),
+    on(el("button", [txt("Increment")]), "click", () => count.set(count.get() + 1)),
+    el("p", [dyn(() => `count: ${count.get()}`)]),
+  ]);
+}
+```
+
+- `el` / `txt` / `dyn` / `attr` / `on` build trees; components are plain functions
+  returning `El`, so composition is ordinary TypeScript.
+- `dyn` and `bindText` re-run through the signal graph and emit only the changed
+  `SET_TEXT`.
+- `each(tag, build)` does keyed diffing, emitting REMOVE and INSERT_BEFORE for
+  removals and reorders.
+- The same components compile to the native webview app and the browser wasm app.
+
+## Not built yet
+
+- **No JSX**: scriptc's entry accepts `.ts`/`.js` only (no `.tsx`), so JSX needs
+  compiler work. The hyperscript API above is the current surface.
 - **No tooling**: no CLI (`new` / `dev` / `build`), no dev server, no HMR.
 - **Ergonomics**: the webview and wasm lanes need separate entry files and a
   hand-written `profile.json`.
+- **Bulk-update tax**: 10k-row rewrites pay ~4 ms of string serialisation vs
+  React (see bench/). Small frequent updates win; bulk rewrites do not.
 
 ## Repo / fork layout (intended)
 
