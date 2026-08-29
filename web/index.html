@@ -16,12 +16,12 @@
     import { instantiateFromBytes } from "./.scriptc/renderer.mjs";
 
     let api;
-    window.__nt_send = (json) => { if (api) api.nt_on_event(json); };
+    window.__nt_event = (slot, value) => { if (api) { if (value) api.nt_on_event_value(slot, value); else api.nt_on_event(slot); } };
 
     const t0 = performance.now();
     const bytes = await (await fetch("./.scriptc/renderer.wasm")).arrayBuffer();
     api = await instantiateFromBytes(bytes, {
-      ntApply: (batchJson) => { window.__nt.apply(JSON.parse(batchJson)); },
+      ntApply: (b) => { window.__nt.applyBin(b); },
     });
     api.nt_start();
     const ms = (performance.now() - t0).toFixed(1);

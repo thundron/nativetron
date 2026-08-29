@@ -65,7 +65,38 @@
     }
   }
 
-  window.__nt = { apply: apply };
+  var td = new TextDecoder();
+
+  function attachSlot(id, type, slot) {
+    var key = id + ":" + type;
+    if (handlers[key]) return;
+    var h = function (ev) {
+      var v = ev && ev.target && "value" in ev.target ? ev.target.value : "";
+      window.__nt_event(slot, v);
+    };
+    handlers[key] = h;
+    node(id).addEventListener(type, h);
+  }
+
+  function applyBin(bytes) {
+    var dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    var o = 0;
+    var u32 = function () { var v = dv.getUint32(o, true); o += 4; return v; };
+    var s = function () { var n = u32(); var r = td.decode(bytes.subarray(o, o + n)); o += n; return r; };
+    while (o < bytes.byteLength) {
+      var code = dv.getUint8(o); o += 1;
+      switch (code) {
+        case 1: { var id = u32(); nodes[id] = document.createElement(s()); break; }
+        case 2: { var id2 = u32(); nodes[id2] = document.createTextNode(s()); break; }
+        case 3: { var id3 = u32(); node(id3).textContent = s(); break; }
+        case 4: { var id4 = u32(); node(id4).setAttribute(s(), s()); break; }
+        case 6: { var p = u32(); node(p).appendChild(nodes[u32()]); break; }
+        case 9: { var id5 = u32(); attachSlot(id5, s(), u32()); break; }
+      }
+    }
+  }
+
+  window.__nt = { apply: apply, applyBin: applyBin };
 
   function ready() {
     send({ n: 0, t: "__ready" });

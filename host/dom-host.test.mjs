@@ -44,7 +44,7 @@ const document = {
 };
 
 const sent = [];
-const sandbox = { document, window: {} };
+const sandbox = { document, window: {}, TextDecoder };
 sandbox.window.__nt_send = (s) => sent.push(JSON.parse(s));
 vm.createContext(sandbox);
 vm.runInContext(src, sandbox);
@@ -86,4 +86,32 @@ assert.deepEqual(sent.shift(), { n: INP, t: "input", value: "typed" }, "input ev
 nt.apply([[10, INP, "input"]]);
 assert.equal(root.children[3].listeners.input.length, 0, "UNLISTEN removed handler");
 
-console.log("DOM Host ABI v0: all conformance checks passed");
+// binary encoding (ABI v1)
+const root2 = makeNode("element", "div");
+document.getElementById = (id) => (id === "nt-root" ? root2 : null);
+const enc = [];
+const te = new TextEncoder();
+const pushU32 = (v) => { enc.push(v & 0xff, (v >>> 8) & 0xff, (v >>> 16) & 0xff, (v >>> 24) & 0xff); };
+const pushStr = (s) => { const b = te.encode(s); pushU32(b.length); for (const x of b) enc.push(x); };
+enc.push(1); pushU32(11); pushStr("h1");
+enc.push(2); pushU32(12); pushStr("Bin");
+enc.push(6); pushU32(0); pushU32(11);
+enc.push(6); pushU32(11); pushU32(12);
+enc.push(1); pushU32(13); pushStr("button");
+enc.push(4); pushU32(13); pushStr("style"); pushStr("x");
+enc.push(6); pushU32(0); pushU32(13);
+enc.push(9); pushU32(13); pushStr("click"); pushU32(4);
+let slotSeen = null;
+sandbox.window.__nt_event = (slot, value) => { slotSeen = [slot, value]; };
+nt.applyBin(new Uint8Array(enc));
+assert.equal(root2.children.length, 2, "binary: h1 + button");
+assert.equal(root2.children[0].children[0].textContent, "Bin");
+assert.equal(root2.children[1].attrs.style, "x");
+root2.children[1].listeners.click[0]({ target: {} });
+assert.deepEqual(slotSeen, [4, ""], "binary: slot-based event");
+enc.length = 0;
+enc.push(3); pushU32(12); pushStr("Bin2");
+nt.applyBin(new Uint8Array(enc));
+assert.equal(root2.children[0].children[0].textContent, "Bin2", "binary SET_TEXT");
+
+console.log("DOM Host ABI v0 (json) + v1 (binary): all conformance checks passed");

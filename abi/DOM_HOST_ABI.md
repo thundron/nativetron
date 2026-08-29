@@ -48,3 +48,32 @@ On a listened event the host posts one JSON message:
 
 Control message `{ "n": 0, "t": "__ready" }` is sent once the document is ready;
 the reconciler flushes its initial batch in response.
+
+## v1: binary encoding (wasm lane)
+
+v0's JSON wire format costs a stringify in the guest and a `JSON.parse` in the
+host on every interaction. v1 encodes the same opcodes as bytes written straight
+into linear memory; the host decodes with `DataView` + `TextDecoder` and applies
+via `window.__nt.applyBin(bytes)`. Opcode semantics are unchanged.
+
+Layout, little-endian: `u8 opcode`, node ids as `u32`, strings as `u32 length`
+followed by that many UTF-8 bytes.
+
+| opcode | payload |
+|---|---|
+| 1 CREATE_ELEMENT | u32 id, str tag |
+| 2 CREATE_TEXT | u32 id, str text |
+| 3 SET_TEXT | u32 id, str text |
+| 4 SET_ATTR | u32 id, str name, str value |
+| 6 APPEND | u32 parent, u32 child |
+| 9 LISTEN | u32 id, str type, u32 slot |
+
+Events skip serialization entirely: `LISTEN` carries a handler `slot`, and the
+host calls the exported `onEvent(slot)` (or `onEventValue(slot, value)` when the
+target has a value) with scalars only.
+
+The bytes are borrowed for the duration of the call (the glue hands the host a
+zero-copy `subarray` of linear memory); the host must not retain them.
+
+Both encodings are live: the native webview lane uses v0 JSON (its bridge is
+`eval`, which is text anyway); the wasm lane uses v1.

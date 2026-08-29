@@ -1,15 +1,15 @@
 import {
   ROOT, newId, createElement, createText, setAttr, append, on, bindText,
-  flush, setSink, setLive, dispatch, type NtEvent,
+  flush, setBinarySink, setLive, dispatchSlot,
 } from "../framework/core.js";
 import { signal } from "../framework/reactive.js";
 
-declare function ntApply(batch: string): void;
+declare function ntApply(batch: Uint8Array): void;
 
 const count = signal(0);
 
 export function start(): number {
-  setSink((json: string) => { ntApply(json); });
+  setBinarySink((b: Uint8Array) => { ntApply(b); });
 
   const h1 = newId();
   createElement(h1, "h1");
@@ -48,9 +48,14 @@ export function start(): number {
   return 0;
 }
 
-export function onEvent(json: string): number {
-  const ev = JSON.parse(json) as NtEvent;
-  dispatch(ev);
+export function onEvent(slot: number): number {
+  dispatchSlot(slot, "");
+  flush();
+  return 0;
+}
+
+export function onEventValue(slot: number, value: string): number {
+  dispatchSlot(slot, value);
   flush();
   return 0;
 }

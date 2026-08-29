@@ -6,12 +6,12 @@
 import { installBench } from "./harness.js";
 import { instantiateFromBytes } from "../../web/.scriptc/renderer.mjs";
 let api, wasmBytes = 0, button, out;
-window.__nt_send = (json) => { if (api) api.nt_on_event(json); };
+window.__nt_event = (slot, value) => { if (api) { if (value) api.nt_on_event_value(slot, value); else api.nt_on_event(slot); } };
 installBench({
   setup: async () => {
     const buf = await (await fetch("../../web/.scriptc/renderer.wasm")).arrayBuffer();
     wasmBytes = buf.byteLength;
-    api = await instantiateFromBytes(buf, { ntApply: (b) => window.__nt.apply(JSON.parse(b)) });
+    api = await instantiateFromBytes(buf, { ntApply: (b) => window.__nt.applyBin(b) });
     api.nt_start();
     const root = document.getElementById("nt-root");
     button = root.querySelector("button");

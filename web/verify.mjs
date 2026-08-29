@@ -31,19 +31,20 @@ const document = {
   addEventListener() {},
 };
 
-const sandbox = { document, window: {}, console };
+const sandbox = { document, window: {}, console, TextDecoder };
 vm.createContext(sandbox);
 
 const glue = await import(pathToFileURL(join(here, ".scriptc", "renderer.mjs")).href);
 const wasm = readFileSync(join(here, ".scriptc", "renderer.wasm"));
 
 let api;
-sandbox.window.__nt_send = (json) => { if (api) api.nt_on_event(json); };
+sandbox.window.__nt_send = (json) => {};
+sandbox.window.__nt_event = (slot, value) => { if (api) { if (value) api.nt_on_event_value(slot, value); else api.nt_on_event(slot); } };
 vm.runInContext(hostSrc, sandbox);
 const nt = sandbox.window.__nt;
 
 api = await glue.instantiateFromBytes(wasm, {
-  ntApply: (batchJson) => { nt.apply(JSON.parse(batchJson)); },
+  ntApply: (bytes) => { nt.applyBin(bytes); },
 });
 
 
