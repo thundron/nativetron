@@ -1,0 +1,25 @@
+<!doctype html><html><head><meta charset="utf-8"><title>nt bench</title></head>
+<body>
+<div id="nt-root"></div>
+<script src="../../host/dom-host.js"></script>
+<script type="module">
+import { installBench } from "./harness.js";
+import { instantiateFromBytes } from "../../web/.scriptc/renderer.mjs";
+let api, wasmBytes = 0, button, out;
+window.__nt_send = (json) => { if (api) api.nt_on_event(json); };
+installBench({
+  setup: async () => {
+    const buf = await (await fetch("../../web/.scriptc/renderer.wasm")).arrayBuffer();
+    wasmBytes = buf.byteLength;
+    api = await instantiateFromBytes(buf, { ntApply: (b) => window.__nt.apply(JSON.parse(b)) });
+    api.nt_start();
+    const root = document.getElementById("nt-root");
+    button = root.querySelector("button");
+    out = root.querySelectorAll("p")[1];
+  },
+  click: () => button.click(),
+  readCount: () => out.textContent,
+  extra: () => ({ wasmKB: +(wasmBytes / 1024).toFixed(1), wasmMemMB: +(api.__memory().byteLength / 1048576).toFixed(2) }),
+});
+</script>
+</body></html>

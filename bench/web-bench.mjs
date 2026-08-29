@@ -16,7 +16,7 @@ const kb = (n) => `${(n / 1024).toFixed(1)} KB`;
 
 if (existsSync(join(REACT, "node_modules"))) {
   try {
-    execFileSync("npx", ["esbuild", "app.jsx", "--bundle", "--minify", "--format=esm",
+    execFileSync("npx", ["esbuild", "app.jsx", "--bundle", "--minify", "--format=esm", "--jsx=automatic",
       "--define:process.env.NODE_ENV=\"production\"", "--outfile=bundle.js"], { cwd: REACT, stdio: "ignore" });
   } catch {}
 }

@@ -1,0 +1,19 @@
+<!doctype html><html><head><meta charset="utf-8"><title>react bench</title></head>
+<body>
+<div id="nt-root"></div>
+<script type="module">
+import { installBench } from "./harness.js";
+await import("../web-react/bundle.js");
+let button, out;
+installBench({
+  setup: async () => {
+    await new Promise((r) => setTimeout(r, 200));
+    const root = document.getElementById("nt-root");
+    button = root.querySelector("button");
+    out = root.querySelectorAll("p")[1];
+  },
+  click: () => button.click(),
+  readCount: () => out.textContent,
+});
+</script>
+</body></html>
