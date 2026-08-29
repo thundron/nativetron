@@ -12,7 +12,14 @@ window.__setup = async (n) => {
   window.__wasmMemMB = +(api.__memory().byteLength / 1048576).toFixed(2);
   return document.getElementById("nt-root").children.length;
 };
-window.__trial = () => { const t0 = performance.now(); api.nt_update(); return +(performance.now() - t0).toFixed(3); };
+window.__trial = () => {
+  window.__uapply = 0; window.__measuring = 1;
+  const t0 = performance.now(); api.nt_update(); const d = performance.now() - t0;
+  window.__measuring = 0;
+  window.__lastGuest = +(d - window.__uapply).toFixed(3);
+  window.__lastApply = +window.__uapply.toFixed(3);
+  return +d.toFixed(3);
+};
 window.__stats = () => ({
   rows: document.getElementById("nt-root").children.length,
   sample: document.getElementById("nt-root").children[0].textContent,

@@ -72,6 +72,17 @@ function iref(v: string): number {
 export function createElement(id: number, tag: string): void {
   if (binary) { const t = iref(tag); u8(1); u32(id); u32(t); } else ops.push([1, id, tag]);
 }
+export function elementWithText(parent: number, id: number, tag: string, textId: number, text: string): void {
+  if (binary) {
+    const t = iref(tag);
+    u8(13); u32(parent); u32(id); u32(t); u32(textId); str(text);
+  } else {
+    ops.push([1, id, tag]);
+    ops.push([2, textId, text]);
+    ops.push([6, id, textId]);
+    ops.push([6, parent, id]);
+  }
+}
 export function createText(id: number, text: string): void {
   if (binary) { u8(2); u32(id); str(text); } else ops.push([2, id, text]);
 }

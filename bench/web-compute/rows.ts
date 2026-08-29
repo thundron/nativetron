@@ -1,5 +1,5 @@
 import {
-  ROOT, newId, createElement, createText, setText, append, flush, setBinarySink, setLive,
+  ROOT, newId, elementWithText, setText, flush, setBinarySink, setLive,
 } from "../../framework/core.js";
 
 declare function ntApply(b: Uint8Array): void;
@@ -16,11 +16,8 @@ export function build(n: number): number {
     vals.push((i * 7919) % 100000);
     idx.push(i);
     const d = newId();
-    createElement(d, "div");
     const t = newId();
-    createText(t, labels[i]! + " " + vals[i]!);
-    append(d, t);
-    append(ROOT, d);
+    elementWithText(ROOT, d, "div", t, labels[i]! + " " + vals[i]!);
     textIds.push(t);
   }
   setLive();

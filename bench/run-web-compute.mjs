@@ -101,6 +101,7 @@ try {
   console.log(`\n| context | nativetron | react |`);
   console.log(`|---|---|---|`);
   console.log(`| rows rendered | ${ntRows} | ${rxRows} |`);
+  console.log(`| mount ${ROWS} rows | ${ntMount} ms | ${rxMount} ms |`);
   console.log(`| mount ${ROWS} rows (incl. fetch/instantiate) | ${ntMount} ms | ${rxMount} ms |`);
   console.log(`| JS heap | ${ntS.jsHeapMB} MB | ${rxS.jsHeapMB} MB |`);
   console.log(`| wasm linear memory | ${ntS.wasmMemMB} MB | — |`);

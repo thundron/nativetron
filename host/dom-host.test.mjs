@@ -11,11 +11,26 @@ function makeNode(kind, tag) {
   return {
     kind, tag, children: [], attrs: {}, _text: "", listeners: {},
     parentNode: null,
-    set textContent(v) { this._text = String(v); },
-    get textContent() { return this._text; },
+    set textContent(v) {
+      this._text = String(v);
+      if (this.kind === "element") {
+        for (const c of this.children) c.parentNode = null;
+        this.children = [];
+        if (v !== "") { const t = makeNode("text", null); t._text = String(v); t.parentNode = this; this.children.push(t); }
+      }
+    },
+    get textContent() { return this.kind === "element" ? this.children.map((c) => c.textContent).join("") : this._text; },
+    get firstChild() { return this.children.length ? this.children[0] : null; },
     setAttribute(n, v) { this.attrs[n] = v; },
     removeAttribute(n) { delete this.attrs[n]; },
-    appendChild(c) { c.parentNode = this; this.children.push(c); return c; },
+    appendChild(c) {
+      if (c.kind === "fragment") {
+        for (const g of c.children.slice()) { g.parentNode = this; this.children.push(g); }
+        c.children = [];
+        return c;
+      }
+      c.parentNode = this; this.children.push(c); return c;
+    },
     insertBefore(c, ref) {
       c.parentNode = this;
       const i = this.children.indexOf(ref);
@@ -36,6 +51,7 @@ const document = {
   getElementById: (id) => (id === "nt-root" ? root : null),
   createElement: (tag) => makeNode("element", tag),
   createTextNode: (t) => { const n = makeNode("text", null); n._text = String(t); return n; },
+  createDocumentFragment: () => makeNode("fragment", null),
   addEventListener() {},
 };
 
@@ -105,6 +121,19 @@ enc.length = 0;
 enc.push(3); pushU32(12); pushStr("Bin2");
 nt.applyBin(new Uint8Array(enc));
 assert.equal(root2.children[0].children[0].textContent, "Bin2", "binary SET_TEXT");
+enc.length = 0;
+intern(5, "li");
+enc.push(13); pushU32(0); pushU32(20); pushU32(5); pushU32(21); pushStr("compound");
+nt.applyBin(new Uint8Array(enc));
+assert.equal(root2.children[root2.children.length - 1].tag, "li", "compound: element created");
+assert.equal(root2.children[root2.children.length - 1].textContent, "compound", "compound: text set");
+enc.length = 0;
+enc.push(3); pushU32(21); pushStr("patched");
+nt.applyBin(new Uint8Array(enc));
+assert.equal(root2.children[root2.children.length - 1].textContent, "patched", "compound: text node id is addressable");
+enc.length = 0;
+enc.push(8); pushU32(20);
+nt.applyBin(new Uint8Array(enc));
 enc.length = 0;
 enc.push(8); pushU32(13);
 nt.applyBin(new Uint8Array(enc));

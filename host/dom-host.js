@@ -1,5 +1,5 @@
 (function () {
-  var nodes = {};
+  var nodes = [];
   var handlers = {};
   var interned = [];
 
@@ -47,7 +47,7 @@
         case 8: {
           var n = nodes[op[1]];
           if (n && n.parentNode) n.parentNode.removeChild(n);
-          delete nodes[op[1]];
+          nodes[op[1]] = undefined;
           break;
         }
         case 9: attach(op[1], op[2]); break;
@@ -88,6 +88,14 @@
       return r;
     };
     var iv = function () { return interned[u32()]; };
+    var fragParent = -1, frag = null;
+    var flushFrag = function () {
+      if (frag !== null) { node(fragParent).appendChild(frag); frag = null; fragParent = -1; }
+    };
+    var appendTo = function (p, child) {
+      if (p !== fragParent) { flushFrag(); fragParent = p; frag = document.createDocumentFragment(); }
+      frag.appendChild(child);
+    };
     while (o < bytes.byteLength) {
       var code = dv.getUint8(o); o += 1;
       switch (code) {
@@ -95,14 +103,23 @@
         case 2: { var id2 = u32(); nodes[id2] = document.createTextNode(s()); break; }
         case 3: { var id3 = u32(); node(id3).textContent = s(); break; }
         case 4: { var id4 = u32(); node(id4).setAttribute(iv(), s()); break; }
-        case 6: { var p = u32(); node(p).appendChild(nodes[u32()]); break; }
-        case 7: { var pp = u32(); var cc = u32(); var rr = u32(); node(pp).insertBefore(nodes[cc], nodes[rr]); break; }
-        case 8: { var rid = u32(); var rn = nodes[rid]; if (rn && rn.parentNode) rn.parentNode.removeChild(rn); delete nodes[rid]; break; }
+        case 6: { var p = u32(); appendTo(p, nodes[u32()]); break; }
+        case 7: { flushFrag(); var pp = u32(); var cc = u32(); var rr = u32(); node(pp).insertBefore(nodes[cc], nodes[rr]); break; }
+        case 8: { flushFrag(); var rid = u32(); var rn = nodes[rid]; if (rn && rn.parentNode) rn.parentNode.removeChild(rn); nodes[rid] = undefined; break; }
         case 9: { var id5 = u32(); attachSlot(id5, iv(), u32()); break; }
         case 11: { var id6 = u32(); node(id6)[iv()] = s(); break; }
         case 12: { var sid = u32(); interned[sid] = s(); break; }
+        case 13: {
+          var rp = u32(), re = u32(), rt = iv(), rtx = u32();
+          var e = document.createElement(rt);
+          e.textContent = s();
+          nodes[re] = e; nodes[rtx] = e.firstChild;
+          appendTo(rp, e);
+          break;
+        }
       }
     }
+    flushFrag();
   }
 
   window.__nt = { apply: apply, applyBin: applyBin };

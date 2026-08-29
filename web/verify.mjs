@@ -10,11 +10,27 @@ const hostSrc = readFileSync(join(here, "..", "host", "dom-host.js"), "utf8");
 function makeNode(kind, tag) {
   return {
     kind, tag, children: [], attrs: {}, _text: "", listeners: {}, parentNode: null,
-    set textContent(v) { this._text = String(v); },
+    set textContent(v) {
+      this._text = String(v);
+      if (this.kind === "element") {
+        for (const c of this.children) c.parentNode = null;
+        this.children = [];
+        if (v !== "") { const t = makeNode("text", null); t._text = String(v); t.parentNode = this; this.children.push(t); }
+      }
+    },
     get textContent() { return this._text; },
+    get firstChild() { return this.children.length ? this.children[0] : null; },
     setAttribute(n, v) { this.attrs[n] = v; },
     removeAttribute(n) { delete this.attrs[n]; },
-    appendChild(c) { if (c.parentNode) c.parentNode.removeChild(c); c.parentNode = this; this.children.push(c); return c; },
+    appendChild(c) {
+      if (c.kind === "fragment") {
+        for (const g of c.children.slice()) { if (g.parentNode) g.parentNode.removeChild(g); g.parentNode = this; this.children.push(g); }
+        c.children = [];
+        return c;
+      }
+      if (c.parentNode) c.parentNode.removeChild(c);
+      c.parentNode = this; this.children.push(c); return c;
+    },
     insertBefore(c, ref) {
       if (c.parentNode) c.parentNode.removeChild(c);
       c.parentNode = this;
@@ -34,6 +50,7 @@ const document = {
   getElementById: (id) => (id === "nt-root" ? root : null),
   createElement: (tag) => makeNode("element", tag),
   createTextNode: (t) => { const n = makeNode("text", null); n._text = String(t); return n; },
+  createDocumentFragment: () => makeNode("fragment", null),
   addEventListener() {},
 };
 
