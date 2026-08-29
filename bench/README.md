@@ -139,3 +139,23 @@ _Notes: RSS is the summed resident set of the process tree (sampled every
 system-spawned (not a child) and may be undercounted; Electron's helpers are
 children and fully counted. Disk = what each app ships (nativetron binaries
 vs the Electron.app runtime); nativetron reuses the OS WebKit, not shipped._
+
+## Browser payload (wasm vs React)
+
+# nativetron (wasm) vs React — browser payload
+
+Identical app: h1 + paragraph + Increment button + counter.
+
+| artifact | nativetron | react |
+|---|---|---|
+| app+runtime (raw) | 88.6 KB | 189.0 KB |
+| app+runtime (gzip) | 41.5 KB | 59.1 KB |
+| — wasm / react+react-dom+app | 83.7 KB | 189.0 KB |
+| — JS glue | 2.5 KB | — |
+| — DOM host | 2.4 KB | — |
+
+ratio (react / nativetron): raw 2.13×, gzip 1.42×
+
+nativetron ships no framework runtime in JS: the reconciler and all app
+logic are AOT-compiled into the wasm. The wasm's fixed cost is the scriptc
+runtime (GC, strings, JSON); React's fixed cost is react+react-dom.

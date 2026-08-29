@@ -1,2 +1,4 @@
 # The Electron runtime is a ~100MB+ download; never commit it.
 electron-app/node_modules/
+web-react/node_modules
+web-react/bundle.js
