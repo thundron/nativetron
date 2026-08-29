@@ -4,12 +4,12 @@
 <script src="../../host/dom-host.js"></script>
 <script type="module">
 import { installBench } from "./harness.js";
-import { instantiateFromBytes } from "../../web/.scriptc/renderer.mjs";
+import { instantiateFromBytes } from "./app/.scriptc/counter.mjs";
 let api, wasmBytes = 0, button, out;
 window.__nt_event = (slot, value) => { if (api) { if (value) api.nt_on_event_value(slot, value); else api.nt_on_event(slot); } };
 installBench({
   setup: async () => {
-    const buf = await (await fetch("../../web/.scriptc/renderer.wasm")).arrayBuffer();
+    const buf = await (await fetch("./app/.scriptc/counter.wasm")).arrayBuffer();
     wasmBytes = buf.byteLength;
     api = await instantiateFromBytes(buf, { ntApply: (b) => window.__nt.applyBin(b) });
     api.nt_start();

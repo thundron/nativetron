@@ -69,6 +69,15 @@ export function setAttr(id: number, name: string, value: string): void {
 export function append(parent: number, child: number): void {
   if (binary) { u8(6); u32(parent); u32(child); } else ops.push([6, parent, child]);
 }
+export function insertBefore(parent: number, child: number, ref: number): void {
+  if (binary) { u8(7); u32(parent); u32(child); u32(ref); } else ops.push([7, parent, child, ref]);
+}
+export function remove(id: number): void {
+  if (binary) { u8(8); u32(id); } else ops.push([8, id]);
+}
+export function setProp(id: number, name: string, value: string): void {
+  if (binary) { u8(11); u32(id); str(name); str(value); } else ops.push([11, id, name, value]);
+}
 
 export function flush(): void {
   if (binary) {

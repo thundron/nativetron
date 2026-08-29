@@ -14,9 +14,15 @@ function makeNode(kind, tag) {
     get textContent() { return this._text; },
     setAttribute(n, v) { this.attrs[n] = v; },
     removeAttribute(n) { delete this.attrs[n]; },
-    appendChild(c) { c.parentNode = this; this.children.push(c); return c; },
-    insertBefore(c, ref) { c.parentNode = this; const i = this.children.indexOf(ref); this.children.splice(i < 0 ? this.children.length : i, 0, c); return c; },
-    removeChild(c) { this.children.splice(this.children.indexOf(c), 1); c.parentNode = null; return c; },
+    appendChild(c) { if (c.parentNode) c.parentNode.removeChild(c); c.parentNode = this; this.children.push(c); return c; },
+    insertBefore(c, ref) {
+      if (c.parentNode) c.parentNode.removeChild(c);
+      c.parentNode = this;
+      const i = this.children.indexOf(ref);
+      this.children.splice(i < 0 ? this.children.length : i, 0, c);
+      return c;
+    },
+    removeChild(c) { const i = this.children.indexOf(c); if (i >= 0) this.children.splice(i, 1); c.parentNode = null; return c; },
     addEventListener(t, h) { (this.listeners[t] ||= []).push(h); },
     removeEventListener(t, h) { this.listeners[t] = (this.listeners[t] || []).filter((x) => x !== h); },
   };
@@ -38,30 +44,55 @@ const glue = await import(pathToFileURL(join(here, ".scriptc", "renderer.mjs")).
 const wasm = readFileSync(join(here, ".scriptc", "renderer.wasm"));
 
 let api;
-sandbox.window.__nt_send = (json) => {};
+sandbox.window.__nt_send = () => {};
 sandbox.window.__nt_event = (slot, value) => { if (api) { if (value) api.nt_on_event_value(slot, value); else api.nt_on_event(slot); } };
 vm.runInContext(hostSrc, sandbox);
 const nt = sandbox.window.__nt;
 
-api = await glue.instantiateFromBytes(wasm, {
-  ntApply: (bytes) => { nt.applyBin(bytes); },
-});
-
-
+api = await glue.instantiateFromBytes(wasm, { ntApply: (bytes) => nt.applyBin(bytes) });
 api.nt_start();
 
-assert.equal(root.children.length, 4, "h1, p, button, p");
-assert.equal(root.children[0].tag, "h1");
-assert.equal(root.children[0].children[0].textContent, "Hello from nativetron (wasm)");
-assert.equal(root.children[2].tag, "button");
-const out = root.children[3].children[0];
-assert.equal(out.textContent, "count: 0");
+const main = root.children[0];
+const text = (n) => (n.kind === "text" ? n.textContent : n.children.map(text).join(""));
+const section = (i) => main.children[2 + i];
+const counter = section(0);
+const list = section(1);
+const ul = list.children.find((c) => c.tag === "ul");
+const liText = () => ul.children.map((li) => text(li));
+const clickButton = (sec, label) => {
+  const b = sec.children.find((c) => c.tag === "button" && text(c) === label);
+  assert.ok(b, `button ${label} not found`);
+  b.listeners.click[0]({ target: {} });
+};
 
-const button = root.children[2];
-button.listeners.click[0]({ target: {} });
-assert.equal(out.textContent, "count: 1", "click -> compiled wasm handler -> DOM update");
-button.listeners.click[0]({ target: {} });
-button.listeners.click[0]({ target: {} });
-assert.equal(out.textContent, "count: 3");
+assert.equal(main.tag, "main");
+assert.equal(text(main.children[0]), "nativetron");
+assert.equal(text(counter.children[0]), "Counter");
 
-console.log("wasm renderer drives the DOM: build + 3 clicks -> count: 3");
+const countP = counter.children[counter.children.length - 1];
+assert.equal(text(countP), "count: 0");
+clickButton(counter, "Increment");
+clickButton(counter, "Increment");
+assert.equal(text(countP), "count: 2", "counter updates through compiled handler");
+
+assert.deepEqual(liText(), ["alpha", "beta", "gamma"], "initial keyed list");
+
+clickButton(list, "Add");
+assert.deepEqual(liText(), ["alpha", "beta", "gamma", "item-1"], "append new key");
+
+clickButton(list, "Remove first");
+assert.deepEqual(liText(), ["beta", "gamma", "item-1"], "REMOVE op drops the node");
+
+clickButton(list, "Reverse");
+assert.deepEqual(liText(), ["item-1", "gamma", "beta"], "INSERT_BEFORE reorders keyed nodes");
+
+clickButton(list, "Add");
+assert.deepEqual(liText(), ["item-1", "gamma", "beta", "item-2"], "append after reorder");
+
+clickButton(list, "Reverse");
+assert.deepEqual(liText(), ["item-2", "beta", "gamma", "item-1"], "reorder again");
+
+const countLabel = list.children[list.children.length - 1];
+assert.equal(text(countLabel), "4 items", "reactive count tracks the list");
+
+console.log("components + signals + keyed list (add/remove/reorder): all checks passed");

@@ -1,60 +1,60 @@
-// nativetron renderer — compiled to native. The entire UI is built through the
-// DOM Host ABI: no page-side app JS, no VDOM, just batched DOM ops emitted from
-// compiled code. The click handler runs natively and mutates the DOM over the
-// bridge. This is the seed of the compile-time-reactive framework.
-import {
-  ROOT,
-  newId,
-  createElement,
-  createText,
-  setAttr,
-  append,
-  on,
-  bindText,
-  mount,
-  run,
-} from "../framework/dom.js";
+import { mount, run } from "../framework/dom.js";
+import { el, txt, dyn, attr, on, mountTo, each, type El, type KeyedItem } from "../framework/ui.js";
 import { signal } from "../framework/reactive.js";
 
-mount("nativetron", 520, 360);
+const count = signal(0);
+const items = signal<string[]>(["alpha", "beta", "gamma"]);
+let seq = 0;
 
-// build the UI tree (ids allocated by the reconciler)
-const h1 = newId();
-createElement(h1, "h1");
-const h1t = newId();
-createText(h1t, "Hello from nativetron");
-append(h1, h1t);
-append(ROOT, h1);
+function button(label: string, handler: () => void): El {
+  return on(attr(el("button", [txt(label)]), "style", "margin-right:8px"), "click", handler);
+}
 
-const p = newId();
-createElement(p, "p");
-const pt = newId();
-createText(pt, "The counter below is state held in native code.");
-append(p, pt);
-append(ROOT, p);
+function Counter(): El {
+  return el("section", [
+    el("h2", [txt("Counter")]),
+    button("Increment", () => { count.set(count.get() + 1); }),
+    el("p", [dyn(() => `count: ${count.get()}`)]),
+  ]);
+}
 
-const btn = newId();
-createElement(btn, "button");
-setAttr(btn, "style", "font-size:15px;padding:8px 14px");
-const btnLabel = newId();
-createText(btnLabel, "Increment");
-append(btn, btnLabel);
-append(ROOT, btn);
+function List(): El {
+  return el("section", [
+    el("h2", [txt("Keyed list")]),
+    button("Add", () => {
+      seq++;
+      const next = items.get().slice();
+      next.push(`item-${seq}`);
+      items.set(next);
+    }),
+    button("Remove first", () => {
+      const next = items.get().slice();
+      next.shift();
+      items.set(next);
+    }),
+    button("Reverse", () => {
+      const cur = items.get();
+      const next: string[] = [];
+      for (let i = cur.length - 1; i >= 0; i--) next.push(cur[i]!);
+      items.set(next);
+    }),
+    each("ul", () => {
+      const out: KeyedItem[] = [];
+      const cur = items.get();
+      for (let i = 0; i < cur.length; i++) {
+        out.push({ key: cur[i]!, el: el("li", [txt(cur[i]!)]) });
+      }
+      return out;
+    }),
+    el("p", [dyn(() => `${items.get().length} items`)]),
+  ]);
+}
 
-const out = newId();
-createElement(out, "p");
-const outText = newId();
-createText(outText, "count: 0");
-append(out, outText);
-append(ROOT, out);
-
-// native reactive state: the counter is a signal, and the text node is bound to
-// it. The click handler only mutates state — no manual setText. bindText runs an
-// effect that re-emits SET_TEXT whenever `count` changes.
-const count = signal<number>(0);
-bindText(outText, () => `count: ${count.get()}`);
-on(btn, "click", () => {
-  count.set(count.get() + 1);
-});
-
+mount("nativetron", 560, 520);
+mountTo(el("main", [
+  el("h1", [txt("nativetron")]),
+  el("p", [txt("Same components as the browser build — compiled to native.")]),
+  Counter(),
+  List(),
+]));
 run();

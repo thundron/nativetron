@@ -1,48 +1,69 @@
-import {
-  ROOT, newId, createElement, createText, setAttr, append, on, bindText,
-  flush, setBinarySink, setLive, dispatchSlot,
-} from "../framework/core.js";
+import { flush, setBinarySink, setLive, dispatchSlot } from "../framework/core.js";
+import { el, txt, dyn, attr, on, mountTo, each, type El, type KeyedItem } from "../framework/ui.js";
 import { signal } from "../framework/reactive.js";
 
-declare function ntApply(batch: Uint8Array): void;
+declare function ntApply(b: Uint8Array): void;
 
 const count = signal(0);
+const items = signal<string[]>(["alpha", "beta", "gamma"]);
+let seq = 0;
+
+function button(label: string, handler: () => void): El {
+  return on(attr(el("button", [txt(label)]), "style", "margin-right:8px"), "click", handler);
+}
+
+function Counter(): El {
+  return el("section", [
+    el("h2", [txt("Counter")]),
+    button("Increment", () => { count.set(count.get() + 1); }),
+    el("p", [dyn(() => `count: ${count.get()}`)]),
+  ]);
+}
+
+function List(): El {
+  return el("section", [
+    el("h2", [txt("Keyed list")]),
+    button("Add", () => {
+      seq++;
+      const next = items.get().slice();
+      next.push(`item-${seq}`);
+      items.set(next);
+    }),
+    button("Remove first", () => {
+      const next = items.get().slice();
+      next.shift();
+      items.set(next);
+    }),
+    button("Reverse", () => {
+      const cur = items.get();
+      const next: string[] = [];
+      for (let i = cur.length - 1; i >= 0; i--) next.push(cur[i]!);
+      items.set(next);
+    }),
+    each("ul", () => {
+      const out: KeyedItem[] = [];
+      const cur = items.get();
+      for (let i = 0; i < cur.length; i++) {
+        out.push({ key: cur[i]!, el: el("li", [txt(cur[i]!)]) });
+      }
+      return out;
+    }),
+    el("p", [dyn(() => `${items.get().length} items`)]),
+  ]);
+}
+
+function App(): El {
+  return el("main", [
+    el("h1", [txt("nativetron")]),
+    el("p", [txt("Components, signals and keyed lists — compiled to WebAssembly.")]),
+    Counter(),
+    List(),
+  ]);
+}
 
 export function start(): number {
   setBinarySink((b: Uint8Array) => { ntApply(b); });
-
-  const h1 = newId();
-  createElement(h1, "h1");
-  const h1t = newId();
-  createText(h1t, "Hello from nativetron (wasm)");
-  append(h1, h1t);
-  append(ROOT, h1);
-
-  const p = newId();
-  createElement(p, "p");
-  const pt = newId();
-  createText(pt, "This UI is driven by TypeScript compiled to WebAssembly.");
-  append(p, pt);
-  append(ROOT, p);
-
-  const btn = newId();
-  createElement(btn, "button");
-  setAttr(btn, "style", "font-size:15px;padding:8px 14px");
-  const btnLabel = newId();
-  createText(btnLabel, "Increment");
-  append(btn, btnLabel);
-  append(ROOT, btn);
-
-  const out = newId();
-  createElement(out, "p");
-  const outText = newId();
-  createText(outText, "count: 0");
-  append(out, outText);
-  append(ROOT, out);
-
-  bindText(outText, () => `count: ${count.get()}`);
-  on(btn, "click", () => { count.set(count.get() + 1); });
-
+  mountTo(App());
   setLive();
   flush();
   return 0;

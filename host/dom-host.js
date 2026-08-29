@@ -103,7 +103,10 @@
         case 3: { var id3 = u32(); node(id3).textContent = s(); break; }
         case 4: { var id4 = u32(); node(id4).setAttribute(s(), s()); break; }
         case 6: { var p = u32(); node(p).appendChild(nodes[u32()]); break; }
+        case 7: { var pp = u32(); var cc = u32(); var rr = u32(); node(pp).insertBefore(nodes[cc], nodes[rr]); break; }
+        case 8: { var rid = u32(); var rn = nodes[rid]; if (rn && rn.parentNode) rn.parentNode.removeChild(rn); delete nodes[rid]; break; }
         case 9: { var id5 = u32(); attachSlot(id5, s(), u32()); break; }
+        case 11: { var id6 = u32(); node(id6)[s()] = s(); break; }
       }
     }
   }

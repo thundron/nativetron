@@ -1,0 +1,22 @@
+{
+  "profile_format": 1,
+  "name": "nativetron-bench-counter",
+  "entry": "counter.ts",
+  "emission": "llvm",
+  "abi": {
+    "prefix": "nt_",
+    "init_symbol": "nt_init",
+    "sink_register_symbol": "nt_set_panic_sink",
+    "collect_symbol": "nt_collect",
+    "result_reset_symbol": null,
+    "callback_register_symbol": "nt_set_callback"
+  },
+  "callbacks": [
+    { "name": "ntApply", "params": ["bytes"], "returns": "void" }
+  ],
+  "exports": [
+    { "export": "start", "symbol": "nt_start", "params": [], "returns": "f64" },
+    { "export": "onEvent", "symbol": "nt_on_event", "params": ["f64"], "returns": "f64" },
+    { "export": "onEventValue", "symbol": "nt_on_event_value", "params": ["f64", "string"], "returns": "f64" }
+  ]
+}
