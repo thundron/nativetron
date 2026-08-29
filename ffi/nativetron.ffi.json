@@ -1,0 +1,22 @@
+{
+  "ffi_format": 4,
+  "functions": [
+    { "name": "ntInit", "symbol": "nt_init", "params": [], "returns": "void" },
+    { "name": "ntSetTitle", "symbol": "nt_set_title", "params": ["string"], "returns": "void" },
+    { "name": "ntSetSize", "symbol": "nt_set_size", "params": ["i32", "i32"], "returns": "void" },
+    { "name": "ntSetHtml", "symbol": "nt_set_html", "params": ["string"], "returns": "void" },
+    { "name": "ntEval", "symbol": "nt_eval", "params": ["string"], "returns": "void" },
+    {
+      "name": "ntOnMessage",
+      "symbol": "nt_on_message",
+      "params": [
+        { "callback": { "id": "msg", "params": ["string", { "context": "msg" }], "returns": "void", "lifetime": "retained" } },
+        { "context": "msg" }
+      ],
+      "returns": "void"
+    },
+    { "name": "ntRun", "symbol": "nt_run", "params": [], "returns": "void" }
+  ],
+  "libraries": ["../native/nativetron_core.o"],
+  "system_libraries": []
+}

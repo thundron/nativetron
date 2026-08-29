@@ -1,0 +1,5 @@
+/build/
+/native/*.o
+.scriptc/
+node_modules/
+.DS_Store
