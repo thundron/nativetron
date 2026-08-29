@@ -170,11 +170,11 @@ Per-click microseconds; both stacks driven through their own event path.
 | statistic | nativetron | react |
 |---|---|---|
 | median | 1.50 µs | 2.85 µs |
-| mean | 1.62 µs | 2.88 µs |
-| stddev | 0.37 µs | 0.28 µs |
-| min | 1.25 µs | 2.55 µs |
-| p95 | 2.05 µs | 3.30 µs |
-| max | 4.15 µs | 4.85 µs |
+| mean | 1.64 µs | 2.88 µs |
+| stddev | 0.34 µs | 0.26 µs |
+| min | 1.35 µs | 2.50 µs |
+| p95 | 2.05 µs | 3.15 µs |
+| max | 3.95 µs | 4.60 µs |
 
 | paired comparison | value |
 |---|---|
@@ -184,16 +184,16 @@ Per-click microseconds; both stacks driven through their own event path.
 
 | memory / size | nativetron | react |
 |---|---|---|
-| JS heap | 2.19 MB | 1.69 MB |
+| JS heap | 2.32 MB | 1.68 MB |
 | wasm linear memory | 1.38 MB | — |
-| module size | 54.6 KB | 189.7 KB |
+| module size | 55.2 KB | 189.7 KB |
 | final DOM state | count: 200500 | count: 200500 |
 
 ### Verdict: interaction path
 
-**1.90x faster than React** (median 1.50 vs 2.85 us), **100/100** interleaved
-trials, p < 0.001. Tail is better too (max 4.15 vs 4.85 us). Events cross as
-scalars (handler slot), so no serialisation happens on this path at all.
+**1.90x faster than React** (1.50 vs 2.85 us), **100/100** trials, p < 0.001,
+with a better tail (max 3.95 vs 4.60 us). Events cross as scalars, so nothing is
+serialised on this path.
 
 ## Browser compute-heavy (10k rows)
 
@@ -204,42 +204,72 @@ scalars (handler slot), so no serialisation happens on this path at all.
 
 | statistic (ms per update) | nativetron | react |
 |---|---|---|
-| median | 6.80 | 3.50 |
-| mean | 6.89 | 3.61 |
-| stddev | 0.34 | 0.41 |
-| min | 6.40 | 3.10 |
+| median | 6.45 | 3.50 |
+| mean | 6.57 | 3.68 |
+| stddev | 0.41 | 0.60 |
+| min | 6.10 | 3.20 |
 | p95 | 7.40 | 4.70 |
-| max | 8.10 | 4.70 |
+| max | 7.90 | 6.00 |
 
 | paired | value |
 |---|---|
-| median paired diff (nt - react) | 3.30 ms |
-| speedup (react / nativetron, medians) | 0.51× |
+| median paired diff (nt - react) | 3.00 ms |
+| speedup (react / nativetron, medians) | 0.54× |
 | nativetron faster in | 0/30 trials |
 | sign-test p (approx) | <0.001 |
 
 | context | nativetron | react |
 |---|---|---|
 | rows rendered | 10000 | 10000 |
-| JS heap | 9.06 MB | 15.14 MB |
-| wasm linear memory | 7.38 MB | — |
-| module size | 51.4 KB | 189.8 KB |
+| mount 10000 rows (incl. fetch/instantiate) | 89 ms | 12 ms |
+| JS heap | 7.06 MB | 10.53 MB |
+| wasm linear memory | 5.38 MB | — |
+| module size | 52.4 KB | 189.8 KB |
 | first row after run | "row 348 3" | "row 348 3" |
 
-### Verdict: bulk-update path
+### Verdict: bulk paths
 
-React wins ~1.9x (6.80 vs 3.50 ms). Compute is ~3 ms of ours (arithmetic at
-parity with V8); the rest is encoding 10k strings and applying 10k text writes.
-React spends ~3 ms of its 3.5 ms on the same text writes, so our real overhead is
-the serialisation tax of running outside the engine.
-
-Optimisations tried and **rejected** on evidence: a hand-rolled ASCII UTF-8
-encoder in the guest measured 7% *slower* than `Buffer.from` (A/B, same session),
-because the runtime's encoder is a memcpy path while the TS loop pays per-char
-bounds checks.
+React still wins bulk work: updating 10k rows 1.8x (6.45 vs 3.50 ms) and mounting
+10k rows 7x (89 vs 12 ms). Compute is at parity; the gap is the cost of crossing
+the boundary for every node. This is the honest ceiling of running compiled code
+outside the engine, and it is why the interaction path is the one that matters
+for real apps.
 
 ### Measurement note
 
-All numbers above were re-taken with the machine on **AC power**. Earlier
-readings drifted up to 27% on battery *with no code change* — including React's,
-which is the tell. Always compare within a single interleaved run.
+Numbers are from AC power. On battery, readings drifted up to 27% with no code
+change - including React's, which is the tell. Only compare within one
+interleaved run.
+
+## Optimisation ledger
+
+Applied, with measured effect:
+
+| change | effect |
+|---|---|
+| `-Oz`, gc-sections, `--strip-all` on the reactor link | 1.88 MB -> 85.7 KB |
+| wasm stack 16 MB -> 1 MB | linear memory 16.4 -> 1.4 MB |
+| `wasm-opt -Oz` (auto when binaryen present) | further 14-17% |
+| `Array.sort`: O(n^2) insertion -> stable merge sort | 100k sort 387 -> 31 ms |
+| `(a,b)=>a-b` comparators inlined (no closure call) | ~10% |
+| array receivers borrow (no retain/release per access) | 31 -> 15 ms |
+| ping-pong merge buffers (no copy-back pass) | 12 -> 8 ms, matching V8 |
+| interned tag/attr/event names in the binary lane | mount 99 -> 89 ms |
+| binary command buffer replacing JSON (ABI v1) | per-click 4.05 -> 2.40 us |
+
+Tried and **rejected on evidence**:
+
+| change | why |
+|---|---|
+| hand-rolled ASCII UTF-8 encoder in the guest | 7% *slower* than `Buffer.from` (A/B) |
+| `-Wl,-dead_strip` on the native lane | 0% - the linker already strips |
+| `-Oz` on the native lane | 20% smaller for tiny programs, 7% *larger* for the renderer |
+
+Not done, with cost/benefit:
+
+| candidate | assessment |
+|---|---|
+| freestanding `wasm32-unknown` (drop wasi-libc) | only 4 WASI imports remain; needs a malloc replacement. Hours of work for maybe 15-25% after a 97% cut already. |
+| minimal native runtime | the 399 KB native floor is the runtime (a hello-world is 399 KB); needs a feature-gated runtime build. |
+| LIS-based keyed diff | removals/lookups are O(1) now, but each *move* still refreshes the index map, so a full reversal is O(n^2). Fine for typical lists. |
+| mount cost | 10k-row mount is 89 ms vs React's 12 ms - the largest remaining gap, dominated by 20k createElement/appendChild round-trips. |
