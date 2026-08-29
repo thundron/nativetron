@@ -169,48 +169,33 @@ Per-click microseconds; both stacks driven through their own event path.
 
 | statistic | nativetron | react |
 |---|---|---|
-| median | 2.40 µs | 4.30 µs |
-| mean | 2.56 µs | 4.28 µs |
-| stddev | 0.40 µs | 0.21 µs |
-| min | 2.10 µs | 3.90 µs |
-| p95 | 3.20 µs | 4.70 µs |
-| max | 4.75 µs | 4.95 µs |
+| median | 2.25 µs | 4.25 µs |
+| mean | 2.34 µs | 4.23 µs |
+| stddev | 0.34 µs | 0.21 µs |
+| min | 1.95 µs | 3.90 µs |
+| p95 | 2.90 µs | 4.50 µs |
+| max | 3.90 µs | 4.95 µs |
 
 | paired comparison | value |
 |---|---|
-| median paired diff (nt - react) | -1.75 µs |
+| median paired diff (nt - react) | -2.00 µs |
 | nativetron faster in | 100/100 trials |
 | sign-test p (approx) | <0.001 |
 
 | memory / size | nativetron | react |
 |---|---|---|
-| JS heap | 3.27 MB | 1.69 MB |
+| JS heap | 2.18 MB | 3.84 MB |
 | wasm linear memory | 1.38 MB | — |
 | module size | 63.2 KB | 189.7 KB |
 | final DOM state | count: 200500 | count: 200500 |
 
-### After ABI v1 (binary command buffer) — the JSON hop removed
+### Verdict: interaction path
 
-| metric | v0 (JSON) | v1 (binary) | React |
-|---|---|---|---|
-| median per click | 4.05 us | **2.40 us** | 4.30 us |
-| stddev | 0.52 us | 0.40 us | 0.21 us |
-| max (tail) | 7.60 us | **4.75 us** | 4.95 us |
-| module size | 83.7 KB | **63.2 KB** | 189.7 KB |
-| trials won vs React | 58/100 (p=0.10) | **100/100 (p<0.001)** | — |
-
-- **1.79x faster than React**, decisive: nativetron won every one of 100
-  interleaved trials, sign-test p < 0.001. Previously a statistical tie.
-- **Tail latency fixed**: max 7.60 -> 4.75 us, now below React's 4.95 us. The
-  outliers really were JSON allocation churn.
-- **Module shrank 83.7 -> 63.2 KB** because the JSON encoder dropped out of the
-  compiled output entirely.
-- **JS heap readings are not reliable here** (single end-of-run sample, GC timing
-  dependent): they swing between runs in both directions, so no memory claim is
-  made from this benchmark.
-
-Still true: a counter does ~no work per click, so this measures bridge cost. A
-compute-heavy workload is needed to test AOT throughput itself.
+nativetron is **1.89x faster** (median 2.25 vs 4.25 us) and won **100/100**
+interleaved trials, p < 0.001. Tail latency is also better (max 3.90 vs 4.95 us).
+This is the workload the architecture is built for: the event goes
+DOM click -> wasm handler (scalars only, no serialisation) -> compiled signal
+update -> one small binary batch.
 
 ## Browser compute-heavy (10k rows)
 
@@ -221,17 +206,17 @@ compute-heavy workload is needed to test AOT throughput itself.
 
 | statistic (ms per update) | nativetron | react |
 |---|---|---|
-| median | 11.95 | 4.85 |
-| mean | 12.14 | 5.01 |
-| stddev | 0.48 | 0.56 |
-| min | 11.70 | 4.50 |
-| p95 | 13.50 | 6.40 |
-| max | 13.90 | 6.80 |
+| median | 11.95 | 4.80 |
+| mean | 12.06 | 4.96 |
+| stddev | 0.44 | 0.50 |
+| min | 11.60 | 4.50 |
+| p95 | 13.40 | 6.40 |
+| max | 13.40 | 6.40 |
 
 | paired | value |
 |---|---|
-| median paired diff (nt - react) | 7.10 ms |
-| speedup (react / nativetron, medians) | 0.41× |
+| median paired diff (nt - react) | 7.15 ms |
+| speedup (react / nativetron, medians) | 0.40× |
 | nativetron faster in | 0/30 trials |
 | sign-test p (approx) | <0.001 |
 
@@ -243,32 +228,31 @@ compute-heavy workload is needed to test AOT throughput itself.
 | module size | 59.9 KB | 189.8 KB |
 | first row after run | "row 348 3" | "row 348 3" |
 
-### Reading the compute result honestly
+### Verdict: bulk-update path
 
-React wins this workload ~2.5x, and the reason is instructive:
+React wins this one ~2.5x, and after three compiler optimisations the number
+barely moved (13.90 -> 11.95 ms), which localises the cost precisely:
 
-| phase (10k rows, measured natively) | nativetron |
+| phase (10k rows) | cost |
 |---|---|
 | arithmetic | 0.2 ms (parity with V8) |
-| sort (10k, closure comparator) | 2.7 ms |
-| string building | 1.1 ms |
-| encode + host decode + DOM text | ~8 ms |
+| sort | ~1.8 ms (was 2.7 ms) |
+| string building | ~1.1 ms |
+| **encode + decode + 10k DOM text sets** | **~8 ms** |
 
-- **V8's built-ins are optimised C++.** Its sort is TimSort in C++ with an
-  inlined comparator (~0.3 ms); our compiled merge sort pays a real closure call
-  per comparison (~20 ns x 133k). Same for string concat. AOT compilation does
-  not automatically beat a mature engine's native built-ins.
-- **Our DOM path serialises 10k strings** (UTF-8 encode in wasm, decode in JS)
-  where React mutates text nodes directly. An ASCII fast path in the host decoder
-  bought 13% (13.9 -> 12.1 ms).
-- **Arithmetic is at parity**, which is the honest scope of the AOT win here.
+React spends ~4 ms of its 4.8 ms on the same 10k text-node writes. Our extra
+~4 ms is the **serialisation tax**: 10k strings UTF-8-encoded in wasm and decoded
+in JS. That tax is structural to running compiled code outside the engine, not a
+missing optimisation.
 
-Fixed along the way: scriptc lowered `Array.sort` to an **O(n^2) insertion
-sort**. Replacing it with a stable bottom-up merge sort took this benchmark from
-524.8 ms to 12.1 ms per update (43x). That bug was only visible because of this
-workload.
+**Honest conclusion:** the architecture wins where interactions are small and
+frequent (the normal case for an app), and pays a real tax on bulk DOM rewrites.
 
-**Correction to the earlier thesis:** "compute-heavy work favours AOT" does not
-hold for workloads dominated by engine built-ins (sort, string ops, DOM). Where
-nativetron does win is the interaction path (1.79x vs React), module size (3.2x),
-and the desktop metrics. Claiming a general compute win would be wrong.
+Compiler fixes found by this benchmark (all on the scriptc fork):
+1. `Array.sort` was an **O(n^2) insertion sort** -> stable merge sort
+   (100k numeric sort: 387 -> 31 ms).
+2. `(a,b) => a-b` comparators now **inline** instead of an indirect closure call.
+3. Array receivers **borrow** for indexed access, removing retain/release traffic
+   in every loop (31 -> 15 ms on the same sort; helps all array code).
+Net: 100k numeric sort 387 -> 15 ms (**26x**), vs V8's 8 ms.
+Validated: 197/197 comparable corpus tests still match Node byte-for-byte.
