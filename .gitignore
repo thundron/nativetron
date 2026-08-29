@@ -3,3 +3,4 @@
 .scriptc/
 node_modules/
 .DS_Store
+framework/host-embed.generated.ts

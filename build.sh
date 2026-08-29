@@ -14,6 +14,10 @@ case "$(uname -s)" in
   *) LINK='' ;;
 esac
 
+echo "[1/3] generate host-embed (single source: host/dom-host.js)"
+mkdir -p "$ROOT/framework"
+node -e 'const fs=require("fs");const js=fs.readFileSync(process.argv[1],"utf8");fs.writeFileSync(process.argv[2],"// AUTO-GENERATED from host/dom-host.js by build.sh — do not edit.\nexport const HOST_JS = "+JSON.stringify(js)+";\n")' "$ROOT/host/dom-host.js" "$ROOT/framework/host-embed.generated.ts"
+
 echo "[1/3] native core -> native/nativetron_core.o"
 clang++ -std=c++17 -O2 -I "$WV_INC" -c "$ROOT/native/nativetron_core.cc" \
   -o "$ROOT/native/nativetron_core.o"

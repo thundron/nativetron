@@ -2,6 +2,7 @@
   "ffi_format": 4,
   "functions": [
     { "name": "ntInit", "symbol": "nt_init", "params": [], "returns": "void" },
+    { "name": "ntAddInit", "symbol": "nt_add_init", "params": ["string"], "returns": "void" },
     { "name": "ntSetTitle", "symbol": "nt_set_title", "params": ["string"], "returns": "void" },
     { "name": "ntSetSize", "symbol": "nt_set_size", "params": ["i32", "i32"], "returns": "void" },
     { "name": "ntSetHtml", "symbol": "nt_set_html", "params": ["string"], "returns": "void" },

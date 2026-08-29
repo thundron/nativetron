@@ -1,48 +1,57 @@
-// nativetron renderer — compiled to NATIVE machine code by scriptc.
-// It owns the window, renders a page, and handles UI events in native code,
-// pushing DOM updates back over the bridge. No V8 runs this logic.
+// nativetron renderer — compiled to native. The entire UI is built through the
+// DOM Host ABI: no page-side app JS, no VDOM, just batched DOM ops emitted from
+// compiled code. The click handler runs natively and mutates the DOM over the
+// bridge. This is the seed of the compile-time-reactive framework.
+import {
+  ROOT,
+  newId,
+  createElement,
+  createText,
+  setText,
+  setAttr,
+  append,
+  on,
+  mount,
+  run,
+} from "../framework/dom.js";
 
-declare function ntInit(): void;
-declare function ntSetTitle(title: string): void;
-declare function ntSetSize(w: number, h: number): void;
-declare function ntSetHtml(html: string): void;
-declare function ntOnMessage(cb: (req: string) => void): void;
-declare function ntEval(js: string): void;
-declare function ntRun(): void;
+mount("nativetron", 520, 360);
 
-const HTML = `<!doctype html><html><head><meta charset="utf-8">
-<style>
-  body{font-family:-apple-system,system-ui,sans-serif;margin:40px;color:#111}
-  h1{margin:0 0 8px} .muted{color:#666} button{font-size:15px;padding:8px 14px}
-  #out{font-variant-numeric:tabular-nums}
-</style></head><body>
-  <h1>Hello from nativetron</h1>
-  <p class="muted">This page is a view. The click handler below runs as
-     <b>compiled native code</b>, not in a JS engine.</p>
-  <button id="b">Ping native</button>
-  <p id="out">clicks: 0</p>
-  <script>
-    document.getElementById('b').onclick = () =>
-      window.__nt_ipc(JSON.stringify({ type: 'click' }));
-  </script>
-</body></html>`;
+// build the UI tree (ids allocated by the reconciler)
+const h1 = newId();
+createElement(h1, "h1");
+const h1t = newId();
+createText(h1t, "Hello from nativetron");
+append(h1, h1t);
+append(ROOT, h1);
 
-let clicks = 0;
+const p = newId();
+createElement(p, "p");
+const pt = newId();
+createText(pt, "The counter below is state held in native code.");
+append(p, pt);
+append(ROOT, p);
 
-ntInit();
-ntSetTitle("nativetron");
-ntSetSize(520, 340);
-ntSetHtml(HTML);
+const btn = newId();
+createElement(btn, "button");
+setAttr(btn, "style", "font-size:15px;padding:8px 14px");
+const btnLabel = newId();
+createText(btnLabel, "Increment");
+append(btn, btnLabel);
+append(ROOT, btn);
 
-ntOnMessage((req: string) => {
-  // webview delivers bound-call args as a JSON array: ["{...}"]
-  const args = JSON.parse(req) as string[];
-  const msg = JSON.parse(args[0]) as { type: string };
-  if (msg.type === "click") {
-    clicks++;
-    const text = `clicks: ${clicks}`;
-    ntEval(`document.getElementById('out').textContent = ${JSON.stringify(text)};`);
-  }
+const out = newId();
+createElement(out, "p");
+const outText = newId();
+createText(outText, "count: 0");
+append(out, outText);
+append(ROOT, out);
+
+// native state + event handling
+let count = 0;
+on(btn, "click", () => {
+  count++;
+  setText(outText, `count: ${count}`);
 });
 
-ntRun();
+run();

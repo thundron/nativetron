@@ -43,6 +43,14 @@ void nt_init(void) {
   });
 }
 
+// inject a script that runs at document-start on every page load (the DOM host
+// runtime). Must be called after nt_init and before nt_set_html.
+void nt_add_init(const uint8_t *s, size_t n) {
+  if (g_w) {
+    g_w->init(sv(s, n));
+  }
+}
+
 void nt_set_title(const uint8_t *s, size_t n) {
   if (g_w) {
     g_w->set_title(sv(s, n));
