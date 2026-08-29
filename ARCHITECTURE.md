@@ -92,30 +92,43 @@ target lands, with **no framework rewrite**.
 
 ## Roadmap
 
-- **Phase 0** — PoC: compiled `main` + compiled `renderer` + webview bridge.
-- **Phase 1** — Freeze the DOM Host ABI (opcodes + event protocol). Keystone.
-- **Phase 2** — Compile-time-reactive core against the ABI; native-first.
-- **Phase 3** — On the scriptc fork: add the browser reactor + host-import wasm
-  target; write the JS host; the same framework runs compiled in the browser.
-  **Spike done** ([docs/PHASE3_WASM_SPIKE.md](./docs/PHASE3_WASM_SPIKE.md)):
-  verdict = *achievable, medium-to-large but well-scaffolded*. scriptc already
-  has every hard primitive on the **native** target — library-mode exports
-  (reactor shape) and outbound-FFI ptr+len string/bytes marshalling (host-import
-  shape) — gated off for wasm by ~2 `if` guards. Plan = 4 small PRs (reactor/
-  export lane → wasm host-import ABI → JS glue emission → callbacks), plus a
-  `scr_wasm_alloc/free` runtime shim and a `-mexec-model=reactor --no-entry`
-  link lane. Needs `zig`/`zigcc` for end-to-end wasm builds (not yet installed).
+- **Phase 0** — PoC: compiled `main` + compiled `renderer` + webview bridge. **DONE**
+- **Phase 1** — DOM Host ABI. **DONE** (v0 JSON, then v1 binary command buffer +
+  slot-based events; both encodings live, conformance-tested).
+- **Phase 2** — Compile-time-reactive core against the ABI. **DONE**
+  (signals/effects/computed; `framework/core.ts` is transport-agnostic and serves
+  both the webview and wasm hosts).
+- **Phase 3** — Browser reactor + host-import wasm target on the scriptc fork.
+  **DONE** — all 4 planned PRs landed. `scriptc build --lib --profile p.json` on
+  wasm32-wasi emits `.wasm` + `.mjs`; compiled TS drives the real DOM.
 
 ## Status snapshot
 
-- **Phase 0/1/2 landed on `main`** and verified: native `main`+`renderer` over
-  the webview bridge; DOM Host ABI v0 (+ headless conformance test); compile-time
-  reactive core (signals/effects/computed, native self-test passes).
-- **Benchmark** ([bench/](./bench/)): shipped artifact **~990 KB vs Electron
-  ~236 MB (~244×)**; nativetron cold start = 2 procs / ~76 MB RSS (mostly OS
-  WebKit). Electron RSS unmeasurable on this host (its unsigned binary is
-  SIGKILLed by macOS security policy). The Electron baseline is **opt-in** —
-  `npm install electron` is never run automatically (it trips macOS XProtect).
+Measured (see [bench/](./bench/)):
+
+| axis | result |
+|---|---|
+| interactions vs React | **1.89x faster**, 100/100 trials, p<0.001 |
+| bulk 10k-row rewrite vs React | React 2.5x faster (serialisation tax, structural) |
+| browser module size | 63 KB vs React 189.7 KB |
+| desktop vs Electron | 296x disk, 4.2x RAM, 1.8x startup, 4x startup CPU |
+
+Compiler work on the fork (branch `internal`): wasm reactor lane, host imports,
+glue emission, size (1.88 MB -> 63 KB), plus three perf fixes found by
+benchmarking — O(n^2) `Array.sort` -> merge sort, comparator inlining, and array
+receiver borrowing (100k numeric sort 387 -> 15 ms).
+
+## Not built yet (the gap between "architecture" and "framework")
+
+The architecture is proven end to end; the developer-facing suite is not:
+
+- **No component model**: node ids are allocated by hand, no JSX, no props or
+  children, no composition.
+- **No list rendering**: the reconciler only appends. REMOVE / INSERT_BEFORE /
+  UNLISTEN are specced in the ABI but unused, so there is no keyed diff.
+- **No tooling**: no CLI (`new` / `dev` / `build`), no dev server, no HMR.
+- **Ergonomics**: the webview and wasm lanes need separate entry files and a
+  hand-written `profile.json`.
 
 ## Repo / fork layout (intended)
 
