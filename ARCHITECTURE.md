@@ -97,6 +97,25 @@ target lands, with **no framework rewrite**.
 - **Phase 2** — Compile-time-reactive core against the ABI; native-first.
 - **Phase 3** — On the scriptc fork: add the browser reactor + host-import wasm
   target; write the JS host; the same framework runs compiled in the browser.
+  **Spike done** ([docs/PHASE3_WASM_SPIKE.md](./docs/PHASE3_WASM_SPIKE.md)):
+  verdict = *achievable, medium-to-large but well-scaffolded*. scriptc already
+  has every hard primitive on the **native** target — library-mode exports
+  (reactor shape) and outbound-FFI ptr+len string/bytes marshalling (host-import
+  shape) — gated off for wasm by ~2 `if` guards. Plan = 4 small PRs (reactor/
+  export lane → wasm host-import ABI → JS glue emission → callbacks), plus a
+  `scr_wasm_alloc/free` runtime shim and a `-mexec-model=reactor --no-entry`
+  link lane. Needs `zig`/`zigcc` for end-to-end wasm builds (not yet installed).
+
+## Status snapshot
+
+- **Phase 0/1/2 landed on `main`** and verified: native `main`+`renderer` over
+  the webview bridge; DOM Host ABI v0 (+ headless conformance test); compile-time
+  reactive core (signals/effects/computed, native self-test passes).
+- **Benchmark** ([bench/](./bench/)): shipped artifact **~990 KB vs Electron
+  ~236 MB (~244×)**; nativetron cold start = 2 procs / ~76 MB RSS (mostly OS
+  WebKit). Electron RSS unmeasurable on this host (its unsigned binary is
+  SIGKILLed by macOS security policy). The Electron baseline is **opt-in** —
+  `npm install electron` is never run automatically (it trips macOS XProtect).
 
 ## Repo / fork layout (intended)
 

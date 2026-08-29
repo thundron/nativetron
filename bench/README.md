@@ -1,3 +1,11 @@
+> ⚠️ **macOS note:** installing/launching Electron here downloads an *unsigned
+> prebuilt `Electron.app`* that recent macOS XProtect may quarantine or move to
+> Trash, and this host's security policy `SIGKILL`s it. The Electron baseline is
+> therefore **opt-in**: nothing installs or launches Electron automatically.
+> `run-bench.mjs` only measures Electron if you have already run
+> `npm install` in `bench/electron-app/` yourself. The shipped-artifact size
+> comparison does not require Electron to run.
+
 # nativetron vs Electron — benchmark harness
 
 A minimal, honest comparison between the nativetron Phase 0 demo (TypeScript
