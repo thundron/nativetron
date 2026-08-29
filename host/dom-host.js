@@ -10,6 +10,7 @@
 (function () {
   var nodes = {};
   var handlers = {};
+  var interned = [];
 
   function root() {
     return document.getElementById("nt-root") || document.body;
@@ -95,18 +96,20 @@
       o = end;
       return r;
     };
+    var iv = function () { return interned[u32()]; };
     while (o < bytes.byteLength) {
       var code = dv.getUint8(o); o += 1;
       switch (code) {
-        case 1: { var id = u32(); nodes[id] = document.createElement(s()); break; }
+        case 1: { var id = u32(); nodes[id] = document.createElement(iv()); break; }
         case 2: { var id2 = u32(); nodes[id2] = document.createTextNode(s()); break; }
         case 3: { var id3 = u32(); node(id3).textContent = s(); break; }
-        case 4: { var id4 = u32(); node(id4).setAttribute(s(), s()); break; }
+        case 4: { var id4 = u32(); node(id4).setAttribute(iv(), s()); break; }
         case 6: { var p = u32(); node(p).appendChild(nodes[u32()]); break; }
         case 7: { var pp = u32(); var cc = u32(); var rr = u32(); node(pp).insertBefore(nodes[cc], nodes[rr]); break; }
         case 8: { var rid = u32(); var rn = nodes[rid]; if (rn && rn.parentNode) rn.parentNode.removeChild(rn); delete nodes[rid]; break; }
-        case 9: { var id5 = u32(); attachSlot(id5, s(), u32()); break; }
-        case 11: { var id6 = u32(); node(id6)[s()] = s(); break; }
+        case 9: { var id5 = u32(); attachSlot(id5, iv(), u32()); break; }
+        case 11: { var id6 = u32(); node(id6)[iv()] = s(); break; }
+        case 12: { var sid = u32(); interned[sid] = s(); break; }
       }
     }
   }

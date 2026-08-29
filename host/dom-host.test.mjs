@@ -86,21 +86,23 @@ assert.deepEqual(sent.shift(), { n: INP, t: "input", value: "typed" }, "input ev
 nt.apply([[10, INP, "input"]]);
 assert.equal(root.children[3].listeners.input.length, 0, "UNLISTEN removed handler");
 
-// binary encoding (ABI v1)
+// binary encoding (ABI v1 + interned names)
 const root2 = makeNode("element", "div");
 document.getElementById = (id) => (id === "nt-root" ? root2 : null);
 const enc = [];
 const te = new TextEncoder();
 const pushU32 = (v) => { enc.push(v & 0xff, (v >>> 8) & 0xff, (v >>> 16) & 0xff, (v >>> 24) & 0xff); };
 const pushStr = (s) => { const b = te.encode(s); pushU32(b.length); for (const x of b) enc.push(x); };
-enc.push(1); pushU32(11); pushStr("h1");
+const intern = (id, v) => { enc.push(12); pushU32(id); pushStr(v); };
+intern(1, "h1"); intern(2, "button"); intern(3, "style"); intern(4, "click");
+enc.push(1); pushU32(11); pushU32(1);
 enc.push(2); pushU32(12); pushStr("Bin");
 enc.push(6); pushU32(0); pushU32(11);
 enc.push(6); pushU32(11); pushU32(12);
-enc.push(1); pushU32(13); pushStr("button");
-enc.push(4); pushU32(13); pushStr("style"); pushStr("x");
+enc.push(1); pushU32(13); pushU32(2);
+enc.push(4); pushU32(13); pushU32(3); pushStr("x");
 enc.push(6); pushU32(0); pushU32(13);
-enc.push(9); pushU32(13); pushStr("click"); pushU32(4);
+enc.push(9); pushU32(13); pushU32(4); pushU32(4);
 let slotSeen = null;
 sandbox.window.__nt_event = (slot, value) => { slotSeen = [slot, value]; };
 nt.applyBin(new Uint8Array(enc));
@@ -113,5 +115,9 @@ enc.length = 0;
 enc.push(3); pushU32(12); pushStr("Bin2");
 nt.applyBin(new Uint8Array(enc));
 assert.equal(root2.children[0].children[0].textContent, "Bin2", "binary SET_TEXT");
+enc.length = 0;
+enc.push(8); pushU32(13);
+nt.applyBin(new Uint8Array(enc));
+assert.equal(root2.children.length, 1, "binary REMOVE");
 
 console.log("DOM Host ABI v0 (json) + v1 (binary): all conformance checks passed");

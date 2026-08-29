@@ -79,27 +79,34 @@ export function each(tag: string, build: () => KeyedItem[]): El {
       nextIds.push(next[i]!.el.id);
     }
 
+    const wanted = new Map<string, number>();
+    for (let i = 0; i < nextKeys.length; i++) wanted.set(nextKeys[i]!, i);
+
     for (let i = keys.length - 1; i >= 0; i--) {
-      let stillThere = false;
-      for (let j = 0; j < nextKeys.length; j++) if (nextKeys[j] === keys[i]) stillThere = true;
-      if (!stillThere) {
+      if (!wanted.has(keys[i]!)) {
         remove(ids[i]!);
         keys.splice(i, 1);
         ids.splice(i, 1);
       }
     }
 
+    const at = new Map<string, number>();
+    for (let i = 0; i < keys.length; i++) at.set(keys[i]!, i);
+
     for (let i = 0; i < nextKeys.length; i++) {
       const k = nextKeys[i]!;
-      let at = -1;
-      for (let j = i; j < keys.length; j++) if (keys[j] === k) at = j;
-      if (at === i) continue;
-      const id = at >= 0 ? ids[at]! : nextIds[i]!;
-      if (at >= 0) { keys.splice(at, 1); ids.splice(at, 1); }
+      const cur = at.get(k);
+      if (cur === i) continue;
+      const id = cur === undefined ? nextIds[i]! : ids[cur]!;
+      if (cur !== undefined) {
+        keys.splice(cur, 1);
+        ids.splice(cur, 1);
+      }
       if (i < keys.length) insertBefore(host, id, ids[i]!);
       else append(host, id);
       keys = insertStr(keys, i, k);
       ids = insertNum(ids, i, id);
+      for (let j = i; j < keys.length; j++) at.set(keys[j]!, j);
     }
 
     if (!first) flush();

@@ -77,3 +77,11 @@ zero-copy `subarray` of linear memory); the host must not retain them.
 
 Both encodings are live: the native webview lane uses v0 JSON (its bridge is
 `eval`, which is text anyway); the wasm lane uses v1.
+
+## v1.1: interned names
+
+Tag names, attribute names, event types and property names repeat constantly, so
+the binary lane interns them: opcode `12 INTERN (u32 id, str value)` registers a
+string once, and CREATE_ELEMENT / SET_ATTR / LISTEN / SET_PROP then carry a
+`u32` intern id in place of an inline string. Text content stays inline (it is
+almost always unique). The JSON lane is unchanged.

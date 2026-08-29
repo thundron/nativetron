@@ -60,8 +60,12 @@ try {
   await waitCdp();
   const nt = await openPage("nativetron.html");
   const rx = await openPage("react.html");
+  const ntT0 = Date.now();
   const ntRows = await nt.evaluate(`window.__setup(${ROWS})`, true);
+  const ntMount = Date.now() - ntT0;
+  const rxT0 = Date.now();
   const rxRows = await rx.evaluate(`window.__setup(${ROWS})`, true);
+  const rxMount = Date.now() - rxT0;
   for (let i = 0; i < 3; i++) { await nt.evaluate("window.__trial()"); await rx.evaluate("window.__trial()"); }
   const ntT = [], rxT = [];
   for (let i = 0; i < TRIALS; i++) {
@@ -97,6 +101,7 @@ try {
   console.log(`\n| context | nativetron | react |`);
   console.log(`|---|---|---|`);
   console.log(`| rows rendered | ${ntRows} | ${rxRows} |`);
+  console.log(`| mount ${ROWS} rows (incl. fetch/instantiate) | ${ntMount} ms | ${rxMount} ms |`);
   console.log(`| JS heap | ${ntS.jsHeapMB} MB | ${rxS.jsHeapMB} MB |`);
   console.log(`| wasm linear memory | ${ntS.wasmMemMB} MB | — |`);
   console.log(`| module size | ${ntS.wasmKB} KB | 189.8 KB |`);
