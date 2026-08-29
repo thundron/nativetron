@@ -16,7 +16,8 @@
       ],
       "returns": "void"
     },
-    { "name": "ntRun", "symbol": "nt_run", "params": [], "returns": "void" }
+    { "name": "ntRun", "symbol": "nt_run", "params": [], "returns": "void" },
+    { "name": "ntTerminate", "symbol": "nt_terminate", "params": [], "returns": "void" }
   ],
   "libraries": ["../native/nativetron_core.o"],
   "system_libraries": []

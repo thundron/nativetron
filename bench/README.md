@@ -125,56 +125,17 @@ time: 2026-08-29T20:17:30.272Z
 
 ## Results
 
-| metric | nativetron | electron | ratio |
+| metric | nativetron | electron | electron / nativetron |
 |---|---|---|---|
-| **Artifact size shipped** | 990.3 KB (1,014,080 B) | 235.7 MB (247,181,312 B) | 244× (Electron / nativetron) |
-|   — main | 390.2 KB (399,592 B) | (inside runtime) | — |
-|   — renderer | 483.5 KB (495,064 B) | (inside runtime) | — |
-|   — native core .o | 116.6 KB (119,424 B) | (inside runtime) | — |
-| **Peak tree RSS** | 76.8 MB (78,656 KB) | n/a | n/a |
-| **Steady tree RSS** | 70.9 MB (72,624 KB) | n/a | n/a |
-| **Peak process count** | 2 | n/a | — |
-| **Peak thread count** | 15 | n/a | — |
-| **Launch outcome** | ran, sampled | not measured (killed by SIGKILL after ~2.3s) | — |
+| **Disk (shipped runtime)** | 1.0 MB | 286.7 MB | 296.3× |
+| **Cold start → first paint** (median of 5) | 165 ms | 301 ms | 1.8× |
+| **Peak RSS** (process tree) | 80,272 KB | 342,448 KB | 4.3× |
+| **Steady RSS** | 80,256 KB | 338,224 KB | 4.2× |
+| **Processes** | 1 | 4 | — |
+| **Peak CPU%** (startup, tree) | 6.5% | 26.6% | — |
 
-### Notes
-- Electron runtime: re-extracted.
-- Electron launch: killed by SIGKILL after ~2.3s.
-- "Artifact size shipped" is block-usage on disk. The vendored webview is header-only and compiled into the renderer, so it is already inside those bytes; nativetron reuses the OS WKWebView (not shipped). Electron ships its own Chromium+V8 (node_modules/electron/dist).
-- RSS is the summed resident set of the whole process tree, sampled every 100ms for up to 3s.
-```
-
-### Reading the results
-
-- **Artifact size — the clean, robust win:** nativetron ships **~990 KB**
-  (main + renderer + native core) versus Electron's **~236 MB** bundled runtime
-  — a **~244×** difference. This is the number to trust from this environment.
-- **nativetron cold start (real):** a **2-process** tree (compiled `main` spawns
-  the compiled `renderer`), **~76 MB peak / ~71 MB steady RSS**, **15 threads**.
-  Almost all of that RSS is the **OS WKWebView / WebKit** that the renderer
-  brings up — nativetron's own compiled code is a small slice (the `main`
-  process alone is ~1.4 MB RSS; the ~76 MB is WebKit resident memory). This is
-  the honest framing from ARCHITECTURE.md: pixels are still a system web engine.
-- **Electron runtime — not measured here:** the unsigned/ad-hoc Electron binary
-  is `SIGKILL`ed by this host's security policy on launch (across repeated runs
-  it was observed either killed outright, or held as a suspended single 32 KB
-  process that never spawned Chromium's GPU/renderer children — never a real
-  running tree). The harness reports these as `n/a` rather than inventing a
-  number. On an unrestricted macOS desktop, Electron would show ~4–5 processes
-  and ~100–300 MB RSS — i.e. the RSS gap would also favor nativetron, but that
-  figure is **not** something this machine could measure, so it is left `n/a`.
-
-## Honest summary
-
-| What | Measured here? | Result |
-|---|---|---|
-| Ship size (disk) | ✅ both | nativetron ~990 KB vs Electron ~236 MB (~244×) |
-| Cold-start RSS | ✅ nativetron only | ~76 MB peak (mostly OS WebKit); Electron n/a (SIGKILLed by host) |
-| Process/thread count | ✅ nativetron only | 2 procs / 15 threads; Electron n/a |
-| Paint / layout speed | ❌ (headless) | out of scope — both use a system web engine |
-
-The defensible, reproduced-on-this-machine claim is the **~244× smaller shipped
-artifact**. The startup/RSS/process-count wins are directionally supported by
-nativetron's real 2-process / ~76 MB tree, but the Electron side of those rows
-could not be measured in this locked-down headless environment and is honestly
-marked `n/a`.
+_Notes: RSS is the summed resident set of the process tree (sampled every
+100 ms). nativetron's out-of-process WKWebView content helper is
+system-spawned (not a child) and may be undercounted; Electron's helpers are
+children and fully counted. Disk = what each app ships (nativetron binaries
+vs the Electron.app runtime); nativetron reuses the OS WebKit, not shipped._

@@ -12,6 +12,10 @@ declare function ntSetHtml(html: string): void;
 declare function ntOnMessage(cb: (req: string) => void): void;
 declare function ntEval(js: string): void;
 declare function ntRun(): void;
+declare function ntTerminate(): void;
+
+// Cold-start clock: captured as early as compiled code runs (module load).
+const START_MS = Date.now();
 
 // ---- ids -------------------------------------------------------------------
 export const ROOT = 0;
@@ -95,6 +99,12 @@ export function mount(title: string, w: number, h: number): void {
     if (ev.t === "__ready") {
       building = false; // the app is live: later effect runs flush immediately
       flush(); // send the initial UI once the document is ready
+      // Benchmark hook: quit right after first paint so a harness can measure
+      // cold-start-to-ready as the process lifetime.
+      if (process.env.NT_BENCH_QUIT === "1") {
+        console.log(`NT_READY_MS=${Date.now() - START_MS}`);
+        ntTerminate();
+      }
       return;
     }
     const h = lookup(`${ev.n}:${ev.t}`);

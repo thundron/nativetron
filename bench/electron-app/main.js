@@ -9,6 +9,9 @@
 const { app, BrowserWindow } = require("electron");
 const path = require("path");
 
+// Cold-start clock: as early as app code runs.
+const START_MS = Date.now();
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 520,
@@ -21,6 +24,14 @@ function createWindow() {
     },
   });
   win.loadFile(path.join(__dirname, "index.html"));
+  // Benchmark hook: quit right after first paint so a harness can measure
+  // cold-start-to-ready as the process lifetime (parity with nativetron).
+  win.webContents.once("did-finish-load", () => {
+    if (process.env.NT_BENCH_QUIT === "1") {
+      console.log(`NT_READY_MS=${Date.now() - START_MS}`);
+      app.quit();
+    }
+  });
 }
 
 app.whenReady().then(() => {

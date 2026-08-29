@@ -1,0 +1,36 @@
+{
+  "date": "2026-08-29T21:13:30.821Z",
+  "electron": "44.0.0",
+  "nativetron": {
+    "diskBytes": 1014848,
+    "wallMedian": 165,
+    "walls": [
+      182,
+      165,
+      184,
+      155,
+      159
+    ],
+    "readyMs": 154,
+    "peakRSS": 80272,
+    "steadyRSS": 80256,
+    "peakCPU": 6.5,
+    "procs": 1
+  },
+  "electronResult": {
+    "diskBytes": 300650496,
+    "wallMedian": 301,
+    "walls": [
+      322,
+      301,
+      309,
+      257,
+      294
+    ],
+    "readyMs": 137,
+    "peakRSS": 342448,
+    "steadyRSS": 338224,
+    "peakCPU": 26.6,
+    "procs": 4
+  }
+}
