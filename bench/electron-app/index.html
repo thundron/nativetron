@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'"
+    />
+    <title>nativetron-bench-electron</title>
+  </head>
+  <body>
+    <!-- Functionally equivalent to app/renderer.ts: an <h1>, a button, and a
+         counter. Here the state + click handler live in page JavaScript (V8),
+         mirroring the standard Electron model. -->
+    <h1>Hello</h1>
+    <p>The counter below is state held in the renderer (page JS).</p>
+    <button id="inc" style="font-size: 15px; padding: 8px 14px">Increment</button>
+    <p id="out">count: 0</p>
+    <script src="renderer.js"></script>
+  </body>
+</html>
