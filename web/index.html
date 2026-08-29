@@ -1,0 +1,32 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>nativetron — compiled TS in the browser</title>
+  <style>
+    body { font-family: -apple-system, system-ui, sans-serif; margin: 40px; color: #111; }
+    #meta { color: #666; font-size: 13px; margin-top: 24px; }
+  </style>
+</head>
+<body>
+  <div id="nt-root"></div>
+  <div id="meta"></div>
+  <script src="../host/dom-host.js"></script>
+  <script type="module">
+    import { instantiateFromBytes } from "./.scriptc/renderer.mjs";
+
+    let api;
+    window.__nt_send = (json) => { if (api) api.nt_on_event(json); };
+
+    const t0 = performance.now();
+    const bytes = await (await fetch("./.scriptc/renderer.wasm")).arrayBuffer();
+    api = await instantiateFromBytes(bytes, {
+      ntApply: (batchJson) => { window.__nt.apply(JSON.parse(batchJson)); },
+    });
+    api.nt_start();
+    const ms = (performance.now() - t0).toFixed(1);
+    document.getElementById("meta").textContent =
+      `wasm ${(bytes.byteLength / 1048576).toFixed(2)} MB · instantiate+start ${ms} ms · no framework runtime, no VDOM`;
+  </script>
+</body>
+</html>
