@@ -1,0 +1,41 @@
+{
+  "profile_format": 1,
+  "name": "nt-canvas",
+  "entry": "demo.ts",
+  "emission": "llvm",
+  "abi": {
+    "prefix": "nt_",
+    "init_symbol": "nt_init",
+    "sink_register_symbol": "nt_sink",
+    "collect_symbol": "nt_collect",
+    "result_reset_symbol": null,
+    "callback_register_symbol": "nt_set_callback"
+  },
+  "callbacks": [
+    {
+      "name": "present",
+      "params": [
+        "bytes"
+      ],
+      "returns": "void"
+    }
+  ],
+  "exports": [
+    {
+      "export": "draw",
+      "symbol": "nt_draw",
+      "params": [
+        "f64"
+      ],
+      "returns": "f64"
+    },
+    {
+      "export": "drawMany",
+      "symbol": "nt_many",
+      "params": [
+        "f64"
+      ],
+      "returns": "f64"
+    }
+  ]
+}

@@ -1,0 +1,166 @@
+{
+  "ops": [
+    {
+      "code": 1,
+      "name": "SAVE",
+      "args": []
+    },
+    {
+      "code": 2,
+      "name": "RESTORE",
+      "args": []
+    },
+    {
+      "code": 3,
+      "name": "TRANSLATE",
+      "args": [
+        "x:f32",
+        "y:f32"
+      ]
+    },
+    {
+      "code": 4,
+      "name": "ROTATE",
+      "args": [
+        "angle:f32"
+      ]
+    },
+    {
+      "code": 5,
+      "name": "SCALE",
+      "args": [
+        "x:f32",
+        "y:f32"
+      ]
+    },
+    {
+      "code": 6,
+      "name": "FILL_RECT",
+      "args": [
+        "x:f32",
+        "y:f32",
+        "w:f32",
+        "h:f32"
+      ]
+    },
+    {
+      "code": 7,
+      "name": "STROKE_RECT",
+      "args": [
+        "x:f32",
+        "y:f32",
+        "w:f32",
+        "h:f32"
+      ]
+    },
+    {
+      "code": 8,
+      "name": "CLEAR_RECT",
+      "args": [
+        "x:f32",
+        "y:f32",
+        "w:f32",
+        "h:f32"
+      ]
+    },
+    {
+      "code": 9,
+      "name": "BEGIN_PATH",
+      "args": []
+    },
+    {
+      "code": 10,
+      "name": "MOVE_TO",
+      "args": [
+        "x:f32",
+        "y:f32"
+      ]
+    },
+    {
+      "code": 11,
+      "name": "LINE_TO",
+      "args": [
+        "x:f32",
+        "y:f32"
+      ]
+    },
+    {
+      "code": 12,
+      "name": "ARC",
+      "args": [
+        "x:f32",
+        "y:f32",
+        "r:f32",
+        "a0:f32",
+        "a1:f32"
+      ]
+    },
+    {
+      "code": 13,
+      "name": "CLOSE_PATH",
+      "args": []
+    },
+    {
+      "code": 14,
+      "name": "FILL",
+      "args": []
+    },
+    {
+      "code": 15,
+      "name": "STROKE",
+      "args": []
+    },
+    {
+      "code": 16,
+      "name": "FILL_STYLE",
+      "args": [
+        "style:intern"
+      ]
+    },
+    {
+      "code": 17,
+      "name": "STROKE_STYLE",
+      "args": [
+        "style:intern"
+      ]
+    },
+    {
+      "code": 18,
+      "name": "LINE_WIDTH",
+      "args": [
+        "w:f32"
+      ]
+    },
+    {
+      "code": 19,
+      "name": "FONT",
+      "args": [
+        "font:intern"
+      ]
+    },
+    {
+      "code": 20,
+      "name": "FILL_TEXT",
+      "args": [
+        "text:str",
+        "x:f32",
+        "y:f32"
+      ]
+    },
+    {
+      "code": 21,
+      "name": "GLOBAL_ALPHA",
+      "args": [
+        "a:f32"
+      ]
+    },
+    {
+      "code": 22,
+      "name": "INTERN",
+      "args": [
+        "id",
+        "value:str"
+      ]
+    }
+  ]
+}

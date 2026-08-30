@@ -1,0 +1,45 @@
+<!doctype html><html><body>
+<canvas id="a" width="640" height="480"></canvas>
+<canvas id="b" width="640" height="480"></canvas>
+<script src="./canvas-host.generated.js"></script>
+<script type="module">
+import { instantiateFromBytes } from "./.scriptc/demo.mjs";
+import { drawDirect } from "./reference.mjs";
+const A = document.getElementById("a"), B = document.getElementById("b");
+let api = null, bytes = 0;
+window.__init = async () => {
+  const buf = await (await fetch("./.scriptc/demo.wasm")).arrayBuffer();
+  api = await instantiateFromBytes(buf, { present: (b) => { bytes = b.byteLength; window.__ntc(A, b); } });
+  return buf.byteLength;
+};
+window.__compare = (t) => {
+  api.nt_draw(t);
+  drawDirect(B.getContext("2d"), t);
+  const ca = A.getContext("2d").getImageData(0, 0, 640, 480).data;
+  const cb = B.getContext("2d").getImageData(0, 0, 640, 480).data;
+  let diff = 0, maxd = 0;
+  for (let i = 0; i < ca.length; i++) { const d = Math.abs(ca[i] - cb[i]); if (d) { diff++; if (d > maxd) maxd = d; } }
+  return JSON.stringify({ t, differingSubpixels: diff, maxDelta: maxd, bytes });
+};
+window.__heavy = (n, frames) => {
+  const c = B.getContext("2d");
+  const direct = () => { c.clearRect(0,0,640,480); c.fillStyle = "#2b6cb0";
+    for (let i = 0; i < n; i++) c.fillRect((i*37)%620, (i*53)%460, 6, 6); };
+  api.nt_many(n); direct();
+  const t0 = performance.now(); for (let i = 0; i < frames; i++) api.nt_many(n); const cm = performance.now() - t0;
+  const t1 = performance.now(); for (let i = 0; i < frames; i++) direct(); const dm = performance.now() - t1;
+  const ca = A.getContext("2d").getImageData(0,0,640,480).data, cb = c.getImageData(0,0,640,480).data;
+  let diff = 0; for (let i = 0; i < ca.length; i++) if (ca[i] !== cb[i]) diff++;
+  return JSON.stringify({ n, compiledMs: +(cm/frames).toFixed(3), directMs: +(dm/frames).toFixed(3), differingSubpixels: diff });
+};
+window.__bench = (frames) => {
+  const t0 = performance.now();
+  for (let i = 0; i < frames; i++) api.nt_draw(i);
+  const compiled = performance.now() - t0;
+  const c = B.getContext("2d");
+  const t1 = performance.now();
+  for (let i = 0; i < frames; i++) drawDirect(c, i);
+  const direct = performance.now() - t1;
+  return JSON.stringify({ frames, compiledMs: +(compiled / frames).toFixed(3), directMs: +(direct / frames).toFixed(3) });
+};
+</script></body></html>
