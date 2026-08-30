@@ -59,9 +59,6 @@ const f = (x) => x.toFixed(2);
 
 try {
   await waitCdp();
-  // A mount happens once per page load, so it is measured on fresh pages,
-  // repeated, and with the order alternated: whichever stack is timed first
-  // otherwise absorbs the other page's load work.
   const ntMounts = [], rxMounts = [], guests = [], hosts = [];
   for (let r = 0; r < MOUNT_REPS; r++) {
     const a = await openPage("nativetron.html");
