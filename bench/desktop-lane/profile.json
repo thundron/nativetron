@@ -1,0 +1,6 @@
+{"profile_format":1,"name":"lane","entry":"lane.ts","emission":"llvm",
+ "abi":{"prefix":"nt_","init_symbol":"nt_init","sink_register_symbol":"nt_sink","collect_symbol":"nt_collect","result_reset_symbol":null,"callback_register_symbol":"nt_set_callback"},
+ "callbacks":[{"name":"jsonOut","params":["string"],"returns":"void"},{"name":"binOut","params":["bytes"],"returns":"void"}],
+ "exports":[{"export":"setup","symbol":"nt_setup","params":["f64"],"returns":"f64"},
+            {"export":"frameBinary","symbol":"nt_fb","params":[],"returns":"f64"},
+            {"export":"frameJson","symbol":"nt_fj","params":[],"returns":"f64"}]}

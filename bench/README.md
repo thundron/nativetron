@@ -35,6 +35,18 @@ JS cost 5 ms via a fragment, 3 ms via `innerHTML`.
 Update splits about 3 ms guest / 3.5 ms host. A 10k sort is 2.1 ms in wasm vs
 0.4 ms in V8; comparators other than the literal `a - b` are not inlined.
 
+## Transport, per frame
+
+5000 text updates, 60 fps budget 16.67 ms:
+
+| lane | guest encode | host apply | total | payload |
+|---|---|---|---|---|
+| binary (browser) | 0.54 ms | 0.14 ms | 0.68 ms | 72 KB |
+| JSON + eval (desktop) | 1.16 ms | 1.04 ms | 2.20 ms | 86 KB |
+
+`bench/desktop-lane/`. The desktop lane costs 13% of a frame at this rate; a
+binary channel would cut it to 4%.
+
 ## Against Electron
 
 | metric | nativetron | electron 44 |
