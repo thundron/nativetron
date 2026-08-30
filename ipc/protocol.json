@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "header": "u32 frame length, then u8 kind",
+  "kinds": [
+    { "code": 1, "name": "REQUEST", "dir": "either", "fields": ["id:u32", "channel:str", "payload:bytes"] },
+    { "code": 2, "name": "RESULT", "dir": "either", "fields": ["id:u32", "payload:bytes"] },
+    { "code": 3, "name": "ERROR", "dir": "either", "fields": ["id:u32", "message:str"] },
+    { "code": 4, "name": "EVENT", "dir": "either", "fields": ["channel:str", "payload:bytes"] }
+  ]
+}
