@@ -17,7 +17,7 @@ drives it through a protocol.
 components        framework/ui.ts
 signals           framework/reactive.ts
 reconciler        framework/core.ts        emits batched operations
-hosts             native/nativetron_core.cc + webview   (JSON over eval)
+hosts             native/nativetron_core.cc + webview   (base64 over eval)
                   host/dom-host.js                      (binary over linear memory)
 ```
 
@@ -30,8 +30,8 @@ mount and which transport they install.
 `app/main.ts` compiles to a native executable that spawns `app/renderer.ts`,
 also native. The renderer owns a window through a C++ wrapper around the
 [webview](https://github.com/webview/webview) library, and injects
-`host/dom-host.js` into the page. Operations cross as JSON inside an `eval`
-call; page events come back through a retained FFI callback.
+`host/dom-host.js` into the page. Operations cross as base64 inside a constant
+`eval` call; page events come back through a retained FFI callback.
 
 ## Browser
 

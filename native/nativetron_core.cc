@@ -56,6 +56,35 @@ void nt_set_html(const uint8_t *s, size_t n) {
   }
 }
 
+// Ops cross as base64 inside a constant call. The evaluated source is
+// `window.__nt.applyB64("<[A-Za-z0-9+/=]*>")`, so no operand character can
+// close the string literal: escaping correctness stops being load-bearing.
+void nt_send_ops(const uint8_t *b, size_t n) {
+  if (!g_w) return;
+  static const char *T =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  std::string js;
+  js.reserve(((n + 2) / 3) * 4 + 32);
+  js += "window.__nt.applyB64(\"";
+  size_t i = 0;
+  for (; i + 2 < n; i += 3) {
+    uint32_t v = (uint32_t)b[i] << 16 | (uint32_t)b[i + 1] << 8 | b[i + 2];
+    js += T[(v >> 18) & 63];
+    js += T[(v >> 12) & 63];
+    js += T[(v >> 6) & 63];
+    js += T[v & 63];
+  }
+  if (i < n) {
+    uint32_t v = (uint32_t)b[i] << 16 | (i + 1 < n ? (uint32_t)b[i + 1] << 8 : 0);
+    js += T[(v >> 18) & 63];
+    js += T[(v >> 12) & 63];
+    js += (i + 1 < n) ? T[(v >> 6) & 63] : '=';
+    js += '=';
+  }
+  js += "\")";
+  g_w->eval(js);
+}
+
 void nt_eval(const uint8_t *s, size_t n) {
   if (g_w) {
     g_w->eval(sv(s, n));

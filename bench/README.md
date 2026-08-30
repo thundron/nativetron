@@ -39,13 +39,14 @@ Update splits about 3 ms guest / 3.5 ms host. A 10k sort is 2.1 ms in wasm vs
 
 5000 text updates, 60 fps budget 16.67 ms:
 
-| lane | guest encode | host apply | total | payload |
-|---|---|---|---|---|
-| binary (browser) | 0.54 ms | 0.14 ms | 0.68 ms | 72 KB |
-| JSON + eval (desktop) | 1.16 ms | 1.04 ms | 2.20 ms | 86 KB |
+| lane | eval + apply | source |
+|---|---|---|
+| binary, base64 over eval (desktop) | 0.59 ms | 96 KB |
+| JSON in source (removed) | 1.04 ms | 86 KB |
 
-`bench/desktop-lane/`. The desktop lane costs 13% of a frame at this rate; a
-binary channel would cut it to 4%.
+`bench/desktop-lane/`. Both lanes now carry the same binary batch; base64 is
+faster because one long string literal parses cheaper than a nested array
+literal.
 
 ## Against Electron
 

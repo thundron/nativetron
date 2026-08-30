@@ -1,6 +1,5 @@
-import { ROOT, newId, createElement, createText, append, setText, flush, setSink, setBinarySink, setLive } from "../../framework/core.js";
+import { ROOT, newId, createElement, createText, append, setText, flush, setBinarySink, setLive } from "../../framework/core.js";
 
-declare function jsonOut(s: string): void;
 declare function binOut(b: Uint8Array): void;
 
 const ids: number[] = [];
@@ -23,13 +22,6 @@ export function setup(n: number): number {
 
 export function frameBinary(): number {
   setBinarySink((b: Uint8Array) => { binOut(b); });
-  for (let i = 0; i < ids.length; i++) setText(ids[i]!, "v " + i);
-  flush();
-  return ids.length;
-}
-
-export function frameJson(): number {
-  setSink((s: string) => { jsonOut(s); });
   for (let i = 0; i < ids.length; i++) setText(ids[i]!, "v " + i);
   flush();
   return ids.length;

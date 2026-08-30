@@ -7,6 +7,13 @@ import assert from "node:assert/strict";
 const here = dirname(fileURLToPath(import.meta.url));
 const src = readFileSync(join(here, "dom-host.js"), "utf8");
 
+// opcodes come from the spec, so a change to abi/ops.json that the decoder
+// has not followed fails here instead of drifting silently
+const OPS = Object.fromEntries(
+  JSON.parse(readFileSync(join(here, "..", "abi", "ops.json"), "utf8")).ops.map((o) => [o.name, o.code]),
+);
+
+
 function makeNode(kind, tag) {
   return {
     kind, tag, children: [], attrs: {}, _text: "", listeners: {},
@@ -64,51 +71,22 @@ const nt = sandbox.window.__nt;
 
 assert.deepEqual(sent.shift(), { n: 0, t: "__ready" }, "ready control message");
 
-const [H1, H1T, BTN, BLBL, OUT, OUTT] = [1, 2, 3, 4, 5, 6];
-nt.apply([
-  [1, H1, "h1"], [2, H1T, "Hello"], [6, H1, H1T], [6, 0, H1],
-  [1, BTN, "button"], [4, BTN, "style", "x"], [2, BLBL, "Increment"], [6, BTN, BLBL], [6, 0, BTN],
-  [1, OUT, "p"], [2, OUTT, "count: 0"], [6, OUT, OUTT], [6, 0, OUT],
-  [9, BTN, "click"],
-]);
-
-assert.equal(root.children.length, 3, "root has h1, button, p");
-assert.equal(root.children[0].tag, "h1");
-assert.equal(root.children[0].children[0].textContent, "Hello");
-assert.equal(root.children[1].tag, "button");
-assert.equal(root.children[1].attrs.style, "x");
-assert.equal(root.children[2].children[0].textContent, "count: 0");
-
-root.children[1].listeners.click[0]({ target: {} });
-assert.deepEqual(sent.shift(), { n: BTN, t: "click" }, "click event posted");
-
-nt.apply([[3, OUTT, "count: 1"]]);
-assert.equal(root.children[2].children[0].textContent, "count: 1", "SET_TEXT applied");
-
-const INP = 7;
-nt.apply([[1, INP, "input"], [6, 0, INP], [11, INP, "value", "hi"], [9, INP, "input"]]);
-assert.equal(root.children[3].value, "hi", "SET_PROP set value");
-root.children[3].listeners.input[0]({ target: { value: "typed" } });
-assert.deepEqual(sent.shift(), { n: INP, t: "input", value: "typed" }, "input event carries value");
-nt.apply([[10, INP, "input"]]);
-assert.equal(root.children[3].listeners.input.length, 0, "UNLISTEN removed handler");
-
 const root2 = makeNode("element", "div");
 document.getElementById = (id) => (id === "nt-root" ? root2 : null);
 const enc = [];
 const te = new TextEncoder();
 const pushU32 = (v) => { enc.push(v & 0xff, (v >>> 8) & 0xff, (v >>> 16) & 0xff, (v >>> 24) & 0xff); };
 const pushStr = (s) => { const b = te.encode(s); pushU32(b.length); for (const x of b) enc.push(x); };
-const intern = (id, v) => { enc.push(12); pushU32(id); pushStr(v); };
+const intern = (id, v) => { enc.push(OPS.INTERN); pushU32(id); pushStr(v); };
 intern(1, "h1"); intern(2, "button"); intern(3, "style"); intern(4, "click");
-enc.push(1); pushU32(11); pushU32(1);
-enc.push(2); pushU32(12); pushStr("Bin");
-enc.push(6); pushU32(0); pushU32(11);
-enc.push(6); pushU32(11); pushU32(12);
-enc.push(1); pushU32(13); pushU32(2);
-enc.push(4); pushU32(13); pushU32(3); pushStr("x");
-enc.push(6); pushU32(0); pushU32(13);
-enc.push(9); pushU32(13); pushU32(4); pushU32(4);
+enc.push(OPS.CREATE_ELEMENT); pushU32(11); pushU32(1);
+enc.push(OPS.CREATE_TEXT); pushU32(12); pushStr("Bin");
+enc.push(OPS.APPEND); pushU32(0); pushU32(11);
+enc.push(OPS.APPEND); pushU32(11); pushU32(12);
+enc.push(OPS.CREATE_ELEMENT); pushU32(13); pushU32(2);
+enc.push(OPS.SET_ATTR); pushU32(13); pushU32(3); pushStr("x");
+enc.push(OPS.APPEND); pushU32(0); pushU32(13);
+enc.push(OPS.LISTEN); pushU32(13); pushU32(4); pushU32(4);
 let slotSeen = null;
 sandbox.window.__nt_event = (slot, value) => { slotSeen = [slot, value]; };
 nt.applyBin(new Uint8Array(enc));
@@ -117,26 +95,27 @@ assert.equal(root2.children[0].children[0].textContent, "Bin");
 assert.equal(root2.children[1].attrs.style, "x");
 root2.children[1].listeners.click[0]({ target: {} });
 assert.deepEqual(slotSeen, [4, ""], "binary: slot-based event");
+assert.equal(sent.length, 0, "binary lane posts no json event messages");
 enc.length = 0;
-enc.push(3); pushU32(12); pushStr("Bin2");
+enc.push(OPS.SET_TEXT); pushU32(12); pushStr("Bin2");
 nt.applyBin(new Uint8Array(enc));
 assert.equal(root2.children[0].children[0].textContent, "Bin2", "binary SET_TEXT");
 enc.length = 0;
 intern(5, "li");
-enc.push(13); pushU32(0); pushU32(20); pushU32(5); pushU32(21); pushStr("compound");
+enc.push(OPS.ELEMENT_WITH_TEXT); pushU32(0); pushU32(20); pushU32(5); pushU32(21); pushStr("compound");
 nt.applyBin(new Uint8Array(enc));
 assert.equal(root2.children[root2.children.length - 1].tag, "li", "compound: element created");
 assert.equal(root2.children[root2.children.length - 1].textContent, "compound", "compound: text set");
 enc.length = 0;
-enc.push(3); pushU32(21); pushStr("patched");
+enc.push(OPS.SET_TEXT); pushU32(21); pushStr("patched");
 nt.applyBin(new Uint8Array(enc));
 assert.equal(root2.children[root2.children.length - 1].textContent, "patched", "compound: text node id is addressable");
 enc.length = 0;
-enc.push(8); pushU32(20);
+enc.push(OPS.REMOVE); pushU32(20);
 nt.applyBin(new Uint8Array(enc));
 enc.length = 0;
-enc.push(8); pushU32(13);
+enc.push(OPS.REMOVE); pushU32(13);
 nt.applyBin(new Uint8Array(enc));
 assert.equal(root2.children.length, 1, "binary REMOVE");
 
-console.log("DOM Host ABI: json and binary conformance checks passed");
+console.log("DOM Host ABI: binary conformance checks passed");

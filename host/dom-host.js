@@ -33,30 +33,6 @@
     }
   }
 
-  function apply(batch) {
-    for (var i = 0; i < batch.length; i++) {
-      var op = batch[i];
-      switch (op[0]) {
-        case 1: nodes[op[1]] = document.createElement(op[2]); break;
-        case 2: nodes[op[1]] = document.createTextNode(op[2]); break;
-        case 3: node(op[1]).textContent = op[2]; break;
-        case 4: node(op[1]).setAttribute(op[2], op[3]); break;
-        case 5: node(op[1]).removeAttribute(op[2]); break;
-        case 6: node(op[1]).appendChild(nodes[op[2]]); break;
-        case 7: node(op[1]).insertBefore(nodes[op[2]], nodes[op[3]]); break;
-        case 8: {
-          var n = nodes[op[1]];
-          if (n && n.parentNode) n.parentNode.removeChild(n);
-          nodes[op[1]] = undefined;
-          break;
-        }
-        case 9: attach(op[1], op[2]); break;
-        case 10: detach(op[1], op[2]); break;
-        case 11: node(op[1])[op[2]] = op[3]; break;
-      }
-    }
-  }
-
   var td = new TextDecoder();
 
   function attachSlot(id, type, slot) {
@@ -122,7 +98,14 @@
     flushFrag();
   }
 
-  window.__nt = { apply: apply, applyBin: applyBin };
+  function applyB64(b64) {
+    var raw = atob(b64);
+    var n = raw.length;
+    var bytes = new Uint8Array(n);
+    for (var i = 0; i < n; i++) bytes[i] = raw.charCodeAt(i);
+    applyBin(bytes);
+  }
+  window.__nt = { applyBin: applyBin, applyB64: applyB64 };
 
   function ready() {
     send({ n: 0, t: "__ready" });

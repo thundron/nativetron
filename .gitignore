@@ -5,3 +5,5 @@ node_modules/
 .DS_Store
 framework/host-embed.generated.ts
 web/.scriptc/
+security/.scriptc/
+bench/desktop-lane/.scriptc/

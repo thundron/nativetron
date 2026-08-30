@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# nativetron Phase 0 build: native core (C++ webview wrapper) + compiled renderer.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 SCRIPTC="${SCRIPTC:-$ROOT/../../scriptc/packages/cli/dist/main.js}"
 WV_INC="$ROOT/native/vendor/webview/include"
 mkdir -p "$ROOT/build"
+
+node "$ROOT/abi/generate.mjs" --check
 
 # Platform link flags for the webview library (injected into scriptc's clang
 # link step via the clang-driver CCC_OVERRIDE_OPTIONS hook; '+' appends args).

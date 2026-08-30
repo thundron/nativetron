@@ -1,0 +1,115 @@
+{
+  "root": 0,
+  "ops": [
+    {
+      "code": 1,
+      "name": "CREATE_ELEMENT",
+      "args": [
+        "id",
+        "tag:intern"
+      ]
+    },
+    {
+      "code": 2,
+      "name": "CREATE_TEXT",
+      "args": [
+        "id",
+        "text:str"
+      ]
+    },
+    {
+      "code": 3,
+      "name": "SET_TEXT",
+      "args": [
+        "id",
+        "text:str"
+      ]
+    },
+    {
+      "code": 4,
+      "name": "SET_ATTR",
+      "args": [
+        "id",
+        "name:intern",
+        "value:str"
+      ]
+    },
+    {
+      "code": 5,
+      "name": "REMOVE_ATTR",
+      "args": [
+        "id",
+        "name:intern"
+      ]
+    },
+    {
+      "code": 6,
+      "name": "APPEND",
+      "args": [
+        "parent",
+        "child"
+      ]
+    },
+    {
+      "code": 7,
+      "name": "INSERT_BEFORE",
+      "args": [
+        "parent",
+        "child",
+        "ref"
+      ]
+    },
+    {
+      "code": 8,
+      "name": "REMOVE",
+      "args": [
+        "id"
+      ]
+    },
+    {
+      "code": 9,
+      "name": "LISTEN",
+      "args": [
+        "id",
+        "type:intern",
+        "slot"
+      ]
+    },
+    {
+      "code": 10,
+      "name": "UNLISTEN",
+      "args": [
+        "id",
+        "type:intern"
+      ]
+    },
+    {
+      "code": 11,
+      "name": "SET_PROP",
+      "args": [
+        "id",
+        "name:intern",
+        "value:str"
+      ]
+    },
+    {
+      "code": 12,
+      "name": "INTERN",
+      "args": [
+        "id",
+        "value:str"
+      ]
+    },
+    {
+      "code": 13,
+      "name": "ELEMENT_WITH_TEXT",
+      "args": [
+        "parent",
+        "id",
+        "tag:intern",
+        "textId",
+        "text:str"
+      ]
+    }
+  ]
+}

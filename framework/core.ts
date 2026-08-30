@@ -1,4 +1,19 @@
 import { effect } from "./reactive.js";
+import {
+  OP_CREATE_ELEMENT,
+  OP_CREATE_TEXT,
+  OP_SET_TEXT,
+  OP_SET_ATTR,
+  OP_REMOVE_ATTR,
+  OP_APPEND,
+  OP_INSERT_BEFORE,
+  OP_REMOVE,
+  OP_LISTEN,
+  OP_UNLISTEN,
+  OP_SET_PROP,
+  OP_INTERN,
+  OP_ELEMENT_WITH_TEXT,
+} from "./ops.generated.js";
 
 export const ROOT = 0;
 let nextId = 1;
@@ -6,22 +21,13 @@ export function newId(): number {
   return nextId++;
 }
 
-type Op = Array<number | string>;
-let ops: Op[] = [];
-let binary = false;
 let buf = new Uint8Array(4096);
 let off = 0;
 let building = true;
-let jsonSink: (json: string) => void = (_j: string) => {};
 let binSink: (b: Uint8Array) => void = (_b: Uint8Array) => {};
 
-export function setSink(fn: (json: string) => void): void {
-  jsonSink = fn;
-  binary = false;
-}
 export function setBinarySink(fn: (b: Uint8Array) => void): void {
   binSink = fn;
-  binary = true;
 }
 export function setLive(): void {
   building = false;
@@ -63,58 +69,45 @@ function iref(v: string): number {
   }
   internKeys.push(v);
   const id = nextIntern++;
-  u8(12);
+  u8(OP_INTERN);
   u32(id);
   str(v);
   return id;
 }
 
 export function createElement(id: number, tag: string): void {
-  if (binary) { const t = iref(tag); u8(1); u32(id); u32(t); } else ops.push([1, id, tag]);
+  const t = iref(tag); u8(OP_CREATE_ELEMENT); u32(id); u32(t);
 }
 export function elementWithText(parent: number, id: number, tag: string, textId: number, text: string): void {
-  if (binary) {
-    const t = iref(tag);
-    u8(13); u32(parent); u32(id); u32(t); u32(textId); str(text);
-  } else {
-    ops.push([1, id, tag]);
-    ops.push([2, textId, text]);
-    ops.push([6, id, textId]);
-    ops.push([6, parent, id]);
-  }
+  const t = iref(tag);
+  u8(OP_ELEMENT_WITH_TEXT); u32(parent); u32(id); u32(t); u32(textId); str(text);
 }
 export function createText(id: number, text: string): void {
-  if (binary) { u8(2); u32(id); str(text); } else ops.push([2, id, text]);
+  u8(OP_CREATE_TEXT); u32(id); str(text);
 }
 export function setText(id: number, text: string): void {
-  if (binary) { u8(3); u32(id); str(text); } else ops.push([3, id, text]);
+  u8(OP_SET_TEXT); u32(id); str(text);
 }
 export function setAttr(id: number, name: string, value: string): void {
-  if (binary) { const n = iref(name); u8(4); u32(id); u32(n); str(value); } else ops.push([4, id, name, value]);
+  const n = iref(name); u8(OP_SET_ATTR); u32(id); u32(n); str(value);
 }
 export function append(parent: number, child: number): void {
-  if (binary) { u8(6); u32(parent); u32(child); } else ops.push([6, parent, child]);
+  u8(OP_APPEND); u32(parent); u32(child);
 }
 export function insertBefore(parent: number, child: number, ref: number): void {
-  if (binary) { u8(7); u32(parent); u32(child); u32(ref); } else ops.push([7, parent, child, ref]);
+  u8(OP_INSERT_BEFORE); u32(parent); u32(child); u32(ref);
 }
 export function remove(id: number): void {
-  if (binary) { u8(8); u32(id); } else ops.push([8, id]);
+  u8(OP_REMOVE); u32(id);
 }
 export function setProp(id: number, name: string, value: string): void {
-  if (binary) { const n = iref(name); u8(11); u32(id); u32(n); str(value); } else ops.push([11, id, name, value]);
+  const n = iref(name); u8(OP_SET_PROP); u32(id); u32(n); str(value);
 }
 
 export function flush(): void {
-  if (binary) {
-    if (off === 0) return;
-    binSink(buf.subarray(0, off));
-    off = 0;
-    return;
-  }
-  if (ops.length === 0) return;
-  jsonSink(JSON.stringify(ops));
-  ops = [];
+  if (off === 0) return;
+  binSink(buf.subarray(0, off));
+  off = 0;
 }
 
 export function bindText(nodeId: number, compute: () => string): void {
@@ -137,7 +130,7 @@ export function on(id: number, type: string, h: Handler): void {
   const slot = handlerFns.length;
   handlerKeys.push(`${id}:${type}`);
   handlerFns.push(h);
-  if (binary) { const t = iref(type); u8(9); u32(id); u32(t); u32(slot); } else ops.push([9, id, type]);
+  const t = iref(type); u8(OP_LISTEN); u32(id); u32(t); u32(slot);
 }
 
 export function dispatch(ev: NtEvent): void {

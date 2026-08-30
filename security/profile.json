@@ -1,7 +1,7 @@
 {
   "profile_format": 1,
-  "name": "lane",
-  "entry": "lane.ts",
+  "name": "nt-security",
+  "entry": "hostile-strings.ts",
   "emission": "llvm",
   "abi": {
     "prefix": "nt_",
@@ -22,17 +22,11 @@
   ],
   "exports": [
     {
-      "export": "setup",
-      "symbol": "nt_setup",
+      "export": "attack",
+      "symbol": "nt_attack",
       "params": [
         "f64"
       ],
-      "returns": "f64"
-    },
-    {
-      "export": "frameBinary",
-      "symbol": "nt_fb",
-      "params": [],
       "returns": "f64"
     }
   ]

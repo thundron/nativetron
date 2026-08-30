@@ -6,7 +6,7 @@ to evaluate; the browser lane sends bytes. This measures both for one frame.
 ```sh
 SCRIPTC_CC=zigcc SCRIPTC_TARGET=wasm32-wasi \
   node $SCRIPTC build --lib --profile bench/desktop-lane/profile.json
-node bench/desktop-lane/run.mjs 5000
+node bench/desktop-lane/b64.mjs 5000
 ```
 
 Timings are V8, not JavaScriptCore, and exclude the native-to-webview call
