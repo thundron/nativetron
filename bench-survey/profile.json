@@ -1,0 +1,449 @@
+{
+ "profile_format": 1,
+ "name": "bench",
+ "entry": "ops.ts",
+ "emission": "llvm",
+ "abi": {
+  "prefix": "nt_",
+  "init_symbol": "nt_init",
+  "sink_register_symbol": "nt_sink",
+  "collect_symbol": "nt_collect",
+  "result_reset_symbol": null,
+  "callback_register_symbol": null
+ },
+ "callbacks": [],
+ "exports": [
+  {
+   "export": "arrPush",
+   "symbol": "nt_arrPush",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "arrPop",
+   "symbol": "nt_arrPop",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "arrShift",
+   "symbol": "nt_arrShift",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "arrUnshift",
+   "symbol": "nt_arrUnshift",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "arrIndexOf",
+   "symbol": "nt_arrIndexOf",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "arrIncludes",
+   "symbol": "nt_arrIncludes",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "arrSlice",
+   "symbol": "nt_arrSlice",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "arrSplice",
+   "symbol": "nt_arrSplice",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "arrConcat",
+   "symbol": "nt_arrConcat",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "arrJoin",
+   "symbol": "nt_arrJoin",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "arrMap",
+   "symbol": "nt_arrMap",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "arrFilter",
+   "symbol": "nt_arrFilter",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "arrReduce",
+   "symbol": "nt_arrReduce",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "arrForEach",
+   "symbol": "nt_arrForEach",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "arrFind",
+   "symbol": "nt_arrFind",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "arrSome",
+   "symbol": "nt_arrSome",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "arrEvery",
+   "symbol": "nt_arrEvery",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "arrReverse",
+   "symbol": "nt_arrReverse",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "arrSort",
+   "symbol": "nt_arrSort",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "numIntLoop",
+   "symbol": "nt_numIntLoop",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "numFloatMath",
+   "symbol": "nt_numFloatMath",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "numMathCalls",
+   "symbol": "nt_numMathCalls",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "numBitOps",
+   "symbol": "nt_numBitOps",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "objFieldRW",
+   "symbol": "nt_objFieldRW",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "objLiteral",
+   "symbol": "nt_objLiteral",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "objSpread",
+   "symbol": "nt_objSpread",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "strBuild",
+   "symbol": "nt_strBuild",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "strIndexOf",
+   "symbol": "nt_strIndexOf",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "strIncludes",
+   "symbol": "nt_strIncludes",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "strSlice",
+   "symbol": "nt_strSlice",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "strSubstring",
+   "symbol": "nt_strSubstring",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "strSplit",
+   "symbol": "nt_strSplit",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "strJoin",
+   "symbol": "nt_strJoin",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "strTrim",
+   "symbol": "nt_strTrim",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "strStartsWith",
+   "symbol": "nt_strStartsWith",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "strEndsWith",
+   "symbol": "nt_strEndsWith",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "strRepeat",
+   "symbol": "nt_strRepeat",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "strCharCodeAt",
+   "symbol": "nt_strCharCodeAt",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "strCompare",
+   "symbol": "nt_strCompare",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "strTemplate",
+   "symbol": "nt_strTemplate",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "strNumToStr",
+   "symbol": "nt_strNumToStr",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "strStrToNum",
+   "symbol": "nt_strStrToNum",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "mapSet",
+   "symbol": "nt_mapSet",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "mapGet",
+   "symbol": "nt_mapGet",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "mapHas",
+   "symbol": "nt_mapHas",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "mapDelete",
+   "symbol": "nt_mapDelete",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "mapIterate",
+   "symbol": "nt_mapIterate",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "setAdd",
+   "symbol": "nt_setAdd",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "setHas",
+   "symbol": "nt_setHas",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "jsonStringify",
+   "symbol": "nt_jsonStringify",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "jsonParse",
+   "symbol": "nt_jsonParse",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "allocObjects",
+   "symbol": "nt_allocObjects",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "allocArrays",
+   "symbol": "nt_allocArrays",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "allocStrings",
+   "symbol": "nt_allocStrings",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  }
+ ]
+}
