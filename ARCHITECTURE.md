@@ -44,6 +44,12 @@ as bytes in linear memory; events call exported functions with scalars.
 The browser lane needed compiler work: a reactor build for wasm32-wasi, host
 imports, glue emission, and a size posture. See `FORK.md` in the scriptc fork.
 
+## Canvas
+
+`canvas/` is a second surface on the same idea: draw calls batch into a binary
+frame and replay against a real 2D context. Generated from `canvas/ops.json`,
+verified subpixel-exact against direct DOM calls.
+
 ## Limitations
 
 - No JSX. scriptc accepts `.ts` and `.js` entries only.
