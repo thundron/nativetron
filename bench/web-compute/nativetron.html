@@ -4,10 +4,16 @@
 <script type="module">
 import { instantiateFromBytes } from "./.scriptc/rows.mjs";
 let api;
+window.__split = {};
 window.__setup = async (n) => {
   const buf = await (await fetch("./.scriptc/rows.wasm")).arrayBuffer();
-  api = await instantiateFromBytes(buf, { ntApply: (b) => window.__nt.applyBin(b) });
+  let host = 0;
+  api = await instantiateFromBytes(buf, {
+    ntApply: (b) => { const t = performance.now(); window.__nt.applyBin(b); host += performance.now() - t; },
+  });
+  const t0 = performance.now();
   api.nt_build(n);
+  window.__split = { guest: +(performance.now() - t0 - host).toFixed(1), host: +host.toFixed(1) };
   window.__wasmKB = +(buf.byteLength / 1024).toFixed(1);
   window.__wasmMemMB = +(api.__memory().byteLength / 1048576).toFixed(2);
   return document.getElementById("nt-root").children.length;

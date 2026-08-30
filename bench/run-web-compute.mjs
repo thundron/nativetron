@@ -10,6 +10,7 @@ const REPO = dirname(ROOT);
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const PORT = 8241;
 const CDP = 9241;
+const MOUNT_REPS = +(process.env.MOUNT_REPS || 5);
 const ROWS = Number(process.env.ROWS ?? 10000);
 const TRIALS = Number(process.env.TRIALS ?? 50);
 
@@ -58,14 +59,27 @@ const f = (x) => x.toFixed(2);
 
 try {
   await waitCdp();
+  // A mount happens once per page load, so it is measured on fresh pages,
+  // repeated, and with the order alternated: whichever stack is timed first
+  // otherwise absorbs the other page's load work.
+  const ntMounts = [], rxMounts = [], guests = [], hosts = [];
+  for (let r = 0; r < MOUNT_REPS; r++) {
+    const a = await openPage("nativetron.html");
+    const b = await openPage("react.html");
+    await sleep(400);
+    const timed = async (p) => { const t = Date.now(); await p.evaluate(`window.__setup(${ROWS})`, true); return Date.now() - t; };
+    if (r % 2 === 0) { ntMounts.push(await timed(a)); rxMounts.push(await timed(b)); }
+    else { rxMounts.push(await timed(b)); ntMounts.push(await timed(a)); }
+    const sp = JSON.parse(await a.evaluate("JSON.stringify(window.__split)", true));
+    guests.push(sp.guest); hosts.push(sp.host);
+    await a.close(); await b.close();
+  }
+  const ntMount = median(ntMounts), rxMount = median(rxMounts);
+
   const nt = await openPage("nativetron.html");
   const rx = await openPage("react.html");
-  const ntT0 = Date.now();
   const ntRows = await nt.evaluate(`window.__setup(${ROWS})`, true);
-  const ntMount = Date.now() - ntT0;
-  const rxT0 = Date.now();
   const rxRows = await rx.evaluate(`window.__setup(${ROWS})`, true);
-  const rxMount = Date.now() - rxT0;
   for (let i = 0; i < 3; i++) { await nt.evaluate("window.__trial()"); await rx.evaluate("window.__trial()"); }
   const ntT = [], rxT = [];
   for (let i = 0; i < TRIALS; i++) {
@@ -101,7 +115,9 @@ try {
   console.log(`\n| context | nativetron | react |`);
   console.log(`|---|---|---|`);
   console.log(`| rows rendered | ${ntRows} | ${rxRows} |`);
-  console.log(`| mount ${ROWS} rows | ${ntMount} ms | ${rxMount} ms |`);
+  console.log(`| mount ${ROWS} rows (median of ${MOUNT_REPS}) | ${ntMount} ms | ${rxMount} ms |`);
+  console.log(`| — building the batch (guest) | ${median(guests)} ms | — |`);
+  console.log(`| — applying it (host) | ${median(hosts)} ms | — |`);
   console.log(`| JS heap | ${ntS.jsHeapMB} MB | ${rxS.jsHeapMB} MB |`);
   console.log(`| wasm linear memory | ${ntS.wasmMemMB} MB | — |`);
   console.log(`| module size | ${ntS.wasmKB} KB | 189.8 KB |`);
