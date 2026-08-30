@@ -1,5 +1,9 @@
 #include "webview/webview.h"
 
+#if defined(__APPLE__)
+#include <CoreFoundation/CoreFoundation.h>
+#endif
+
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -10,6 +14,7 @@ webview::webview *g_w = nullptr;
 using nt_msg_cb = void (*)(const uint8_t *, size_t, void *);
 nt_msg_cb g_msg_cb = nullptr;
 void *g_msg_ctx = nullptr;
+bool g_quit = false;
 
 std::string sv(const uint8_t *p, size_t n) {
   return std::string(reinterpret_cast<const char *>(p), n);
@@ -102,7 +107,49 @@ void nt_run(void) {
   }
 }
 
+#if defined(__APPLE__)
+int nt_pump(void) {
+  using namespace webview::detail;
+  using namespace webview::detail::cocoa;
+  objc::autoreleasepool arp;
+  id app = NSApplication_get_sharedApplication();
+  id until = objc::msg_send<id>(objc::get_class("NSDate"),
+                                objc::selector("distantPast"));
+  id mode = NSRunLoopMode::NSDefaultRunLoopMode();
+  CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.004, true);
+  int n = 0;
+  for (;;) {
+    id ev = NSApplication_nextEventMatchingMask(
+        app, static_cast<NSEventMask>(~0ULL), until, mode, true);
+    if (!ev) {
+      break;
+    }
+    NSApplication_sendEvent(app, ev);
+    n++;
+    if (n > 256) {
+      break;
+    }
+  }
+  objc::msg_send<void>(objc::get_class("CATransaction"),
+                       objc::selector("flush"));
+  return g_quit ? 1 : 0;
+}
+
+void nt_activate(void) {
+  using namespace webview::detail;
+  using namespace webview::detail::cocoa;
+  objc::autoreleasepool arp;
+  id app = NSApplication_get_sharedApplication();
+  objc::msg_send<void>(app, objc::selector("finishLaunching"));
+  NSApplication_activateIgnoringOtherApps(app, true);
+}
+#else
+int nt_pump(void) { return g_quit ? 1 : 0; }
+void nt_activate(void) {}
+#endif
+
 void nt_terminate(void) {
+  g_quit = true;
   if (g_w) {
     g_w->terminate();
   }

@@ -90,6 +90,18 @@
         "bytes"
       ],
       "returns": "void"
+    },
+    {
+      "name": "ntPump",
+      "symbol": "nt_pump",
+      "params": [],
+      "returns": "i32"
+    },
+    {
+      "name": "ntActivate",
+      "symbol": "nt_activate",
+      "params": [],
+      "returns": "void"
     }
   ],
   "libraries": [
