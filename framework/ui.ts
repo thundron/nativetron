@@ -8,6 +8,19 @@ export interface El {
   roots: number[];
 }
 
+export interface ElementHandle {
+  id: number;
+}
+
+export interface ElementRef {
+  current: ElementHandle | null;
+}
+
+export function bindRef(e: El, ref: ElementRef): El {
+  ref.current = { id: e.roots[0]! };
+  return e;
+}
+
 function appendEl(parent: number, child: El): void {
   for (let i = 0; i < child.roots.length; i++) append(parent, child.roots[i]!);
 }

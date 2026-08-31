@@ -38,6 +38,14 @@ export function useRef<T>(initial: T): Ref<T> {
   return { current: initial };
 }
 
+export function createRef<T>(): Ref<T | null> {
+  return { current: null };
+}
+
+export function useImperativeHandle<T>(ref: Ref<T | null> | null, create: () => T): void {
+  if (ref !== null) ref.current = create();
+}
+
 export interface ContextProviderProps<T> {
   value: T;
   children?: El[];

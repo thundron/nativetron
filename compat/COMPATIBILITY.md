@@ -10,7 +10,7 @@ compile error, not a runtime failure.
 
 ## React hooks
 
-7 of 18 implemented.
+8 of 18 implemented.
 
 | | supported | |
 |---|---|---|
@@ -19,10 +19,10 @@ compile error, not a runtime failure.
 | `useEffect` | yes | tracks reads automatically; no dependency array |
 | `useMemo` | yes | tracks reads automatically; no dependency array |
 | `useCallback` | yes | identity passthrough; components run once so it is a no-op |
-| `useRef` | yes | plain { current } box; no host-node refs |
+| `useRef` | yes | plain { current } box; a host ref receives a compiled { id } handle |
 | `useContext` | yes | returns a getter captured from the nearest compiled provider |
 | `useLayoutEffect` | no | no separate commit phase |
-| `useImperativeHandle` | no |  |
+| `useImperativeHandle` | yes | sets a component ref once; there is no dependency array or rerender phase |
 | `useSyncExternalStore` | no |  |
 | `useDeferredValue` | no | no concurrent scheduling |
 | `useTransition` | no | no concurrent scheduling |
@@ -35,14 +35,14 @@ compile error, not a runtime failure.
 
 ## React top-level API
 
-1 of 16 implemented.
+2 of 16 implemented.
 
 | | supported | |
 |---|---|---|
 | `createElement` | different | the JSX factory is h() in framework/jsx.ts |
 | `Fragment` | no | <>...</> has no factory yet |
 | `createContext` | yes | Provider children build lazily under a context stack; provider values are reactive getters |
-| `forwardRef` | no |  |
+| `forwardRef` | no | React 19-style ref props work; the legacy wrapper is not implemented |
 | `memo` | no | components run once; there is no re-render to skip |
 | `lazy` | no | no dynamic import in a compiled binary |
 | `Suspense` | no |  |
@@ -52,13 +52,13 @@ compile error, not a runtime failure.
 | `Children` | no |  |
 | `cloneElement` | no |  |
 | `isValidElement` | no |  |
-| `createRef` | no |  |
+| `createRef` | yes | returns { current: null } |
 | `Component` | no | class components are not supported |
 | `PureComponent` | no |  |
 
 ## JSX
 
-13 of 13 supported.
+14 of 14 supported.
 
 | | supported | |
 |---|---|---|
@@ -75,6 +75,7 @@ compile error, not a runtime failure.
 | `element-valued expression children` | yes | typed El expressions are inserted directly; mixed element/primitive unions are refused |
 | `conditional rendering` | yes | ternary and && over elements lower to show(); the arms are wrapped in a span |
 | `reactive attributes` | yes | non-literal, non-handler attributes recompute when their reads change |
+| `ref attributes` | yes | host refs receive { id }; component refs are ordinary ref props; host refs are not yet cleared when an ancestor is removed |
 
 ## Node builtins
 

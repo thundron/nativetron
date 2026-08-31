@@ -1,8 +1,8 @@
 // generated from app.tsx by app/jsx/build.mjs — do not edit
 import { mount, run, selftestEval } from "../../framework/dom.js";
 import { h, applyProps } from "../../framework/jsx.js";
-import { mountTo, each, show, dynAttr, nothing, frag, type El, type KeyedItem } from "../../framework/ui.js";
-import { useState, createContext, useContext, provide } from "../../compat/react.js";
+import { mountTo, each, show, dynAttr, nothing, frag, type El, type KeyedItem, type ElementHandle } from "../../framework/ui.js";
+import { useState, useRef, createRef, useImperativeHandle, createContext, useContext, provide, type Ref } from "../../compat/react.js";
 interface CounterProps {
     label: string;
     step: number;
@@ -22,6 +22,30 @@ function ContextText(props: ContextTextProps): El {
 function ContextDemo(): El {
     const [theme, setTheme] = useState("dark");
     return (h("section", { "class": "context-demo" }, ContextText({ "className": "context-default" }), provide(Theme, () => ({ "value": theme() }).value, () => frag([ContextText({ "className": "context-value" }), provide(Theme, () => ({ "value": "nested" }).value, () => frag([ContextText({ "className": "context-nested" })])), ContextText({ "className": "context-after-nested" })])), ContextText({ "className": "context-default-after" }), h("button", { "onclick": () => setTheme("light") }, "Change context")));
+}
+interface DemoHandle {
+    read: () => string;
+}
+interface RefChildProps {
+    ref: Ref<DemoHandle | null>;
+    label: string;
+}
+function RefChild(props: RefChildProps): El {
+    useImperativeHandle(props.ref, () => ({ read: () => "component:" + props.label }));
+    return h("span", null, "ref child");
+}
+function RefDemo(): El {
+    const hostRef = useRef<ElementHandle | null>(null);
+    const componentRef = createRef<DemoHandle>();
+    const [hostStatus, setHostStatus] = useState("host:pending");
+    const [componentStatus, setComponentStatus] = useState("component:pending");
+    return (h("section", { "class": "ref-demo" }, h("button", { "ref": hostRef, "onclick": () => {
+            const handle = hostRef.current;
+            setHostStatus(handle === null ? "host:missing" : "host:" + handle.id);
+        } }, "Read host ref"), RefChild({ "ref": componentRef, "label": "ready" }), h("button", { "onclick": () => {
+            const handle = componentRef.current;
+            setComponentStatus(handle === null ? "component:missing" : handle.read());
+        } }, "Read component ref"), h("p", { "class": "host-ref-status" }, () => "" + (hostStatus())), h("p", { "class": "component-ref-status" }, () => "" + (componentStatus()))));
 }
 interface BadgeProps {
     text: string;
@@ -55,7 +79,7 @@ function Items(): El {
 }
 mount("nativetron — JSX", 560, 560);
 const counterDefaults: CounterProps = { label: "By one", step: 1 };
-mountTo(h("main", null, h("h1", null, "Compiled JSX"), Counter({ ...counterDefaults, "label": "By three", "step": 3 }), SpreadAttrs(), ContextDemo(), GeneralChildren(), Fragmented(), Items()));
+mountTo(h("main", null, h("h1", null, "Compiled JSX"), Counter({ ...counterDefaults, "label": "By three", "step": 3 }), SpreadAttrs(), ContextDemo(), RefDemo(), GeneralChildren(), Fragmented(), Items()));
 if (process.env.NT_SELFTEST === "jsx") {
     setTimeout(() => {
         selftestEval('var b=[].slice.call(document.querySelectorAll("button"));' +
@@ -64,7 +88,9 @@ if (process.env.NT_SELFTEST === "jsx") {
             'var rm=b.filter(function(x){return x.textContent==="Remove first"})[0];' +
             'var spread=b.filter(function(x){return x.textContent==="Spread"})[0];' +
             'var context=b.filter(function(x){return x.textContent==="Change context"})[0];' +
-            'inc.click();inc.click();inc.click();spread.click();context.click();add.click();rm.click();' +
+            'var hostRef=b.filter(function(x){return x.textContent==="Read host ref"})[0];' +
+            'var componentRef=b.filter(function(x){return x.textContent==="Read component ref"})[0];' +
+            'inc.click();inc.click();inc.click();spread.click();context.click();hostRef.click();componentRef.click();add.click();rm.click();' +
             'setTimeout(function(){' +
             'var p=[].slice.call(document.querySelectorAll("p"))' +
             '.filter(function(x){return x.textContent.indexOf("count:")===0})[0];' +
@@ -86,7 +112,9 @@ if (process.env.NT_SELFTEST === "jsx") {
             'contextNested:document.querySelector(".context-nested").textContent,' +
             'contextAfterNested:document.querySelector(".context-after-nested").textContent,' +
             'contextDefaultAfter:document.querySelector(".context-default-after").textContent,' +
-            'contextParent:document.querySelector(".context-value").parentElement.className})}))},500);');
+            'contextParent:document.querySelector(".context-value").parentElement.className,' +
+            'hostRef:document.querySelector(".host-ref-status").textContent,' +
+            'componentRef:document.querySelector(".component-ref-status").textContent})}))},500);');
     }, 300);
 }
 run();

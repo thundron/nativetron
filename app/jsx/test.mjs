@@ -36,8 +36,10 @@ assert.equal(got.contextNested, "nested", "nearest nested provider won");
 assert.equal(got.contextAfterNested, "light", "outer provider was restored after nesting");
 assert.equal(got.contextDefaultAfter, "default", "provider stack was restored after its children");
 assert.equal(got.contextParent, "context-demo", "provider added no wrapper element");
+assert.match(got.hostRef, /^host:[1-9][0-9]*$/, "host ref received an element handle");
+assert.equal(got.componentRef, "component:ready", "component ref exposed its imperative handle");
 
-console.log("ok   props, spreads, expression children, context, conditionals, keyed list, reactive attributes, fragments");
+console.log("ok   props, spreads, expression children, context, refs, conditionals, keyed list, reactive attributes, fragments");
 
 const mixedSrc = join(here, ".mixed-child.tsx");
 const mixedOut = join(here, ".mixed-child.generated.ts");

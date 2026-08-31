@@ -90,7 +90,7 @@ function lowerJsx(context) {
       else if (ts.isStringLiteral(a.initializer)) value = a.initializer;
       else value = a.initializer.expression;
       const isHandler = name.startsWith("on");
-      const isStatic = ts.isStringLiteral(value) || name === "key";
+      const isStatic = ts.isStringLiteral(value) || name === "key" || name === "ref";
       if (!component && !isHandler && !isStatic) value = stringThunk(value);
       props.push(f.createPropertyAssignment(f.createStringLiteral(name), value));
     }

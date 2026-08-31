@@ -1,7 +1,7 @@
 import { mount, run, selftestEval } from "../../framework/dom.js";
 import { h, applyProps } from "../../framework/jsx.js";
-import { mountTo, each, show, dynAttr, nothing, frag, type El, type KeyedItem } from "../../framework/ui.js";
-import { useState, createContext, useContext, provide } from "../../compat/react.js";
+import { mountTo, each, show, dynAttr, nothing, frag, type El, type KeyedItem, type ElementHandle } from "../../framework/ui.js";
+import { useState, useRef, createRef, useImperativeHandle, createContext, useContext, provide, type Ref } from "../../compat/react.js";
 
 interface CounterProps {
   label: string;
@@ -46,6 +46,42 @@ function ContextDemo(): El {
       </Theme.Provider>
       <ContextText className="context-default-after" />
       <button onclick={() => setTheme("light")}>Change context</button>
+    </section>
+  );
+}
+
+interface DemoHandle {
+  read: () => string;
+}
+
+interface RefChildProps {
+  ref: Ref<DemoHandle | null>;
+  label: string;
+}
+
+function RefChild(props: RefChildProps): El {
+  useImperativeHandle(props.ref, () => ({ read: () => "component:" + props.label }));
+  return <span>ref child</span>;
+}
+
+function RefDemo(): El {
+  const hostRef = useRef<ElementHandle | null>(null);
+  const componentRef = createRef<DemoHandle>();
+  const [hostStatus, setHostStatus] = useState("host:pending");
+  const [componentStatus, setComponentStatus] = useState("component:pending");
+  return (
+    <section class="ref-demo">
+      <button ref={hostRef} onclick={() => {
+        const handle = hostRef.current;
+        setHostStatus(handle === null ? "host:missing" : "host:" + handle.id);
+      }}>Read host ref</button>
+      <RefChild ref={componentRef} label="ready" />
+      <button onclick={() => {
+        const handle = componentRef.current;
+        setComponentStatus(handle === null ? "component:missing" : handle.read());
+      }}>Read component ref</button>
+      <p class="host-ref-status">{hostStatus()}</p>
+      <p class="component-ref-status">{componentStatus()}</p>
     </section>
   );
 }
@@ -116,6 +152,7 @@ mountTo(
     <Counter {...counterDefaults} label="By three" step={3} />
     <SpreadAttrs />
     <ContextDemo />
+    <RefDemo />
     <GeneralChildren />
     <Fragmented />
     <Items />
@@ -130,7 +167,9 @@ if (process.env.NT_SELFTEST === "jsx") {
         'var rm=b.filter(function(x){return x.textContent==="Remove first"})[0];' +
         'var spread=b.filter(function(x){return x.textContent==="Spread"})[0];' +
         'var context=b.filter(function(x){return x.textContent==="Change context"})[0];' +
-        'inc.click();inc.click();inc.click();spread.click();context.click();add.click();rm.click();' +
+        'var hostRef=b.filter(function(x){return x.textContent==="Read host ref"})[0];' +
+        'var componentRef=b.filter(function(x){return x.textContent==="Read component ref"})[0];' +
+        'inc.click();inc.click();inc.click();spread.click();context.click();hostRef.click();componentRef.click();add.click();rm.click();' +
         'setTimeout(function(){' +
         'var p=[].slice.call(document.querySelectorAll("p"))' +
         '.filter(function(x){return x.textContent.indexOf("count:")===0})[0];' +
@@ -152,7 +191,9 @@ if (process.env.NT_SELFTEST === "jsx") {
         'contextNested:document.querySelector(".context-nested").textContent,' +
         'contextAfterNested:document.querySelector(".context-after-nested").textContent,' +
         'contextDefaultAfter:document.querySelector(".context-default-after").textContent,' +
-        'contextParent:document.querySelector(".context-value").parentElement.className})}))},500);',
+        'contextParent:document.querySelector(".context-value").parentElement.className,' +
+        'hostRef:document.querySelector(".host-ref-status").textContent,' +
+        'componentRef:document.querySelector(".component-ref-status").textContent})}))},500);',
     );
   }, 300);
 }

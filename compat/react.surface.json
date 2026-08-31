@@ -29,7 +29,7 @@
     {
       "name": "useRef",
       "status": "yes",
-      "note": "plain { current } box; no host-node refs"
+      "note": "plain { current } box; a host ref receives a compiled { id } handle"
     },
     {
       "name": "useContext",
@@ -43,7 +43,8 @@
     },
     {
       "name": "useImperativeHandle",
-      "status": "no"
+      "status": "yes",
+      "note": "sets a component ref once; there is no dependency array or rerender phase"
     },
     {
       "name": "useSyncExternalStore",
@@ -103,7 +104,8 @@
     },
     {
       "name": "forwardRef",
-      "status": "no"
+      "status": "no",
+      "note": "React 19-style ref props work; the legacy wrapper is not implemented"
     },
     {
       "name": "memo",
@@ -146,7 +148,8 @@
     },
     {
       "name": "createRef",
-      "status": "no"
+      "status": "yes",
+      "note": "returns { current: null }"
     },
     {
       "name": "Component",
@@ -222,6 +225,11 @@
       "name": "reactive attributes",
       "status": "yes",
       "note": "non-literal, non-handler attributes recompute when their reads change"
+    },
+    {
+      "name": "ref attributes",
+      "status": "yes",
+      "note": "host refs receive { id }; component refs are ordinary ref props; host refs are not yet cleared when an ancestor is removed"
     }
   ]
 }
