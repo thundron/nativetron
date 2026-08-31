@@ -19,7 +19,7 @@
     { "name": "application menu", "status": "yes", "module": "framework/menu.ts", "exports": ["setApplicationMenu", "getApplicationMenuItemCount"], "note": "top-level menus, separators, command-key equivalents, enabled state, compiled callbacks" },
     { "name": "context menu", "status": "no" },
     { "name": "tray/status item", "status": "yes", "module": "framework/menu.ts", "exports": ["setTray", "removeTray", "hasTray"], "note": "text status item with tooltip and compiled click callback; image and attached menu are not implemented" },
-    { "name": "file associations", "status": "no" },
+    { "name": "file associations", "status": "different", "module": "packaging/nativetron.config.json", "contract": true, "note": "document types and URL schemes are registered in Info.plist; runtime open-file and open-URL event delivery is not implemented" },
     { "name": "global shortcuts", "status": "no" }
   ]
 }

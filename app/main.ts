@@ -74,7 +74,8 @@ ipc.on("renderer:log", (payload: Uint8Array) => {
 
 ipc.listen(0, "127.0.0.1");
 ipc.onListening((port: number) => {
-  const renderer = spawn(join(process.cwd(), "build", "renderer"), [], {
+  const rendererPath = process.env.NT_RENDERER_PATH ?? join(process.cwd(), "build", "renderer");
+  const renderer = spawn(rendererPath, [], {
     stdio: "inherit",
     env: {
       NT_IPC_PORT: "" + port,

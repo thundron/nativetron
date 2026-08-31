@@ -2,7 +2,7 @@
 
 Platform: macOS arm64.
 
-14 supported, 1 partial, 5 unsupported.
+14 supported, 2 partial, 4 unsupported.
 
 | capability | status | note |
 |---|---|---|
@@ -24,7 +24,7 @@ Platform: macOS arm64.
 | application menu | yes | top-level menus, separators, command-key equivalents, enabled state, compiled callbacks |
 | context menu | no |  |
 | tray/status item | yes | text status item with tooltip and compiled click callback; image and attached menu are not implemented |
-| file associations | no |  |
+| file associations | different | document types and URL schemes are registered in Info.plist; runtime open-file and open-URL event delivery is not implemented |
 | global shortcuts | no |  |
 
 Generated from `desktop/surface.json`; do not edit directly.

@@ -12,6 +12,7 @@ for (const row of surface.capabilities) {
   if (row.status === "no") continue;
   if (!row.module) throw new Error(`${row.name}: implemented rows need a module`);
   const source = readFileSync(join(root, row.module), "utf8");
+  if (row.contract === true) continue;
   const names = row.exports ?? [row.export];
   for (const name of names) {
     if (!name || !new RegExp(`export\\s+function\\s+${name}\\b`).test(source)) {

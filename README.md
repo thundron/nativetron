@@ -27,6 +27,13 @@ Failure-path checks:
 ```sh
 node ipc/codec.test.mjs
 node stress/lifecycle.test.mjs
+node packaging/package.test.mjs
+```
+
+Build a release bundle:
+
+```sh
+node packaging/release.mjs --output dist
 ```
 
 ## Writing a component
@@ -63,6 +70,7 @@ mountTo(el("main", [Counter()]));
 | `desktop/` | generated desktop capability contract |
 | `pyrus/` | compiled Pyrus release-review workflow and compatibility notes |
 | `stress/` | lifecycle, crash, idle-memory, and orphan-cleanup tests |
+| `packaging/` | app-bundle, signing, notarization, install, and release tools |
 | `app/`, `web/` | desktop and browser entry points |
 | `bench/` | benchmarks against React and Electron |
 

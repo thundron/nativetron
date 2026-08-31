@@ -1,0 +1,17 @@
+{
+  "name": "Nativetron",
+  "executable": "nativetron",
+  "bundleIdentifier": "dev.nativetron.example",
+  "version": "0.1.0",
+  "minimumSystemVersion": "13.0",
+  "category": "public.app-category.developer-tools",
+  "mainBinary": "../build/main",
+  "rendererBinary": "../build/renderer",
+  "documentTypes": [
+    {
+      "name": "Nativetron Document",
+      "extensions": ["nativetron"],
+      "role": "Editor"
+    }
+  ]
+}
