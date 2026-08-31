@@ -1,0 +1,25 @@
+{
+  "platform": "macOS arm64",
+  "capabilities": [
+    { "name": "window title", "status": "yes", "module": "framework/window.ts", "export": "setWindowTitle" },
+    { "name": "window size", "status": "yes", "module": "framework/window.ts", "export": "setWindowSize" },
+    { "name": "minimize", "status": "yes", "module": "framework/window.ts", "export": "minimizeWindow" },
+    { "name": "maximize", "status": "yes", "module": "framework/window.ts", "export": "maximizeWindow" },
+    { "name": "fullscreen", "status": "yes", "module": "framework/window.ts", "export": "toggleFullscreen", "note": "toggle operation" },
+    { "name": "show / hide / focus", "status": "yes", "module": "framework/window.ts", "exports": ["showWindow", "hideWindow", "focusWindow"] },
+    { "name": "close", "status": "yes", "module": "framework/window.ts", "export": "closeWindow" },
+    { "name": "window state", "status": "yes", "module": "framework/window.ts", "export": "getWindowState", "note": "minimized, maximized, visible, focused, fullscreen" },
+    { "name": "multiple windows", "status": "no" },
+    { "name": "window events", "status": "no" },
+    { "name": "clipboard text", "status": "yes", "module": "framework/desktop.ts", "exports": ["readClipboard", "writeClipboard"] },
+    { "name": "open file/directory dialog", "status": "yes", "module": "framework/desktop.ts", "export": "openDialog", "note": "synchronous native modal" },
+    { "name": "save dialog", "status": "yes", "module": "framework/desktop.ts", "export": "saveDialog", "note": "synchronous native modal" },
+    { "name": "open external URL", "status": "yes", "module": "framework/desktop.ts", "export": "openExternal" },
+    { "name": "notifications", "status": "different", "module": "framework/desktop.ts", "export": "notify", "note": "submitted through deprecated NSUserNotification; delivery and permission behavior are not yet production-grade" },
+    { "name": "application menu", "status": "no" },
+    { "name": "context menu", "status": "no" },
+    { "name": "tray/status item", "status": "no" },
+    { "name": "file associations", "status": "no" },
+    { "name": "global shortcuts", "status": "no" }
+  ]
+}

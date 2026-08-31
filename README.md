@@ -53,7 +53,8 @@ mountTo(el("main", [Counter()]));
 | `abi/` | the DOM Host ABI specification |
 | `host/` | DOM host runtime used by both lanes |
 | `native/` | C++ webview wrapper exposing a C ABI |
+| `desktop/` | generated desktop capability contract |
 | `app/`, `web/` | desktop and browser entry points |
 | `bench/` | benchmarks against React and Electron |
 
-See [ARCHITECTURE.md](./ARCHITECTURE.md) for how the pieces fit together.
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for how the pieces fit together, [compat/COMPATIBILITY.md](./compat/COMPATIBILITY.md) for the compiled React/Node surface, and [desktop/COMPATIBILITY.md](./desktop/COMPATIBILITY.md) for native desktop capabilities.

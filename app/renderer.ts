@@ -3,6 +3,8 @@ import { el, txt, dyn, attr, on, mountTo, each, type El, type KeyedItem } from "
 import { signal } from "../framework/reactive.js";
 import { IpcRenderer } from "../ipc/renderer.js";
 import { encodeUtf8, decodeUtf8 } from "../ipc/codec.js";
+import { minimizeWindow, showWindow, hideWindow, getWindowState } from "../framework/window.js";
+import { readClipboard, writeClipboard, openExternal, notify } from "../framework/desktop.js";
 
 const ipc = new IpcRenderer();
 
@@ -118,12 +120,49 @@ async function selftest(): Promise<void> {
   quit();
 }
 
+function desktopSelftest(): void {
+  const previous = readClipboard();
+  const expected = "nativetron clipboard café 😀";
+  writeClipboard(expected);
+  const actual = readClipboard();
+  writeClipboard(previous);
+  const ok = actual === expected && !openExternal("") && !notify("", "");
+  console.log(ok ? "NT_DESKTOP_SELFTEST=OK" : "NT_DESKTOP_SELFTEST=FAIL");
+  quit();
+}
+
+function windowSelftest(): void {
+  const before = getWindowState();
+  minimizeWindow();
+  setTimeout(() => {
+    const minimized = getWindowState();
+    showWindow();
+    setTimeout(() => {
+      const restored = getWindowState();
+      hideWindow();
+      setTimeout(() => {
+        const hidden = getWindowState();
+        showWindow();
+        setTimeout(() => {
+          const shown = getWindowState();
+          const ok = before.visible && minimized.minimized &&
+            restored.visible && !restored.minimized && !hidden.visible && shown.visible;
+          console.log(ok ? "NT_WINDOW_SELFTEST=OK" : "NT_WINDOW_SELFTEST=FAIL");
+          quit();
+        }, 150);
+      }, 150);
+    }, 150);
+  }, 150);
+}
+
 ipc.onOpen(() => {
   ipc.invoke("os:homedir", encodeUtf8(""))
     .then((reply: Uint8Array) => { home.set(decodeUtf8(reply)); })
     .catch((e: unknown) => {});
   ipc.send("renderer:log", encodeUtf8("connected"));
   if (process.env.NT_SELFTEST === "ipc") selftest();
+  if (process.env.NT_SELFTEST === "window") windowSelftest();
+  if (process.env.NT_SELFTEST === "desktop") desktopSelftest();
 });
 ipc.onClose(() => { quit(); });
 ipc.connect(+(process.env.NT_IPC_PORT ?? "0"), "127.0.0.1");

@@ -33,6 +33,116 @@
       "returns": "void"
     },
     {
+      "name": "ntWindowAction",
+      "symbol": "nt_window_action",
+      "params": [
+        "i32"
+      ],
+      "returns": "void"
+    },
+    {
+      "name": "ntWindowState",
+      "symbol": "nt_window_state",
+      "params": [],
+      "returns": "i32"
+    },
+    {
+      "name": "ntClipboardWrite",
+      "symbol": "nt_clipboard_write",
+      "params": [
+        "string"
+      ],
+      "returns": "void"
+    },
+    {
+      "name": "ntClipboardRead",
+      "symbol": "nt_clipboard_read",
+      "params": [
+        {
+          "callback": {
+            "id": "clipboard",
+            "params": [
+              "string",
+              {
+                "context": "clipboard"
+              }
+            ],
+            "returns": "void",
+            "lifetime": "call"
+          }
+        },
+        {
+          "context": "clipboard"
+        }
+      ],
+      "returns": "void"
+    },
+    {
+      "name": "ntOpenExternal",
+      "symbol": "nt_open_external",
+      "params": [
+        "string"
+      ],
+      "returns": "i32"
+    },
+    {
+      "name": "ntOpenDialog",
+      "symbol": "nt_open_dialog",
+      "params": [
+        "i32",
+        "i32",
+        {
+          "callback": {
+            "id": "open_dialog",
+            "params": [
+              "string",
+              {
+                "context": "open_dialog"
+              }
+            ],
+            "returns": "void",
+            "lifetime": "call"
+          }
+        },
+        {
+          "context": "open_dialog"
+        }
+      ],
+      "returns": "void"
+    },
+    {
+      "name": "ntSaveDialog",
+      "symbol": "nt_save_dialog",
+      "params": [
+        {
+          "callback": {
+            "id": "save_dialog",
+            "params": [
+              "string",
+              {
+                "context": "save_dialog"
+              }
+            ],
+            "returns": "void",
+            "lifetime": "call"
+          }
+        },
+        {
+          "context": "save_dialog"
+        }
+      ],
+      "returns": "void"
+    },
+    {
+      "name": "ntNotify",
+      "symbol": "nt_notify",
+      "params": [
+        "string",
+        "string"
+      ],
+      "returns": "i32"
+    },
+    {
       "name": "ntSetHtml",
       "symbol": "nt_set_html",
       "params": [

@@ -13,6 +13,7 @@ namespace {
 webview::webview *g_w = nullptr;
 
 using nt_msg_cb = void (*)(const uint8_t *, size_t, void *);
+using nt_text_cb = void (*)(const uint8_t *, size_t, void *);
 nt_msg_cb g_msg_cb = nullptr;
 void *g_msg_ctx = nullptr;
 bool g_quit = false;
@@ -21,6 +22,25 @@ bool g_dirty = false;
 std::string sv(const uint8_t *p, size_t n) {
   return std::string(reinterpret_cast<const char *>(p), n);
 }
+
+void text_result(nt_text_cb cb, void *ctx, const std::string &value) {
+  cb(reinterpret_cast<const uint8_t *>(value.data()), value.size(), ctx);
+}
+
+#if defined(__APPLE__)
+id native_window() {
+  if (!g_w) return nullptr;
+  auto result = g_w->window();
+  if (!result.ok()) return nullptr;
+  return static_cast<id>(result.value());
+}
+
+std::string native_text(id value) {
+  if (!value) return "";
+  const char *text = webview::detail::cocoa::NSString_get_UTF8String(value);
+  return text ? std::string(text) : std::string();
+}
+#endif
 } // namespace
 
 extern "C" {
@@ -55,6 +75,190 @@ void nt_set_size(int32_t w, int32_t h) {
   if (g_w) {
     g_w->set_size(w, h, WEBVIEW_HINT_NONE);
   }
+}
+
+void nt_window_action(int32_t action) {
+#if defined(__APPLE__)
+  using namespace webview::detail;
+  using namespace webview::detail::cocoa;
+  objc::autoreleasepool arp;
+  id window = native_window();
+  if (!window) return;
+  switch (action) {
+    case 1:
+      objc::msg_send<void>(window, objc::selector("miniaturize:"), nullptr);
+      break;
+    case 2:
+      if (!objc::msg_send<bool>(window, objc::selector("isZoomed"))) {
+        objc::msg_send<void>(window, objc::selector("zoom:"), nullptr);
+      }
+      break;
+    case 3:
+      objc::msg_send<void>(window, objc::selector("toggleFullScreen:"), nullptr);
+      break;
+    case 4:
+      objc::msg_send<void>(window, objc::selector("deminiaturize:"), nullptr);
+      objc::msg_send<void>(window, objc::selector("makeKeyAndOrderFront:"), nullptr);
+      break;
+    case 6:
+      objc::msg_send<void>(window, objc::selector("makeKeyAndOrderFront:"), nullptr);
+      break;
+    case 5:
+      objc::msg_send<void>(window, objc::selector("orderOut:"), nullptr);
+      break;
+    case 7:
+      objc::msg_send<void>(window, objc::selector("close"));
+      g_quit = true;
+      break;
+  }
+#else
+  (void)action;
+#endif
+}
+
+int32_t nt_window_state(void) {
+#if defined(__APPLE__)
+  using namespace webview::detail;
+  id window = native_window();
+  if (!window) return 0;
+  int32_t state = 0;
+  if (objc::msg_send<bool>(window, objc::selector("isMiniaturized"))) state |= 1;
+  if (objc::msg_send<bool>(window, objc::selector("isZoomed"))) state |= 2;
+  if (objc::msg_send<bool>(window, objc::selector("isVisible"))) state |= 4;
+  if (objc::msg_send<bool>(window, objc::selector("isKeyWindow"))) state |= 8;
+  auto style = objc::msg_send<unsigned long>(window, objc::selector("styleMask"));
+  if ((style & (1UL << 14)) != 0) state |= 16;
+  return state;
+#else
+  return 0;
+#endif
+}
+
+void nt_clipboard_write(const uint8_t *s, size_t n) {
+#if defined(__APPLE__)
+  using namespace webview::detail;
+  using namespace webview::detail::cocoa;
+  objc::autoreleasepool arp;
+  id pasteboard = objc::msg_send<id>(objc::get_class("NSPasteboard"),
+                                     objc::selector("generalPasteboard"));
+  objc::msg_send<long>(pasteboard, objc::selector("clearContents"));
+  id type = NSString_stringWithUTF8String("public.utf8-plain-text");
+  id value = NSString_stringWithUTF8String(sv(s, n));
+  objc::msg_send<bool>(pasteboard, objc::selector("setString:forType:"), value, type);
+#else
+  (void)s;
+  (void)n;
+#endif
+}
+
+void nt_clipboard_read(nt_text_cb cb, void *ctx) {
+#if defined(__APPLE__)
+  using namespace webview::detail;
+  using namespace webview::detail::cocoa;
+  objc::autoreleasepool arp;
+  id pasteboard = objc::msg_send<id>(objc::get_class("NSPasteboard"),
+                                     objc::selector("generalPasteboard"));
+  id type = NSString_stringWithUTF8String("public.utf8-plain-text");
+  id value = objc::msg_send<id>(pasteboard, objc::selector("stringForType:"), type);
+  text_result(cb, ctx, native_text(value));
+#else
+  text_result(cb, ctx, "");
+#endif
+}
+
+int32_t nt_open_external(const uint8_t *s, size_t n) {
+#if defined(__APPLE__)
+  using namespace webview::detail;
+  using namespace webview::detail::cocoa;
+  if (n == 0) return 0;
+  objc::autoreleasepool arp;
+  id url = NSURL_URLWithString(sv(s, n));
+  if (!url) return 0;
+  id workspace = objc::msg_send<id>(objc::get_class("NSWorkspace"),
+                                     objc::selector("sharedWorkspace"));
+  return objc::msg_send<bool>(workspace, objc::selector("openURL:"), url) ? 1 : 0;
+#else
+  (void)s;
+  (void)n;
+  return 0;
+#endif
+}
+
+void nt_open_dialog(int32_t directories, int32_t multiple, nt_text_cb cb, void *ctx) {
+#if defined(__APPLE__)
+  using namespace webview::detail;
+  using namespace webview::detail::cocoa;
+  objc::autoreleasepool arp;
+  id panel = NSOpenPanel_openPanel();
+  NSOpenPanel_set_canChooseFiles(panel, directories == 0);
+  NSOpenPanel_set_canChooseDirectories(panel, directories != 0);
+  NSOpenPanel_set_allowsMultipleSelection(panel, multiple != 0);
+  if (NSSavePanel_runModal(panel) != NSModalResponseOK) {
+    text_result(cb, ctx, "");
+    return;
+  }
+  id urls = NSOpenPanel_get_URLs(panel);
+  auto count = objc::msg_send<unsigned long>(urls, objc::selector("count"));
+  std::string result;
+  for (unsigned long i = 0; i < count; i++) {
+    id url = objc::msg_send<id>(urls, objc::selector("objectAtIndex:"), i);
+    id path = objc::msg_send<id>(url, objc::selector("path"));
+    if (!result.empty()) result += '\n';
+    result += native_text(path);
+  }
+  text_result(cb, ctx, result);
+#else
+  (void)directories;
+  (void)multiple;
+  text_result(cb, ctx, "");
+#endif
+}
+
+void nt_save_dialog(nt_text_cb cb, void *ctx) {
+#if defined(__APPLE__)
+  using namespace webview::detail;
+  using namespace webview::detail::cocoa;
+  objc::autoreleasepool arp;
+  id panel = objc::msg_send<id>(objc::get_class("NSSavePanel"),
+                                 objc::selector("savePanel"));
+  if (NSSavePanel_runModal(panel) != NSModalResponseOK) {
+    text_result(cb, ctx, "");
+    return;
+  }
+  id url = objc::msg_send<id>(panel, objc::selector("URL"));
+  id path = objc::msg_send<id>(url, objc::selector("path"));
+  text_result(cb, ctx, native_text(path));
+#else
+  text_result(cb, ctx, "");
+#endif
+}
+
+int32_t nt_notify(const uint8_t *title, size_t title_n,
+                  const uint8_t *body, size_t body_n) {
+#if defined(__APPLE__)
+  using namespace webview::detail;
+  using namespace webview::detail::cocoa;
+  if (title_n == 0) return 0;
+  objc::autoreleasepool arp;
+  id note = objc::msg_send<id>(objc::get_class("NSUserNotification"),
+                                objc::selector("alloc"));
+  note = objc::msg_send<id>(note, objc::selector("init"));
+  objc::msg_send<void>(note, objc::selector("setTitle:"),
+                       NSString_stringWithUTF8String(sv(title, title_n)));
+  objc::msg_send<void>(note, objc::selector("setInformativeText:"),
+                       NSString_stringWithUTF8String(sv(body, body_n)));
+  id center = objc::msg_send<id>(objc::get_class("NSUserNotificationCenter"),
+                                  objc::selector("defaultUserNotificationCenter"));
+  objc::msg_send<void>(center, objc::selector("deliverNotification:"), note);
+  objc::msg_send<void>(note, objc::selector("release"));
+  return 1;
+#else
+  (void)title;
+  (void)title_n;
+  (void)body;
+  (void)body_n;
+  return 0;
+#endif
 }
 
 void nt_set_html(const uint8_t *s, size_t n) {

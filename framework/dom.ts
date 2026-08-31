@@ -1,4 +1,6 @@
 import { HOST_JS } from "./host-embed.generated.js";
+import "./window.js";
+import "./desktop.js";
 import { dispatch, dispatchSlot, flush, setBinarySink, setLive, type NtEvent } from "./core.js";
 
 declare function ntInit(): void;
