@@ -1,0 +1,15 @@
+{
+  "name": "@nativetron/node",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "index.mjs",
+  "dependencies": {
+    "react": "^19.2.8",
+    "react-reconciler": "^0.33.0"
+  },
+  "scripts": {
+    "build": "node-gyp configure build",
+    "test": "node test.mjs"
+  }
+}
