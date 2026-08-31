@@ -1,13 +1,30 @@
-# Pyrus release-review port
+# Pyrus compiled workflow ports
 
-Source workflow: `project-pyrus/src/main/releases/changelog.js` and `suspicious-scanner.js`.
+## Release review
+
+Sources: `project-pyrus/src/main/releases/changelog.js` and `suspicious-scanner.js`.
 
 The compiled slice validates changelog SemVer headings and hashes, normalizes and sorts semantic deployment diffs, enforces scan/preview/finding limits, and reports secret files, local state, binaries, nested generated output, large additions, deletions, and credential patterns. `app/main.ts` exposes it as `pyrus:review-release` over binary IPC.
 
-Differences from Pyrus:
+Differences:
 
 - CommonJS became typed ESM.
 - `localeCompare(value, "en")` became the statically lowered one-argument code-unit comparator. Finding content is unchanged; only presentation order can differ for non-ASCII paths. The two-argument ICU collation remains `SC2020`.
 - Returned records are not frozen. They remain private values serialized immediately by the main-process handler.
 
-The port drove static compiler support for non-empty literal-string `replaceAll` and named `node:path` `posix` namespace imports. Dynamic or empty string patterns remain an explicit compile-time refusal.
+This port drove static compiler support for non-empty literal-string `replaceAll` and named `node:path` `posix` namespace imports. Dynamic or empty string patterns remain an explicit compile-time refusal.
+
+## Pear NDJSON
+
+Source: `project-pyrus/src/main/pear/ndjson.js`.
+
+The compiled parser preserves Pyrus's shared byte, line, object, event-count, UTF-8, JSON-shape, identity, structured-error, and nesting limits. It handles fragmented lines and CRLF, classifies known tags, and rejects malformed UTF-8 through `node:util.TextDecoder("utf-8", { fatal: true })`. `app/main.ts` exposes it as `pyrus:parse-ndjson` over binary IPC.
+
+Differences:
+
+- CommonJS and `Buffer` became typed ESM and `Uint8Array`.
+- Parsed values are not deeply frozen. They remain private values reduced to a summary by the main-process handler.
+- `PearNDJSONError.details` is omitted; IPC returns the bounded error message.
+- Custom known-tag maps are not exposed; the compiled parser uses Pyrus's default command/tag contract.
+
+This port drove exact fatal UTF-8 decoding in scriptc's C and LLVM backends and named `node:util` `TextDecoder` imports. Non-fatal decoder options and fatal non-UTF-8 decoders remain explicit `SC2020` refusals.

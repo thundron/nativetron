@@ -153,6 +153,29 @@ async function selftest(): Promise<void> {
   quit();
 }
 
+function pyrusNDJSONSelftest(): void {
+  const valid = encodeUtf8(
+    '{"cmd":"stage","tag":"file","data":"a"}\r\n' +
+    '{"cmd":"stage","tag":"future-tag","data":true}\n',
+  );
+  let validOk = false;
+  ipc.invoke("pyrus:parse-ndjson", valid)
+    .then((reply: Uint8Array) => {
+      validOk = decodeUtf8(reply) === "stage:file:known\nstage:future-tag:unknown";
+      return ipc.invoke("pyrus:parse-ndjson", new Uint8Array([0xff, 0x0a]));
+    })
+    .then((_reply: Uint8Array) => {
+      console.log("NT_PYRUS_NDJSON_SELFTEST=FAIL");
+      quit();
+    })
+    .catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : "";
+      const ok = validOk && message === "NDJSON record is not valid UTF-8 at event 1";
+      console.log(ok ? "NT_PYRUS_NDJSON_SELFTEST=OK" : "NT_PYRUS_NDJSON_SELFTEST=FAIL");
+      quit();
+    });
+}
+
 async function pyrusSelftest(): Promise<void> {
   const unsafe = await requestReleaseReview(SAMPLE_REVIEW);
   const safe = await requestReleaseReview(SAFE_REVIEW);
@@ -322,6 +345,7 @@ ipc.onOpen(() => {
   if (process.env.NT_SELFTEST === "menu") menuSelftest();
   if (process.env.NT_SELFTEST === "shortcut") shortcutSelftest();
   if (process.env.NT_SELFTEST === "pyrus") pyrusSelftest();
+  if (process.env.NT_SELFTEST === "pyrus-ndjson") pyrusNDJSONSelftest();
 });
 ipc.onClose(() => { quit(); });
 ipc.connect(+(process.env.NT_IPC_PORT ?? "0"), "127.0.0.1");

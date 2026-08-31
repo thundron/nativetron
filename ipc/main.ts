@@ -111,7 +111,14 @@ export class IpcMain {
       return;
     }
     const self = this;
-    this.handlers[found]!(payload)
+    let result: Promise<Uint8Array>;
+    try {
+      result = this.handlers[found]!(payload);
+    } catch (err: unknown) {
+      self.fail(id, err instanceof Error ? err.message : "handler failed");
+      return;
+    }
+    result
       .then((out: Uint8Array) => { self.reply(id, out); })
       .catch((err: unknown) => {
         self.fail(id, err instanceof Error ? err.message : "handler failed");
