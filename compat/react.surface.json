@@ -171,7 +171,7 @@
     {
       "name": "attributes",
       "status": "yes",
-      "note": "string-valued; evaluated once"
+      "note": "string literals are set once; other expressions become reactive"
     },
     {
       "name": "event handlers",
@@ -189,8 +189,8 @@
     },
     {
       "name": "props on components",
-      "status": "no",
-      "note": "component functions take no arguments yet"
+      "status": "yes",
+      "note": "a plain object argument; children arrive as props.children"
     },
     {
       "name": "fragments",
@@ -202,23 +202,23 @@
     },
     {
       "name": "array / .map() children",
-      "status": "no",
-      "note": "use each() from framework/ui.ts for keyed lists"
+      "status": "yes",
+      "note": "an inline .map() with a key prop lowers to a keyed each()"
     },
     {
       "name": "element-valued expression children",
-      "status": "no",
-      "note": "a bound child is coerced to string; nest the element directly"
+      "status": "different",
+      "note": "only through a conditional; a bare element expression is coerced to string"
     },
     {
       "name": "conditional rendering",
-      "status": "no",
-      "note": "a bound child is text, so a false branch renders as text"
+      "status": "yes",
+      "note": "ternary and && over elements lower to show(); the arms are wrapped in a span"
     },
     {
       "name": "reactive attributes",
-      "status": "no",
-      "note": "attributes are written once at construction"
+      "status": "yes",
+      "note": "non-literal, non-handler attributes recompute when their reads change"
     }
   ]
 }

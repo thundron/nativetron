@@ -58,23 +58,23 @@ compile error, not a runtime failure.
 
 ## JSX
 
-6 of 13 supported.
+10 of 13 supported.
 
 | | supported | |
 |---|---|---|
 | `host elements` | yes | <div>, <button>, ... |
 | `component elements` | yes | <Counter /> calls the function once |
-| `attributes` | yes | string-valued; evaluated once |
+| `attributes` | yes | string literals are set once; other expressions become reactive |
 | `event handlers` | yes | onclick -> click; any on* prop whose value is a function |
 | `text children` | yes |  |
 | `expression children` | yes | auto-wrapped into a reactive binding and coerced to string |
-| `props on components` | no | component functions take no arguments yet |
+| `props on components` | yes | a plain object argument; children arrive as props.children |
 | `fragments` | no |  |
 | `spread props` | no |  |
-| `array / .map() children` | no | use each() from framework/ui.ts for keyed lists |
-| `element-valued expression children` | no | a bound child is coerced to string; nest the element directly |
-| `conditional rendering` | no | a bound child is text, so a false branch renders as text |
-| `reactive attributes` | no | attributes are written once at construction |
+| `array / .map() children` | yes | an inline .map() with a key prop lowers to a keyed each() |
+| `element-valued expression children` | different | only through a conditional; a bare element expression is coerced to string |
+| `conditional rendering` | yes | ternary and && over elements lower to show(); the arms are wrapped in a span |
+| `reactive attributes` | yes | non-literal, non-handler attributes recompute when their reads change |
 
 ## Node builtins
 

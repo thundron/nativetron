@@ -21,3 +21,25 @@ the changed text directly.
 
 Handlers are props whose value is a function; `onclick` becomes the `click`
 listener. Everything else becomes an attribute.
+
+## What the transform emits
+
+| JSX | emitted |
+|---|---|
+| `<div a="1">x</div>` | `h("div", { a: "1" }, "x")` |
+| `<Comp a={1} />` | `Comp({ a: 1 })` — a direct call, no factory |
+| `<Comp>{x}</Comp>` | `Comp({ children: [...] })` |
+| `{expr}` | `() => "" + (expr)` — a reactive text binding |
+| `<div style={e}>` | `dynAttr(..., "style", () => "" + (e))` |
+| `<ul>{xs.map(x => <li key={x}>..</li>)}</ul>` | `each("ul", () => xs.map(x => ({ key, el })))` |
+| `{c ? <a/> : <b/>}` | `show(() => c, () => .., () => ..)` |
+| `{c && <a/>}` | `show(() => c, () => .., nothing)` |
+
+`key` is read out of the emitted props and removed from the DOM attributes.
+A list child must be an inline `.map()` whose callback returns one element
+with a `key`.
+
+The generated file is TypeScript, not JavaScript: scriptc needs the
+annotations, so it is printed rather than transpiled.
+
+    node app/jsx/test.mjs

@@ -17,16 +17,20 @@ export function h(
     else if (typeof c === "function") kids.push(dyn(c));
     else kids.push(c);
   }
-  let e = el(tag, kids);
+  return applyProps(el(tag, kids), props);
+}
+
+export function applyProps(e: El, props: Record<string, PropValue> | null): El {
   if (props === null) return e;
+  let out = e;
   const names = Object.keys(props);
   for (let i = 0; i < names.length; i++) {
     const k = names[i]!;
     const v = props[k]!;
-    if (typeof v === "function") e = on(e, eventName(k), v);
-    else e = attr(e, k, v);
+    if (typeof v === "function") out = on(out, eventName(k), v);
+    else out = attr(out, k, v);
   }
-  return e;
+  return out;
 }
 
 function eventName(k: string): string {

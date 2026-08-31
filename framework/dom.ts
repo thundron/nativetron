@@ -90,6 +90,12 @@ export function mount(title: string, w: number, h: number): void {
   });
 }
 
+/** Evaluate a probe in the page (test tooling; the app decides what to ask). */
+export function selftestEval(js: string): void {
+  flush();
+  ntEval(js);
+}
+
 export function selftestRead(): void {
   flush();
   ntEval(

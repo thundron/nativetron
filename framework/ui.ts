@@ -115,3 +115,45 @@ export function each(tag: string, build: () => KeyedItem[]): El {
 
   return { id: host };
 }
+
+/** A subtree chosen by a condition. The wrapper element exists because the
+ * protocol addresses nodes by id: swapping needs a stable parent. */
+export function show(cond: () => boolean, whenTrue: () => El, whenFalse: () => El): El {
+  const host = newId();
+  createElement(host, "span");
+  let curId = 0;
+  let last = -1;
+  let first = true;
+
+  effect(() => {
+    const c = cond() ? 1 : 0;
+    if (c === last) return;
+    if (curId !== 0) remove(curId);
+    const next = c === 1 ? whenTrue() : whenFalse();
+    append(host, next.id);
+    curId = next.id;
+    last = c;
+    if (!first) flush();
+    first = false;
+  });
+
+  return { id: host };
+}
+
+/** An attribute recomputed when its reads change. */
+export function dynAttr(e: El, name: string, compute: () => string): El {
+  let first = true;
+  effect(() => {
+    setAttr(e.id, name, compute());
+    if (!first) flush();
+    first = false;
+  });
+  return e;
+}
+
+/** An empty placeholder, for the false arm of `show`. */
+export function nothing(): El {
+  const id = newId();
+  createText(id, "");
+  return { id };
+}
