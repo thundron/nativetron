@@ -5,41 +5,54 @@ import {
 import { effect } from "./reactive.js";
 
 export interface El {
-  id: number;
+  roots: number[];
+}
+
+function appendEl(parent: number, child: El): void {
+  for (let i = 0; i < child.roots.length; i++) append(parent, child.roots[i]!);
 }
 
 export function el(tag: string, children: El[]): El {
   const id = newId();
   createElement(id, tag);
-  for (let i = 0; i < children.length; i++) append(id, children[i]!.id);
-  return { id };
+  for (let i = 0; i < children.length; i++) appendEl(id, children[i]!);
+  return { roots: [id] };
+}
+
+export function frag(children: El[]): El {
+  const roots: number[] = [];
+  for (let i = 0; i < children.length; i++) {
+    const child = children[i]!;
+    for (let j = 0; j < child.roots.length; j++) roots.push(child.roots[j]!);
+  }
+  return { roots };
 }
 
 export function txt(s: string): El {
   const id = newId();
   createText(id, s);
-  return { id };
+  return { roots: [id] };
 }
 
 export function dyn(compute: () => string): El {
   const id = newId();
   createText(id, "");
   bindText(id, compute);
-  return { id };
+  return { roots: [id] };
 }
 
 export function attr(e: El, name: string, value: string): El {
-  setAttr(e.id, name, value);
+  setAttr(e.roots[0]!, name, value);
   return e;
 }
 
 export function on(e: El, type: string, handler: () => void): El {
-  listen(e.id, type, () => { handler(); });
+  listen(e.roots[0]!, type, () => { handler(); });
   return e;
 }
 
 export function mountTo(root: El): void {
-  append(ROOT, root.id);
+  appendEl(ROOT, root);
 }
 
 export interface KeyedItem {
@@ -76,7 +89,7 @@ export function each(tag: string, build: () => KeyedItem[]): El {
     const nextIds: number[] = [];
     for (let i = 0; i < next.length; i++) {
       nextKeys.push(next[i]!.key);
-      nextIds.push(next[i]!.el.id);
+      nextIds.push(next[i]!.el.roots[0]!);
     }
 
     const wanted = new Map<string, number>();
@@ -113,7 +126,7 @@ export function each(tag: string, build: () => KeyedItem[]): El {
     first = false;
   });
 
-  return { id: host };
+  return { roots: [host] };
 }
 
 /** A subtree chosen by a condition. The wrapper element exists because the
@@ -121,30 +134,30 @@ export function each(tag: string, build: () => KeyedItem[]): El {
 export function show(cond: () => boolean, whenTrue: () => El, whenFalse: () => El): El {
   const host = newId();
   createElement(host, "span");
-  let curId = 0;
+  let current: number[] = [];
   let last = -1;
   let first = true;
 
   effect(() => {
     const c = cond() ? 1 : 0;
     if (c === last) return;
-    if (curId !== 0) remove(curId);
+    for (let i = 0; i < current.length; i++) remove(current[i]!);
     const next = c === 1 ? whenTrue() : whenFalse();
-    append(host, next.id);
-    curId = next.id;
+    appendEl(host, next);
+    current = next.roots;
     last = c;
     if (!first) flush();
     first = false;
   });
 
-  return { id: host };
+  return { roots: [host] };
 }
 
 /** An attribute recomputed when its reads change. */
 export function dynAttr(e: El, name: string, compute: () => string): El {
   let first = true;
   effect(() => {
-    setAttr(e.id, name, compute());
+    setAttr(e.roots[0]!, name, compute());
     if (!first) flush();
     first = false;
   });
@@ -155,5 +168,5 @@ export function dynAttr(e: El, name: string, compute: () => string): El {
 export function nothing(): El {
   const id = newId();
   createText(id, "");
-  return { id };
+  return { roots: [id] };
 }

@@ -1,7 +1,7 @@
 // generated from app.tsx by app/jsx/build.mjs — do not edit
 import { mount, run, selftestEval } from "../../framework/dom.js";
 import { h, applyProps } from "../../framework/jsx.js";
-import { mountTo, each, show, dynAttr, nothing, type El, type KeyedItem } from "../../framework/ui.js";
+import { mountTo, each, show, dynAttr, nothing, frag, type El, type KeyedItem } from "../../framework/ui.js";
 import { useState } from "../../compat/react.js";
 interface CounterProps {
     label: string;
@@ -10,6 +10,9 @@ interface CounterProps {
 function Counter(props: CounterProps): El {
     const [count, setCount] = useState(0);
     return (h("section", null, h("h2", null, () => "" + (props.label)), h("button", { "style": "margin-right:8px", "onclick": () => setCount(count() + props.step) }, "Increment"), dynAttr(h("p", null, "count: ", () => "" + (count())), "style", () => "" + (count() > 5 ? "color:#b00" : "color:#111")), show(() => count() > 5, () => h("p", null, "over five"), () => h("p", null, "five or fewer")), show(() => count() > 8, () => h("p", null, "and over eight"), nothing)));
+}
+function Fragmented(): El {
+    return (frag([h("p", { "class": "fragment-a" }, "fragment alpha"), h("p", { "class": "fragment-b" }, "fragment beta")]));
 }
 function Items(): El {
     const [items, setItems] = useState<string[]>(["alpha", "beta", "gamma"]);
@@ -20,7 +23,7 @@ function Items(): El {
         } }, "Add"), h("button", { "onclick": () => { const next = items().slice(); next.shift(); setItems(next); } }, "Remove first"), applyProps(each("ul", () => items().map((x: string) => ({ key: "" + (x), el: h("li", null, () => "" + (x)) }))), { "class": "items" }), h("p", null, () => "" + (items().length), " items")));
 }
 mount("nativetron — JSX", 560, 560);
-mountTo(h("main", null, h("h1", null, "Compiled JSX"), Counter({ "label": "By three", "step": 3 }), Items()));
+mountTo(h("main", null, h("h1", null, "Compiled JSX"), Counter({ "label": "By three", "step": 3 }), Fragmented(), Items()));
 if (process.env.NT_SELFTEST === "jsx") {
     setTimeout(() => {
         selftestEval('var b=[].slice.call(document.querySelectorAll("button"));' +
@@ -35,7 +38,9 @@ if (process.env.NT_SELFTEST === "jsx") {
             '(window.__nt_send||window.__nt_ipc)(JSON.stringify({n:0,t:"__selftest",value:' +
             'JSON.stringify({text:document.getElementById("nt-root").textContent,' +
             'countStyle:p.getAttribute("style"),' +
-            'items:[].slice.call(ul.children).map(function(li){return li.textContent}).join(",")})}))},500);');
+            'items:[].slice.call(ul.children).map(function(li){return li.textContent}).join(","),' +
+            'fragmentParent:document.querySelector(".fragment-a").parentElement.tagName,' +
+            'fragmentAdjacent:document.querySelector(".fragment-a").nextElementSibling.className})}))},500);');
     }, 300);
 }
 run();

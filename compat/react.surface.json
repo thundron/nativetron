@@ -194,7 +194,8 @@
     },
     {
       "name": "fragments",
-      "status": "no"
+      "status": "yes",
+      "note": "<>...</> returns multiple root nodes without a wrapper element"
     },
     {
       "name": "spread props",

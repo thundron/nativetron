@@ -1,6 +1,6 @@
 import { mount, run, selftestEval } from "../../framework/dom.js";
 import { h, applyProps } from "../../framework/jsx.js";
-import { mountTo, each, show, dynAttr, nothing, type El, type KeyedItem } from "../../framework/ui.js";
+import { mountTo, each, show, dynAttr, nothing, frag, type El, type KeyedItem } from "../../framework/ui.js";
 import { useState } from "../../compat/react.js";
 
 interface CounterProps {
@@ -18,6 +18,15 @@ function Counter(props: CounterProps): El {
       {count() > 5 ? <p>over five</p> : <p>five or fewer</p>}
       {count() > 8 && <p>and over eight</p>}
     </section>
+  );
+}
+
+function Fragmented(): El {
+  return (
+    <>
+      <p class="fragment-a">fragment alpha</p>
+      <p class="fragment-b">fragment beta</p>
+    </>
   );
 }
 
@@ -43,6 +52,7 @@ mountTo(
   <main>
     <h1>Compiled JSX</h1>
     <Counter label="By three" step={3} />
+    <Fragmented />
     <Items />
   </main>,
 );
@@ -61,7 +71,9 @@ if (process.env.NT_SELFTEST === "jsx") {
         '(window.__nt_send||window.__nt_ipc)(JSON.stringify({n:0,t:"__selftest",value:' +
         'JSON.stringify({text:document.getElementById("nt-root").textContent,' +
         'countStyle:p.getAttribute("style"),' +
-        'items:[].slice.call(ul.children).map(function(li){return li.textContent}).join(",")})}))},500);',
+        'items:[].slice.call(ul.children).map(function(li){return li.textContent}).join(","),' +
+        'fragmentParent:document.querySelector(".fragment-a").parentElement.tagName,' +
+        'fragmentAdjacent:document.querySelector(".fragment-a").nextElementSibling.className})}))},500);',
     );
   }, 300);
 }

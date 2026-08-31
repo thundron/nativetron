@@ -58,7 +58,7 @@ compile error, not a runtime failure.
 
 ## JSX
 
-10 of 13 supported.
+11 of 13 supported.
 
 | | supported | |
 |---|---|---|
@@ -69,7 +69,7 @@ compile error, not a runtime failure.
 | `text children` | yes |  |
 | `expression children` | yes | auto-wrapped into a reactive binding and coerced to string |
 | `props on components` | yes | a plain object argument; children arrive as props.children |
-| `fragments` | no |  |
+| `fragments` | yes | <>...</> returns multiple root nodes without a wrapper element |
 | `spread props` | no |  |
 | `array / .map() children` | yes | an inline .map() with a key prop lowers to a keyed each() |
 | `element-valued expression children` | different | only through a conditional; a bare element expression is coerced to string |

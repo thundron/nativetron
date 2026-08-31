@@ -22,6 +22,8 @@ assert.match(got.text, /and over eight/, "&& child appeared");
 assert.doesNotMatch(got.text, /five or fewer/, "ternary false arm removed");
 assert.equal(got.countStyle, "color:#b00", "reactive attribute recomputed");
 assert.equal(got.items, "beta,gamma,item-4", "keyed list: appended and removed by key");
+assert.equal(got.fragmentParent, "MAIN", "fragment added no wrapper element");
+assert.equal(got.fragmentAdjacent, "fragment-b", "fragment roots remained adjacent siblings");
 
-console.log("ok   component props, conditionals, keyed list, reactive attributes");
+console.log("ok   component props, conditionals, keyed list, reactive attributes, fragments");
 console.log("jsx: all checks passed");
