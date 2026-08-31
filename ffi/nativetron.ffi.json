@@ -47,6 +47,25 @@
       "returns": "i32"
     },
     {
+      "name": "ntOnWindowEvent",
+      "symbol": "nt_on_window_event",
+      "params": [
+        {
+          "callback": {
+            "id": "window_event",
+            "params": [
+              "i32",
+              { "context": "window_event" }
+            ],
+            "returns": "void",
+            "lifetime": "retained"
+          }
+        },
+        { "context": "window_event" }
+      ],
+      "returns": "void"
+    },
+    {
       "name": "ntOnMenuAction",
       "symbol": "nt_on_menu_action",
       "params": [
@@ -202,6 +221,43 @@
     {
       "name": "ntTrayPresent",
       "symbol": "nt_tray_present",
+      "params": [],
+      "returns": "i32"
+    },
+    {
+      "name": "ntOnShortcutAction",
+      "symbol": "nt_on_shortcut_action",
+      "params": [
+        {
+          "callback": {
+            "id": "shortcut_action",
+            "params": [
+              "i32",
+              { "context": "shortcut_action" }
+            ],
+            "returns": "void",
+            "lifetime": "retained"
+          }
+        },
+        { "context": "shortcut_action" }
+      ],
+      "returns": "void"
+    },
+    {
+      "name": "ntShortcutRegister",
+      "symbol": "nt_shortcut_register",
+      "params": ["i32", "string", "i32"],
+      "returns": "i32"
+    },
+    {
+      "name": "ntShortcutUnregisterAll",
+      "symbol": "nt_shortcut_unregister_all",
+      "params": [],
+      "returns": "void"
+    },
+    {
+      "name": "ntShortcutCount",
+      "symbol": "nt_shortcut_count",
       "params": [],
       "returns": "i32"
     },

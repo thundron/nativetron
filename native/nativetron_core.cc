@@ -1,6 +1,7 @@
 #include "webview/webview.h"
 
 #if defined(__APPLE__)
+#include <Carbon/Carbon.h>
 #include <CoreFoundation/CoreFoundation.h>
 #endif
 
@@ -26,6 +27,11 @@ nt_action_cb g_tray_cb = nullptr;
 void *g_tray_ctx = nullptr;
 nt_action_cb g_context_cb = nullptr;
 void *g_context_ctx = nullptr;
+nt_action_cb g_window_cb = nullptr;
+void *g_window_ctx = nullptr;
+bool g_window_observing = false;
+nt_action_cb g_shortcut_cb = nullptr;
+void *g_shortcut_ctx = nullptr;
 
 #if defined(__APPLE__)
 id g_action_target = nullptr;
@@ -33,6 +39,8 @@ id g_main_menu = nullptr;
 id g_status_item = nullptr;
 id g_context_menu = nullptr;
 id g_tray_menu = nullptr;
+EventHandlerRef g_shortcut_event_handler = nullptr;
+std::vector<EventHotKeyRef> g_shortcut_refs;
 std::vector<std::string> g_menu_names;
 std::vector<id> g_menus;
 #endif
@@ -82,6 +90,23 @@ id action_target() {
                     (IMP)(+[](id, SEL, id sender) {
                       auto tag = objc::msg_send<long>(sender, objc::selector("tag"));
                       if (g_context_cb) g_context_cb(static_cast<int32_t>(tag), g_context_ctx);
+                    }),
+                    "v@:@");
+    class_addMethod(cls, objc::selector("nativetronWindowEvent:"),
+                    (IMP)(+[](id, SEL, id notification) {
+                      if (!g_window_cb) return;
+                      std::string name = native_text(
+                          objc::msg_send<id>(notification, objc::selector("name")));
+                      int32_t code = name == "NSWindowDidMoveNotification" ? 1
+                          : name == "NSWindowDidResizeNotification" ? 2
+                          : name == "NSWindowDidMiniaturizeNotification" ? 3
+                          : name == "NSWindowDidDeminiaturizeNotification" ? 4
+                          : name == "NSWindowDidBecomeKeyNotification" ? 5
+                          : name == "NSWindowDidResignKeyNotification" ? 6
+                          : name == "NSWindowDidEnterFullScreenNotification" ? 7
+                          : name == "NSWindowDidExitFullScreenNotification" ? 8
+                          : name == "NSWindowWillCloseNotification" ? 9 : 0;
+                      if (code != 0) g_window_cb(code, g_window_ctx);
                     }),
                     "v@:@");
     objc_registerClassPair(cls);
@@ -151,6 +176,36 @@ id action_item(SEL action, int32_t id_value, const std::string &label,
   objc::msg_send<void>(item, objc::selector("setTag:"), static_cast<long>(id_value));
   objc::msg_send<void>(item, objc::selector("setEnabled:"), static_cast<BOOL>(enabled));
   return item;
+}
+
+int32_t shortcut_key(const std::string &key) {
+  static const char *letters = "ASDFHGZXCVBQWERYT123465=97-80]OU[IPLJ'K;\\,/NM.`";
+  static const uint8_t codes[] = {
+      0,1,2,3,4,5,6,7,8,9,11,12,13,14,15,16,17,18,19,20,21,22,23,24,
+      25,26,27,28,29,30,31,32,33,34,35,37,38,39,40,41,42,43,44,45,46,47,50,
+  };
+  if (key.size() == 1) {
+    char c = key[0];
+    if (c >= 'a' && c <= 'z') c = static_cast<char>(c - 'a' + 'A');
+    const char *found = std::strchr(letters, c);
+    if (found) return codes[found - letters];
+  }
+  if (key.size() >= 2 && key[0] == 'F') {
+    int n = std::atoi(key.c_str() + 1);
+    static const uint8_t function_codes[] = {122,120,99,118,96,97,98,100,101,109,103,111};
+    if (n >= 1 && n <= 12) return function_codes[n - 1];
+  }
+  return -1;
+}
+
+OSStatus shortcut_event(EventHandlerCallRef, EventRef event, void *) {
+  EventHotKeyID hotkey{};
+  OSStatus status = GetEventParameter(event, kEventParamDirectObject,
+                                       typeEventHotKeyID, nullptr,
+                                       sizeof(hotkey), nullptr, &hotkey);
+  if (status != noErr) return status;
+  if (g_shortcut_cb) g_shortcut_cb(static_cast<int32_t>(hotkey.id), g_shortcut_ctx);
+  return noErr;
 }
 #endif
 } // namespace
@@ -243,6 +298,36 @@ int32_t nt_window_state(void) {
   return state;
 #else
   return 0;
+#endif
+}
+
+void nt_on_window_event(nt_action_cb cb, void *ctx) {
+  g_window_cb = cb;
+  g_window_ctx = ctx;
+#if defined(__APPLE__)
+  using namespace webview::detail;
+  using namespace webview::detail::cocoa;
+  if (g_window_observing) return;
+  id window = native_window();
+  if (!window) return;
+  id center = objc::msg_send<id>(objc::get_class("NSNotificationCenter"),
+                                  objc::selector("defaultCenter"));
+  const char *names[] = {
+      "NSWindowDidMoveNotification", "NSWindowDidResizeNotification",
+      "NSWindowDidMiniaturizeNotification", "NSWindowDidDeminiaturizeNotification",
+      "NSWindowDidBecomeKeyNotification", "NSWindowDidResignKeyNotification",
+      "NSWindowDidEnterFullScreenNotification", "NSWindowDidExitFullScreenNotification",
+      "NSWindowWillCloseNotification",
+  };
+  for (const char *name : names) {
+    objc::msg_send<void>(center, objc::selector("addObserver:selector:name:object:"),
+                         action_target(), objc::selector("nativetronWindowEvent:"),
+                         NSString_stringWithUTF8String(name), window);
+  }
+  g_window_observing = true;
+#else
+  (void)cb;
+  (void)ctx;
 #endif
 }
 
@@ -505,6 +590,61 @@ void nt_tray_remove(void) {
 int32_t nt_tray_present(void) {
 #if defined(__APPLE__)
   return g_status_item ? 1 : 0;
+#else
+  return 0;
+#endif
+}
+
+void nt_on_shortcut_action(nt_action_cb cb, void *ctx) {
+  g_shortcut_cb = cb;
+  g_shortcut_ctx = ctx;
+#if defined(__APPLE__)
+  if (!g_shortcut_event_handler) {
+    EventTypeSpec type{ kEventClassKeyboard, kEventHotKeyPressed };
+    OSStatus status = InstallApplicationEventHandler(
+        &shortcut_event, 1, &type, nullptr, &g_shortcut_event_handler);
+    if (status != noErr) g_shortcut_event_handler = nullptr;
+  }
+#endif
+}
+
+int32_t nt_shortcut_register(int32_t id_value, const uint8_t *key, size_t key_n,
+                             int32_t modifiers) {
+#if defined(__APPLE__)
+  if (!g_shortcut_event_handler) return 0;
+  int32_t code = shortcut_key(sv(key, key_n));
+  if (code < 0) return 0;
+  UInt32 carbon_modifiers = 0;
+  if ((modifiers & 1) != 0) carbon_modifiers |= cmdKey;
+  if ((modifiers & 2) != 0) carbon_modifiers |= optionKey;
+  if ((modifiers & 4) != 0) carbon_modifiers |= controlKey;
+  if ((modifiers & 8) != 0) carbon_modifiers |= shiftKey;
+  EventHotKeyID hotkey{ UINT32_C(0x4e545343), static_cast<UInt32>(id_value) };
+  EventHotKeyRef ref = nullptr;
+  OSStatus status = RegisterEventHotKey(static_cast<UInt32>(code), carbon_modifiers,
+                                        hotkey, GetApplicationEventTarget(), 0, &ref);
+  if (status != noErr || !ref) return 0;
+  g_shortcut_refs.push_back(ref);
+  return 1;
+#else
+  (void)id_value;
+  (void)key;
+  (void)key_n;
+  (void)modifiers;
+  return 0;
+#endif
+}
+
+void nt_shortcut_unregister_all(void) {
+#if defined(__APPLE__)
+  for (EventHotKeyRef ref : g_shortcut_refs) UnregisterEventHotKey(ref);
+  g_shortcut_refs.clear();
+#endif
+}
+
+int32_t nt_shortcut_count(void) {
+#if defined(__APPLE__)
+  return static_cast<int32_t>(g_shortcut_refs.size());
 #else
   return 0;
 #endif

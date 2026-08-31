@@ -10,7 +10,7 @@
     { "name": "close", "status": "yes", "module": "framework/window.ts", "export": "closeWindow" },
     { "name": "window state", "status": "yes", "module": "framework/window.ts", "export": "getWindowState", "note": "minimized, maximized, visible, focused, fullscreen" },
     { "name": "multiple windows", "status": "no" },
-    { "name": "window events", "status": "no" },
+    { "name": "window events", "status": "yes", "module": "framework/window.ts", "export": "onWindowEvent", "note": "move, resize, minimize, restore, focus, blur, fullscreen enter/exit, and close from native NSWindow notifications" },
     { "name": "clipboard text", "status": "yes", "module": "framework/desktop.ts", "exports": ["readClipboard", "writeClipboard"] },
     { "name": "open file/directory dialog", "status": "yes", "module": "framework/desktop.ts", "export": "openDialog", "note": "synchronous native modal" },
     { "name": "save dialog", "status": "yes", "module": "framework/desktop.ts", "export": "saveDialog", "note": "synchronous native modal" },
@@ -20,6 +20,6 @@
     { "name": "context menu", "status": "yes", "module": "framework/menu.ts", "exports": ["setContextMenu", "showContextMenu", "getContextMenuItemCount"], "note": "separators, enabled state, and compiled callbacks; showContextMenu must run while macOS has a current UI event" },
     { "name": "tray/status item", "status": "yes", "module": "framework/menu.ts", "exports": ["setTray", "setTrayImage", "setTrayMenu", "getTrayMenuItemCount", "removeTray", "hasTray"], "note": "text, tooltip, file-backed template or color image, attached menu, enabled state, separators, and compiled callbacks" },
     { "name": "file associations", "status": "different", "module": "packaging/nativetron.config.json", "contract": true, "note": "document types and URL schemes are registered in Info.plist; runtime open-file and open-URL event delivery is not implemented" },
-    { "name": "global shortcuts", "status": "no" }
+    { "name": "global shortcuts", "status": "yes", "module": "framework/shortcuts.ts", "exports": ["registerGlobalShortcut", "unregisterAllGlobalShortcuts", "getGlobalShortcutCount"], "note": "letters, digits, and F1-F12 with command, option, control, and shift modifiers through native Carbon hotkeys" }
   ]
 }

@@ -3,9 +3,10 @@ import { el, txt, dyn, attr, on, mountTo, each, type El, type KeyedItem } from "
 import { signal } from "../framework/reactive.js";
 import { IpcRenderer } from "../ipc/renderer.js";
 import { encodeUtf8, decodeUtf8 } from "../ipc/codec.js";
-import { minimizeWindow, showWindow, hideWindow, getWindowState } from "../framework/window.js";
+import { getWindowState, hideWindow, minimizeWindow, onWindowEvent, showWindow } from "../framework/window.js";
 import { readClipboard, writeClipboard, openExternal, notify } from "../framework/desktop.js";
 import { getApplicationMenuItemCount, getContextMenuItemCount, getTrayMenuItemCount, hasTray, removeTray, setApplicationMenu, setContextMenu, setTray, setTrayImage, setTrayMenu } from "../framework/menu.js";
+import { getGlobalShortcutCount, registerGlobalShortcut, unregisterAllGlobalShortcuts } from "../framework/shortcuts.js";
 import { SAMPLE_REVIEW, SAFE_REVIEW } from "../pyrus/sample.js";
 import type { ReleaseReview, ReleaseReviewRequest } from "../pyrus/release-review.js";
 
@@ -197,6 +198,20 @@ function menuSelftest(): void {
   quit();
 }
 
+function shortcutSelftest(): void {
+  const registered = registerGlobalShortcut(
+    "F12",
+    { command: true, option: true, control: true, shift: true },
+    () => {},
+  );
+  const rejected = !registerGlobalShortcut("not-a-key", { command: true }, () => {});
+  const count = getGlobalShortcutCount();
+  unregisterAllGlobalShortcuts();
+  const ok = registered && rejected && count === 1 && getGlobalShortcutCount() === 0;
+  console.log(ok ? "NT_SHORTCUT_SELFTEST=OK" : "NT_SHORTCUT_SELFTEST=FAIL");
+  quit();
+}
+
 function desktopSelftest(): void {
   const previous = readClipboard();
   const expected = "nativetron clipboard café 😀";
@@ -209,6 +224,12 @@ function desktopSelftest(): void {
 }
 
 function windowSelftest(): void {
+  let sawMinimize = false;
+  let sawRestore = false;
+  onWindowEvent((event) => {
+    if (event === "minimize") sawMinimize = true;
+    if (event === "restore") sawRestore = true;
+  });
   const before = getWindowState();
   minimizeWindow();
   setTimeout(() => {
@@ -223,7 +244,8 @@ function windowSelftest(): void {
         setTimeout(() => {
           const shown = getWindowState();
           const ok = before.visible && minimized.minimized &&
-            restored.visible && !restored.minimized && !hidden.visible && shown.visible;
+            restored.visible && !restored.minimized && !hidden.visible && shown.visible &&
+            sawMinimize && sawRestore;
           console.log(ok ? "NT_WINDOW_SELFTEST=OK" : "NT_WINDOW_SELFTEST=FAIL");
           quit();
         }, 150);
@@ -246,6 +268,7 @@ ipc.onOpen(() => {
   if (process.env.NT_SELFTEST === "window") windowSelftest();
   if (process.env.NT_SELFTEST === "desktop") desktopSelftest();
   if (process.env.NT_SELFTEST === "menu") menuSelftest();
+  if (process.env.NT_SELFTEST === "shortcut") shortcutSelftest();
   if (process.env.NT_SELFTEST === "pyrus") pyrusSelftest();
 });
 ipc.onClose(() => { quit(); });
