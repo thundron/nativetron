@@ -1,7 +1,7 @@
 import { mount, run, selftestEval } from "../../framework/dom.js";
 import { h, applyProps } from "../../framework/jsx.js";
 import { mountTo, each, show, dynAttr, nothing, frag, type El, type KeyedItem, type ElementHandle } from "../../framework/ui.js";
-import { useState, useRef, createRef, useImperativeHandle, createContext, useContext, provide, type Ref } from "../../compat/react.js";
+import { Fragment, StrictMode, createContext, createRef, forwardRef, memo, startTransition, useContext, useDebugValue, useDeferredValue, useId, useImperativeHandle, useInsertionEffect, useLayoutEffect, useRef, useState, useTransition, provide, type Ref } from "../../compat/react.js";
 
 interface CounterProps {
   label: string;
@@ -94,6 +94,49 @@ function Badge(props: BadgeProps): El {
   return <i>{props.text}</i>;
 }
 
+const MemoBadge = memo(Badge);
+
+interface LegacyRefProps {
+  label: string;
+  ref: Ref<DemoHandle | null> | null;
+}
+
+const LegacyRefChild = forwardRef<DemoHandle, LegacyRefProps>((props: LegacyRefProps, ref: Ref<DemoHandle | null> | null) => {
+  useImperativeHandle(ref, () => ({ read: () => "legacy:" + props.label }));
+  return <span class="legacy-ref-child">legacy ref child</span>;
+});
+
+function CompatibilityDemo(): El {
+  const idA = useId();
+  const idB = useId();
+  const deferred = useDeferredValue("deferred-ready");
+  const [pending, begin] = useTransition();
+  const [transitionState, setTransitionState] = useState("transition-idle");
+  const legacyRef = createRef<DemoHandle>();
+  const [legacyState, setLegacyState] = useState("legacy:pending");
+  useDebugValue(idA);
+  useLayoutEffect(() => {});
+  useInsertionEffect(() => {});
+  return (
+    <section class="compatibility-demo" data-id-a={idA} data-id-b={idB}>
+      <StrictMode>
+        <Fragment>
+          <MemoBadge text={deferred} />
+          <span class="transition-pending">{pending ? "pending" : "settled"}</span>
+        </Fragment>
+      </StrictMode>
+      <LegacyRefChild ref={legacyRef} label="ready" />
+      <button onclick={() => begin(() => setTransitionState("transition-done"))}>Run transition</button>
+      <button onclick={() => startTransition(() => {
+        const handle = legacyRef.current;
+        setLegacyState(handle === null ? "legacy:missing" : handle.read());
+      })}>Read legacy ref</button>
+      <p class="transition-state">{transitionState()}</p>
+      <p class="legacy-ref-state">{legacyState()}</p>
+    </section>
+  );
+}
+
 function GeneralChildren(): El {
   const stored: El = <b>stored</b>;
   return (
@@ -153,6 +196,7 @@ mountTo(
     <SpreadAttrs />
     <ContextDemo />
     <RefDemo />
+    <CompatibilityDemo />
     <GeneralChildren />
     <Fragmented />
     <Items />
@@ -169,7 +213,9 @@ if (process.env.NT_SELFTEST === "jsx") {
         'var context=b.filter(function(x){return x.textContent==="Change context"})[0];' +
         'var hostRef=b.filter(function(x){return x.textContent==="Read host ref"})[0];' +
         'var componentRef=b.filter(function(x){return x.textContent==="Read component ref"})[0];' +
-        'inc.click();inc.click();inc.click();spread.click();context.click();hostRef.click();componentRef.click();add.click();rm.click();' +
+        'var transition=b.filter(function(x){return x.textContent==="Run transition"})[0];' +
+        'var legacyRef=b.filter(function(x){return x.textContent==="Read legacy ref"})[0];' +
+        'inc.click();inc.click();inc.click();spread.click();context.click();hostRef.click();componentRef.click();transition.click();legacyRef.click();add.click();rm.click();' +
         'setTimeout(function(){' +
         'var p=[].slice.call(document.querySelectorAll("p"))' +
         '.filter(function(x){return x.textContent.indexOf("count:")===0})[0];' +
@@ -193,7 +239,14 @@ if (process.env.NT_SELFTEST === "jsx") {
         'contextDefaultAfter:document.querySelector(".context-default-after").textContent,' +
         'contextParent:document.querySelector(".context-value").parentElement.className,' +
         'hostRef:document.querySelector(".host-ref-status").textContent,' +
-        'componentRef:document.querySelector(".component-ref-status").textContent})}))},500);',
+        'componentRef:document.querySelector(".component-ref-status").textContent,' +
+        'compatIdA:document.querySelector(".compatibility-demo").getAttribute("data-id-a"),' +
+        'compatIdB:document.querySelector(".compatibility-demo").getAttribute("data-id-b"),' +
+        'compatTags:[].slice.call(document.querySelector(".compatibility-demo").children,0,2)' +
+        '.map(function(x){return x.tagName}).join(","),' +
+        'transitionPending:document.querySelector(".transition-pending").textContent,' +
+        'transitionState:document.querySelector(".transition-state").textContent,' +
+        'legacyRef:document.querySelector(".legacy-ref-state").textContent})}))},500);',
     );
   }, 300);
 }

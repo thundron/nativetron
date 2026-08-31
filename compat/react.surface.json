@@ -38,8 +38,8 @@
     },
     {
       "name": "useLayoutEffect",
-      "status": "no",
-      "note": "no separate commit phase"
+      "status": "different",
+      "note": "runs immediately as an automatically tracked effect; there is no separate layout commit phase"
     },
     {
       "name": "useImperativeHandle",
@@ -52,13 +52,13 @@
     },
     {
       "name": "useDeferredValue",
-      "status": "no",
-      "note": "no concurrent scheduling"
+      "status": "different",
+      "note": "returns the value immediately; there is no deferred scheduler"
     },
     {
       "name": "useTransition",
-      "status": "no",
-      "note": "no concurrent scheduling"
+      "status": "different",
+      "note": "returns [false, start]; start runs synchronously"
     },
     {
       "name": "useOptimistic",
@@ -70,15 +70,18 @@
     },
     {
       "name": "useInsertionEffect",
-      "status": "no"
+      "status": "different",
+      "note": "runs immediately as an automatically tracked effect; there is no insertion phase"
     },
     {
       "name": "useDebugValue",
-      "status": "no"
+      "status": "different",
+      "note": "accepted as a no-op; no React DevTools runtime is shipped"
     },
     {
       "name": "useId",
-      "status": "no"
+      "status": "yes",
+      "note": "returns a stable process-local id; server hydration prefixes are not applicable"
     },
     {
       "name": "use",
@@ -94,8 +97,8 @@
     },
     {
       "name": "Fragment",
-      "status": "no",
-      "note": "<>...</> has no factory yet"
+      "status": "yes",
+      "note": "named Fragment and <>...</> both return multiple roots without a wrapper"
     },
     {
       "name": "createContext",
@@ -104,13 +107,13 @@
     },
     {
       "name": "forwardRef",
-      "status": "no",
-      "note": "React 19-style ref props work; the legacy wrapper is not implemented"
+      "status": "different",
+      "note": "adapts ref props to the legacy second argument; the compiled props type must include ref and the props object retains it"
     },
     {
       "name": "memo",
-      "status": "no",
-      "note": "components run once; there is no re-render to skip"
+      "status": "different",
+      "note": "identity passthrough because components run once"
     },
     {
       "name": "lazy",
@@ -123,7 +126,8 @@
     },
     {
       "name": "startTransition",
-      "status": "no"
+      "status": "different",
+      "note": "runs the callback synchronously; no concurrent scheduler is shipped"
     },
     {
       "name": "Profiler",
@@ -131,8 +135,8 @@
     },
     {
       "name": "StrictMode",
-      "status": "no",
-      "note": "no double-invoke pass"
+      "status": "different",
+      "note": "renders children without a wrapper; no development double-invoke pass"
     },
     {
       "name": "Children",

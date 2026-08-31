@@ -38,8 +38,15 @@ assert.equal(got.contextDefaultAfter, "default", "provider stack was restored af
 assert.equal(got.contextParent, "context-demo", "provider added no wrapper element");
 assert.match(got.hostRef, /^host:[1-9][0-9]*$/, "host ref received an element handle");
 assert.equal(got.componentRef, "component:ready", "component ref exposed its imperative handle");
+assert.match(got.compatIdA, /^nt-[0-9]+$/, "useId returned a stable compiled id");
+assert.match(got.compatIdB, /^nt-[0-9]+$/, "useId returned a second compiled id");
+assert.notEqual(got.compatIdA, got.compatIdB, "useId values were unique");
+assert.equal(got.compatTags, "I,SPAN", "named Fragment and StrictMode added no wrappers");
+assert.equal(got.transitionPending, "settled", "synchronous transition reported no pending phase");
+assert.equal(got.transitionState, "transition-done", "useTransition ran its callback");
+assert.equal(got.legacyRef, "legacy:ready", "forwardRef adapted the legacy ref argument");
 
-console.log("ok   props, spreads, expression children, context, refs, conditionals, keyed list, reactive attributes, fragments");
+console.log("ok   props, spreads, expression children, context, refs, compatibility wrappers, conditionals, keyed list, reactive attributes, fragments");
 
 const mixedSrc = join(here, ".mixed-child.tsx");
 const mixedOut = join(here, ".mixed-child.generated.ts");

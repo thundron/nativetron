@@ -10,7 +10,7 @@ compile error, not a runtime failure.
 
 ## React hooks
 
-8 of 18 implemented.
+9 of 18 implemented.
 
 | | supported | |
 |---|---|---|
@@ -21,34 +21,34 @@ compile error, not a runtime failure.
 | `useCallback` | yes | identity passthrough; components run once so it is a no-op |
 | `useRef` | yes | plain { current } box; a host ref receives a compiled { id } handle |
 | `useContext` | yes | returns a getter captured from the nearest compiled provider |
-| `useLayoutEffect` | no | no separate commit phase |
+| `useLayoutEffect` | different | runs immediately as an automatically tracked effect; there is no separate layout commit phase |
 | `useImperativeHandle` | yes | sets a component ref once; there is no dependency array or rerender phase |
 | `useSyncExternalStore` | no |  |
-| `useDeferredValue` | no | no concurrent scheduling |
-| `useTransition` | no | no concurrent scheduling |
+| `useDeferredValue` | different | returns the value immediately; there is no deferred scheduler |
+| `useTransition` | different | returns [false, start]; start runs synchronously |
 | `useOptimistic` | no |  |
 | `useActionState` | no |  |
-| `useInsertionEffect` | no |  |
-| `useDebugValue` | no |  |
-| `useId` | no |  |
+| `useInsertionEffect` | different | runs immediately as an automatically tracked effect; there is no insertion phase |
+| `useDebugValue` | different | accepted as a no-op; no React DevTools runtime is shipped |
+| `useId` | yes | returns a stable process-local id; server hydration prefixes are not applicable |
 | `use` | no | requires suspense |
 
 ## React top-level API
 
-2 of 16 implemented.
+3 of 16 implemented.
 
 | | supported | |
 |---|---|---|
 | `createElement` | different | the JSX factory is h() in framework/jsx.ts |
-| `Fragment` | no | <>...</> has no factory yet |
+| `Fragment` | yes | named Fragment and <>...</> both return multiple roots without a wrapper |
 | `createContext` | yes | Provider children build lazily under a context stack; provider values are reactive getters |
-| `forwardRef` | no | React 19-style ref props work; the legacy wrapper is not implemented |
-| `memo` | no | components run once; there is no re-render to skip |
+| `forwardRef` | different | adapts ref props to the legacy second argument; the compiled props type must include ref and the props object retains it |
+| `memo` | different | identity passthrough because components run once |
 | `lazy` | no | no dynamic import in a compiled binary |
 | `Suspense` | no |  |
-| `startTransition` | no |  |
+| `startTransition` | different | runs the callback synchronously; no concurrent scheduler is shipped |
 | `Profiler` | no |  |
-| `StrictMode` | no | no double-invoke pass |
+| `StrictMode` | different | renders children without a wrapper; no development double-invoke pass |
 | `Children` | no |  |
 | `cloneElement` | no |  |
 | `isValidElement` | no |  |

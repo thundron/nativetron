@@ -1,5 +1,5 @@
 import { signal, effect, computed } from "../framework/reactive.js";
-import type { El } from "../framework/ui.js";
+import { frag, type El } from "../framework/ui.js";
 
 export type Getter<T> = () => T;
 export type Setter<T> = (v: T) => void;
@@ -21,6 +21,14 @@ export function useEffect(fn: () => void): void {
   effect(fn);
 }
 
+export function useLayoutEffect(fn: () => void): void {
+  effect(fn);
+}
+
+export function useInsertionEffect(fn: () => void): void {
+  effect(fn);
+}
+
 export function useMemo<T>(fn: () => T): Getter<T> {
   const c = computed(fn);
   return () => c.get();
@@ -28,6 +36,26 @@ export function useMemo<T>(fn: () => T): Getter<T> {
 
 export function useCallback<T>(fn: T): T {
   return fn;
+}
+
+let nextId = 0;
+
+export function useId(): string {
+  const id = nextId;
+  nextId++;
+  return "nt-" + id;
+}
+
+export function useDebugValue<T>(_value: T): void {}
+
+export function useDeferredValue<T>(value: T): T { return value; }
+
+export type TransitionStart = (fn: () => void) => void;
+
+export function startTransition(fn: () => void): void { fn(); }
+
+export function useTransition(): [boolean, TransitionStart] {
+  return [false, startTransition];
 }
 
 export interface Ref<T> {
@@ -78,4 +106,30 @@ export function provide<T>(context: Context<T>, value: Getter<T>, build: () => E
   } finally {
     context.stack.pop();
   }
+}
+
+export interface ChildrenProps {
+  children?: El[];
+}
+
+export function Fragment(props: ChildrenProps): El {
+  return frag(props.children ?? []);
+}
+
+export function StrictMode(props: ChildrenProps): El {
+  return frag(props.children ?? []);
+}
+
+export function memo<P>(component: (props: P) => El): (props: P) => El {
+  return component;
+}
+
+export interface RefProp<T> {
+  ref: Ref<T | null> | null;
+}
+
+export function forwardRef<T, P extends RefProp<T>>(
+  render: (props: P, ref: Ref<T | null> | null) => El,
+): (props: P) => El {
+  return (props: P) => render(props, props.ref);
 }
