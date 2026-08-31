@@ -45,12 +45,27 @@ export class IpcMain {
   listen(port: number, host: string): void {
     const self = this;
     const srv = createServer((sock) => {
+      if (self.peer !== null) {
+        sock.destroy();
+        return;
+      }
+      self.reader.reset();
       self.peer = { write: (b: Uint8Array) => { sock.write(b); } };
       for (let i = 0; i < self.connected.length; i++) self.connected[i]!();
+      const disconnect = (): void => {
+        self.peer = null;
+        self.reader.reset();
+      };
       sock.on("data", (d: Buffer) => {
-        self.reader.push(toBytes(d));
-        self.drain();
+        try {
+          self.reader.push(toBytes(d));
+          self.drain();
+        } catch (_e) {
+          sock.destroy();
+        }
       });
+      sock.on("close", disconnect);
+      sock.on("error", disconnect);
     });
     srv.listen({ port, host });
     srv.on("listening", () => {
@@ -68,17 +83,19 @@ export class IpcMain {
         const id = r.u32();
         const channel = r.str();
         const payload = r.bytes();
+        r.finish();
         r.release();
         this.dispatch(id, channel, payload);
       } else if (kind === FRAME_EVENT) {
         const channel = r.str();
         const payload = r.bytes();
+        r.finish();
         r.release();
         for (let i = 0; i < this.eventChannels.length; i++) {
           if (this.eventChannels[i] === channel) this.eventFns[i]!(payload);
         }
       } else {
-        r.release();
+        throw new Error("unknown ipc frame kind: " + kind);
       }
     }
   }

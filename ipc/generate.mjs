@@ -24,13 +24,14 @@ const targets = [
     path: join(here, "IPC.md"),
     render: (prev) =>
       prev.replace(/<!-- generated:kinds -->[\s\S]*?<!-- \/generated:kinds -->/,
-        `<!-- generated:kinds -->\n${table}\n\nFrame: ${spec.header}.\n\n\`\`\`\n${layout}\n\`\`\`\n<!-- /generated:kinds -->`),
+        `<!-- generated:kinds -->\n${table}\n\nFrame: ${spec.header}. Maximum frame body: ${spec.maxFrameBytes} bytes.\n\n\`\`\`\n${layout}\n\`\`\`\n<!-- /generated:kinds -->`),
   },
   {
     path: join(here, "protocol.generated.ts"),
     render: () =>
       "// generated from ipc/protocol.json by ipc/generate.mjs — do not edit\n" +
       `export const IPC_VERSION = ${spec.version};\n` +
+      `export const IPC_MAX_FRAME_SIZE = ${spec.maxFrameBytes};\n` +
       spec.kinds.map((k) => `export const FRAME_${k.name} = ${k.code};`).join("\n") + "\n",
   },
   {
@@ -38,6 +39,7 @@ const targets = [
     render: () =>
       "// generated from ipc/protocol.json by ipc/generate.mjs — do not edit\n" +
       `export const IPC_VERSION = ${spec.version};\n` +
+      `export const IPC_MAX_FRAME_SIZE = ${spec.maxFrameBytes};\n` +
       spec.kinds.map((k) => `export const FRAME_${k.name} = ${k.code};`).join("\n") + "\n",
   },
 ];

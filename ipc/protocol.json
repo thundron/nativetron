@@ -1,5 +1,6 @@
 {
   "version": 1,
+  "maxFrameBytes": 8388608,
   "header": "u32 frame length, then u8 kind",
   "kinds": [
     { "code": 1, "name": "REQUEST", "dir": "either", "fields": ["id:u32", "channel:str", "payload:bytes"] },

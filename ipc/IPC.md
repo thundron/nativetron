@@ -20,7 +20,7 @@ it; `--check` fails when anything is stale.
 | 3 | ERROR | either | id, message |
 | 4 | EVENT | either | channel, payload |
 
-Frame: u32 frame length, then u8 kind.
+Frame: u32 frame length, then u8 kind. Maximum frame body: 8388608 bytes.
 
 ```
      1 REQUEST  id(u32) channel(u32 length + utf-8) payload(u32 length + raw)

@@ -215,6 +215,11 @@ function windowSelftest(): void {
 }
 
 ipc.onOpen(() => {
+  if (process.env.NT_SELFTEST === "renderer-crash") {
+    process.exit(23);
+    return;
+  }
+  if (process.env.NT_SELFTEST === "stress-idle") console.log("NT_STRESS_READY=OK");
   ipc.invoke("os:homedir", encodeUtf8(""))
     .then((reply: Uint8Array) => { home.set(decodeUtf8(reply)); })
     .catch((e: unknown) => {});

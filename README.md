@@ -22,6 +22,13 @@ cd web && ./build-web.sh            # browser: .scriptc/renderer.{wasm,mjs}
 python3 -m http.server -d web 8000  # open /index.html
 ```
 
+Failure-path checks:
+
+```sh
+node ipc/codec.test.mjs
+node stress/lifecycle.test.mjs
+```
+
 ## Writing a component
 
 Components are functions returning `El`. Signals track dependencies, so `dyn`
@@ -55,6 +62,7 @@ mountTo(el("main", [Counter()]));
 | `native/` | C++ webview wrapper exposing a C ABI |
 | `desktop/` | generated desktop capability contract |
 | `pyrus/` | compiled Pyrus release-review workflow and compatibility notes |
+| `stress/` | lifecycle, crash, idle-memory, and orphan-cleanup tests |
 | `app/`, `web/` | desktop and browser entry points |
 | `bench/` | benchmarks against React and Electron |
 

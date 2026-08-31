@@ -1,3 +1,5 @@
+export const MAX_FRAME_SIZE = 8 * 1024 * 1024;
+
 export function encodeUtf8(s: string): Uint8Array {
   return new TextEncoder().encode(s);
 }
@@ -19,6 +21,7 @@ export class FrameWriter {
 
   private reserve(extra: number): void {
     const need = this.len + extra;
+    if (need > MAX_FRAME_SIZE + 4) throw new Error("ipc frame exceeds limit");
     if (need <= this.buf.length) return;
     let cap = this.buf.length * 2;
     while (cap < need) cap = cap * 2;
@@ -74,6 +77,7 @@ export class FrameReader {
 
   push(chunk: Uint8Array): void {
     const need = this.len + chunk.length;
+    if (need > MAX_FRAME_SIZE + 4) throw new Error("ipc frame buffer exceeds limit");
     if (need > this.buf.length) {
       let cap = this.buf.length * 2;
       while (cap < need) cap = cap * 2;
@@ -89,10 +93,18 @@ export class FrameReader {
   next(): boolean {
     if (this.len < 4) return false;
     const size = this.view.getUint32(0) >>> 0;
+    if (size === 0) throw new Error("ipc frame has no kind");
+    if (size > MAX_FRAME_SIZE) throw new Error("ipc frame exceeds limit");
     if (this.len < 4 + size) return false;
     this.pos = 4;
     this.end = 4 + size;
     return true;
+  }
+
+  reset(): void {
+    this.len = 0;
+    this.pos = 0;
+    this.end = 0;
   }
 
   release(): void {
@@ -103,13 +115,23 @@ export class FrameReader {
     this.end = 0;
   }
 
+  finish(): void {
+    if (this.pos !== this.end) throw new Error("ipc frame has trailing or missing fields");
+  }
+
+  private require(n: number): void {
+    if (this.pos + n > this.end) throw new Error("ipc field exceeds frame");
+  }
+
   u8(): number {
+    this.require(1);
     const v = this.buf[this.pos]!;
     this.pos = this.pos + 1;
     return v;
   }
 
   u32(): number {
+    this.require(4);
     const v = this.view.getUint32(this.pos) >>> 0;
     this.pos = this.pos + 4;
     return v;
@@ -117,6 +139,7 @@ export class FrameReader {
 
   bytes(): Uint8Array {
     const n = this.u32();
+    this.require(n);
     const out = new Uint8Array(n);
     out.set(this.buf.subarray(this.pos, this.pos + n), 0);
     this.pos = this.pos + n;

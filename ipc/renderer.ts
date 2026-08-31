@@ -13,6 +13,7 @@ export class IpcRenderer {
   private eventFns: ((payload: Uint8Array) => void)[] = [];
   private opened: (() => void)[] = [];
   private closed: (() => void)[] = [];
+  private stopped: boolean = false;
 
   on(channel: string, fn: (payload: Uint8Array) => void): void {
     this.eventChannels.push(channel);
@@ -29,21 +30,37 @@ export class IpcRenderer {
 
   connect(port: number, host: string): void {
     const self = this;
+    this.stopped = false;
+    this.reader.reset();
     const c = createConnection({ port, host });
     c.on("connect", () => {
       self.sock = { write: (b: Uint8Array) => { c.write(b); } };
       for (let i = 0; i < self.opened.length; i++) self.opened[i]!();
     });
     c.on("data", (d: Buffer) => {
-      self.reader.push(toBytes(d));
-      self.drain();
+      try {
+        self.reader.push(toBytes(d));
+        self.drain();
+      } catch (_e) {
+        c.destroy();
+        self.shutdown();
+      }
     });
     c.on("close", () => { self.shutdown(); });
     c.on("error", () => { self.shutdown(); });
   }
 
   private shutdown(): void {
+    if (this.stopped) return;
+    this.stopped = true;
     this.sock = null;
+    this.reader.reset();
+    for (let i = 0; i < this.pendingErr.length; i++) {
+      this.pendingErr[i]!(new Error("ipc disconnected"));
+    }
+    this.pendingIds = [];
+    this.pendingOk = [];
+    this.pendingErr = [];
     for (let i = 0; i < this.closed.length; i++) this.closed[i]!();
   }
 
@@ -101,22 +118,25 @@ export class IpcRenderer {
       if (kind === FRAME_RESULT) {
         const id = r.u32();
         const payload = r.bytes();
+        r.finish();
         r.release();
         this.settle(id, payload, "", true);
       } else if (kind === FRAME_ERROR) {
         const id = r.u32();
         const message = r.str();
+        r.finish();
         r.release();
         this.settle(id, new Uint8Array(0), message, false);
       } else if (kind === FRAME_EVENT) {
         const channel = r.str();
         const payload = r.bytes();
+        r.finish();
         r.release();
         for (let i = 0; i < this.eventChannels.length; i++) {
           if (this.eventChannels[i] === channel) this.eventFns[i]!(payload);
         }
       } else {
-        r.release();
+        throw new Error("unknown ipc frame kind: " + kind);
       }
     }
   }
