@@ -49,6 +49,16 @@ export function mount(title: string, w: number, h: number): void {
         selftestRead();
         return;
       }
+      if (process.env.NT_SELFTEST === "ipcui") {
+        ntEval(
+          'var b=[].slice.call(document.querySelectorAll("button"))' +
+            '.filter(function(x){return x.textContent==="Home dir"})[0];' +
+            'b.click();' +
+            'setTimeout(function(){(window.__nt_send||window.__nt_ipc)(JSON.stringify(' +
+            '{n:0,t:"__selftest",value:document.getElementById("nt-root").textContent}))},900);',
+        );
+        return;
+      }
       if (process.env.NT_SELFTEST === "click") {
         ntEval(
           'var b=[].slice.call(document.querySelectorAll("button"))' +

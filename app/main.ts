@@ -76,6 +76,7 @@ ipc.onListening((port: number) => {
       HOME: process.env.HOME ?? "",
       NT_SELFTEST: process.env.NT_SELFTEST ?? "",
       NT_BENCH_QUIT: process.env.NT_BENCH_QUIT ?? "",
+      NT_BLOCKING_RUN: process.env.NT_BLOCKING_RUN ?? "",
     },
   });
   renderer.on("exit", (code: number | null) => {

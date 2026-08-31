@@ -1,10 +1,25 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const check = process.argv.includes("--check");
-const scriptcRoot = process.env.SCRIPTC_ROOT ?? "/Users/thundron/Documents/development/scriptc";
+const REPO = join(here, "..");
+const scriptcRoot = resolveScriptc();
+
+function resolveScriptc() {
+  const env = process.env.SCRIPTC_ROOT;
+  const candidates = env ? [env] : [join(REPO, "..", "..", "scriptc"), join(REPO, "..", "scriptc")];
+  for (const c of candidates) {
+    if (existsSync(join(c, "package.json"))) return c;
+  }
+  console.error(
+    "cannot find the scriptc checkout" +
+      (env ? ` at SCRIPTC_ROOT=${env}` : "") +
+      " — set SCRIPTC_ROOT to it",
+  );
+  process.exit(1);
+}
 
 const react = JSON.parse(readFileSync(join(here, "react.surface.json"), "utf8"));
 

@@ -5,6 +5,7 @@
 #endif
 
 #include <cstddef>
+#include <cstdlib>
 #include <cstdint>
 #include <string>
 
@@ -15,6 +16,7 @@ using nt_msg_cb = void (*)(const uint8_t *, size_t, void *);
 nt_msg_cb g_msg_cb = nullptr;
 void *g_msg_ctx = nullptr;
 bool g_quit = false;
+bool g_dirty = false;
 
 std::string sv(const uint8_t *p, size_t n) {
   return std::string(reinterpret_cast<const char *>(p), n);
@@ -65,6 +67,7 @@ void nt_set_html(const uint8_t *s, size_t n) {
 // `window.__nt.applyB64("<[A-Za-z0-9+/=]*>")`, so no operand character can
 // close the string literal: escaping correctness stops being load-bearing.
 void nt_send_ops(const uint8_t *b, size_t n) {
+  g_dirty = true;
   if (!g_w) return;
   static const char *T =
       "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -91,6 +94,7 @@ void nt_send_ops(const uint8_t *b, size_t n) {
 }
 
 void nt_eval(const uint8_t *s, size_t n) {
+  g_dirty = true;
   if (g_w) {
     g_w->eval(sv(s, n));
   }
@@ -130,8 +134,13 @@ int nt_pump(void) {
       break;
     }
   }
-  objc::msg_send<void>(objc::get_class("CATransaction"),
-                       objc::selector("flush"));
+  // A Core Animation commit is only needed when something was drawn or
+  // evaluated; flushing every tick keeps the window awake for nothing.
+  if (g_dirty || n > 0) {
+    objc::msg_send<void>(objc::get_class("CATransaction"),
+                         objc::selector("flush"));
+    g_dirty = false;
+  }
   return g_quit ? 1 : 0;
 }
 
