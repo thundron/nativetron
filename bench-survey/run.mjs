@@ -23,6 +23,7 @@ const SIZES = {
   setAdd: 20000, setHas: 20000,
   jsonStringify: 2000, jsonParse: 2000,
   allocObjects: 200000, allocArrays: 200000, allocStrings: 100000,
+  escapeObjects: 100000, escapeArrays: 100000, escapeStrings: 100000,
 };
 
 const REPS = Number(process.env.REPS ?? 201);
@@ -88,7 +89,8 @@ if (mism.length) {
 // families summary
 const fam = (name) => name.startsWith("arr") ? "array" : name.startsWith("str") ? "string"
   : name.startsWith("map") || name.startsWith("set") ? "map/set" : name.startsWith("num") ? "numeric"
-  : name.startsWith("obj") ? "object" : name.startsWith("json") ? "json" : name.startsWith("alloc") ? "alloc" : "other";
+  : name.startsWith("obj") ? "object" : name.startsWith("json") ? "json"
+  : name.startsWith("alloc") || name.startsWith("escape") ? "alloc" : "other";
 const byFam = {};
 for (const r of rows) (byFam[fam(r.name)] ||= []).push(r.ratio);
 console.log("\n# family median ratio");

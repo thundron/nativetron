@@ -512,3 +512,29 @@ export function allocStrings(n: number): number {
   }
   return s;
 }
+
+type Quad = { a: number; b: number; c: number; d: number };
+
+export function escapeObjects(n: number): number {
+  const values: Quad[] = [];
+  for (let i = 0; i < n; i++) values.push({ a: i, b: i + 1, c: i + 2, d: i + 3 });
+  let s: number = 0;
+  for (let i = 0; i < values.length; i++) s += values[i]!.a + values[i]!.d;
+  return s;
+}
+
+export function escapeArrays(n: number): number {
+  const values: number[][] = [];
+  for (let i = 0; i < n; i++) values.push([i, i + 1, i + 2, i + 3]);
+  let s: number = 0;
+  for (let i = 0; i < values.length; i++) s += values[i]![0]! + values[i]![3]!;
+  return s;
+}
+
+export function escapeStrings(n: number): number {
+  const values: string[] = [];
+  for (let i = 0; i < n; i++) values.push("s" + i + "_" + (i * 2));
+  let s: number = 0;
+  for (let i = 0; i < values.length; i++) s += values[i]!.length;
+  return s;
+}

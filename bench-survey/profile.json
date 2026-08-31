@@ -468,6 +468,30 @@
     "f64"
    ],
    "returns": "f64"
+  },
+  {
+   "export": "escapeObjects",
+   "symbol": "nt_escapeObjects",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "escapeArrays",
+   "symbol": "nt_escapeArrays",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "escapeStrings",
+   "symbol": "nt_escapeStrings",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
   }
  ]
 }
