@@ -444,6 +444,30 @@
     "f64"
    ],
    "returns": "f64"
+  },
+  {
+   "export": "arrFill",
+   "symbol": "nt_arrFill",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "arrFlat",
+   "symbol": "nt_arrFlat",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
+  },
+  {
+   "export": "strUpper",
+   "symbol": "nt_strUpper",
+   "params": [
+    "f64"
+   ],
+   "returns": "f64"
   }
  ]
 }

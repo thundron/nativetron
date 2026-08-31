@@ -58,12 +58,14 @@ literal.
 
 | metric | nativetron | electron 44 |
 |---|---|---|
-| shipped artifact | 1.0 MB | 287 MB |
+| shipped artifact | 0.55 MiB | 287 MB |
 | cold start to first paint | 168 ms | 307 ms |
 | peak resident memory | 75 MB | 330 MB |
 | steady resident memory | 75 MB | 325 MB |
 | processes | 1 | 4 |
 | startup CPU | 8.0% | 20.6% |
+
+The nativetron artifact is the current 0.20 MiB main plus 0.35 MiB renderer after unreachable runtime sections are stripped. The standalone compiled JSX app is 0.29 MiB.
 
 Electron's helper processes are children and fully counted. The WKWebView
 content process is spawned by the system, so nativetron's resident memory is

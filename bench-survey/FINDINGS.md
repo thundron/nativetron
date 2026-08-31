@@ -1,72 +1,46 @@
 # Findings
 
-54 ops timed, wasm vs V8, warm, median of 201 interleaved reps. Full ranked table:
-RESULTS.md. Representative run below (±10% machine noise; ratios <~1.1x are noise).
+57 operations, compiled wasm versus V8, warm median of 201 paired and interleaved repetitions. `RESULTS.md` contains the full table.
 
-## Direct answer: is sort an outlier?
+## Family results
 
-No. `arrSort` is ~4x — mid-pack, and NOT the worst. The compiled stdlib is broadly
-slower than V8, with a long tail far worse than sort. The ~9x sort figure from the
-prior single-op benchmark understates the spread: many ordinary ops are 10–70x.
-sort is unremarkable.
+| family | median | range |
+|---|--:|--:|
+| numeric | 1.30x | 1.00–10.81x |
+| map/set | 1.46x | 1.01–4.83x |
+| json | 2.11x | 1.87–2.34x |
+| array | 2.94x | 0.72–22.52x |
+| string | 5.86x | 1.36–18.60x |
+| object | 21.31x | 3.65–23.53x |
+| allocation | 24.35x | 6.98–64.31x |
 
-## Family verdict
+Sort is not an outlier. Random `arrSort` is 2.94x, close to the array-family median.
 
-| family | median ratio | range | verdict |
-|---|--:|--:|---|
-| numeric | 1.3x | 1.05–55x | competitive EXCEPT bit ops |
-| map/set | 1.4x | 0.85–4.2x | competitive |
-| json    | 1.9x | 1.7–2.0x | acceptable |
-| array   | 4.3x | 0.53–24.8x | bad, wide spread |
-| string  | 9.0x | 1.4–39.9x | bad |
-| object  | 21.7x | 3.3–23.2x | very bad |
-| alloc   | 24.1x | 6.9–69x | very bad |
+## Largest remaining losses
 
-Competitive (<=1.5x): float math, `Math.*` calls, integer loop, Map set/has/delete,
-Set add, arrUnshift, arrReverse (faster than V8), arrSplice.
+- `allocArrays`: 64.31x.
+- `allocObjects`, object literals, and object field access: 21–24x.
+- `arrEvery`, `arrSome`, `arrFind`, and `arrConcat`: 19–23x.
+- `strTrim`: 18.60x.
+- String slice, substring, construction, and templates: 9.9–11.1x.
+- Bitwise numeric work: 10.81x after native i32 lowering, down from the former 55x path.
 
-Bad (>3x): all allocation, most object ops, string build/scan/slice, arrEvery/Some/
-Find/Map/Concat, bit ops.
+The allocation ratios partly measure V8 escape analysis eliminating work that the compiled lane performs. That is still an application-visible disadvantage of the compiled lane.
 
-## The two real pathologies
+## Changes since the previous run
 
-1. **Allocation of small objects/arrays/strings (7–70x).** `allocArrays` 200k tiny
-   arrays = ~70x. V8 escape-analyzes and often elides the allocation entirely
-   (0.13ms for 200k); the compiled lane really allocates. Caveat: part of this gap
-   is V8 eliding work, not only wasm being slow — but the compiled lane has no
-   equivalent escape analysis, so the allocation cost is real for it.
-2. **Bit ops on numbers (55x).** `numBitOps` (`<<`,`>>`,`^`,`|`) = 55x while the
-   arithmetic-only `numIntLoop` is 1.25x and `numMathCalls` is ~1.05x. Numbers are
-   modeled as f64 everywhere; each bitwise op needs f64->i32->f64 conversion. This
-   is the single worst *compute* op and contradicts any assumption that "integer"
-   code is fast — only non-bitwise integer arithmetic is.
+Upstream string self-concatenation ownership reduced `strBuild` from 4.526 ms to 1.166 ms, a 74% reduction. Its ratio fell from 39.91x to 10.33x.
 
-Object field R/W and object-literal creation at ~22x is the other systemic loss:
-the object model is heap-boxed with no V8-style hidden-class/inline-cache speedup.
+`Array.prototype.fill`, `Array.prototype.flat`, and `String.prototype.toUpperCase` now compile in wasm and are included in the survey:
 
-`arrReverse` (0.5x) and `mapDelete`/`arrUnshift` (~0.9–1.0x) are the only wins/ties.
+- `arrFill`: 1.12x.
+- `arrFlat`: 1.58x.
+- `strUpper`: 1.49x.
 
-## Non-compiling ops (cannot be measured)
+The case-conversion benchmark now varies its input on every iteration and includes character codes in its checksum. The former length-only checksum could not detect a no-op conversion, and repeated conversion of one immutable string allowed V8 to hoist or reuse work. An ASCII runtime fast path reduced the original invariant compiled workload from 13.46 ms to 2.21 ms before the instrument was corrected; Unicode inputs retain the table-driven path.
 
-| op | why | code |
-|---|---|---|
-| `Array.prototype.fill` | no scriptc lowering | SC2020 (build error) |
-| `Array.prototype.flat` | no scriptc lowering | SC2020 (build error) |
-| `String.prototype.toUpperCase` | lowers, but wasm link fails: `undefined symbol: scr_str_to_upper` (no wasm32-wasi runtime impl) | link error |
+## Correctness and method
 
-`fill`/`flat` fail typecheck-time with a code frame. `toUpperCase` passes coverage
-and IR lowering but the wasm runtime lacks the symbol, so `build --lib` fails at
-`wasm-ld`. (Likely native-only; a wasm gap, not a language gap.) Minimal repros in
-`repro/`.
+All 57 checksums matched. Both lanes execute the same `ops.ts`, are warmed, alternate measurement order, and run in one process. Ratios below roughly 1.1x are machine noise on this system.
 
-## Correctness mismatches
-
-None. All 54 compiled checksums equal the V8 checksums exactly.
-
-## Caveats stated plainly
-
-- Warm numbers only; cold first-call is ~1.2–1.7x slower (`coldwarm.mjs`).
-- Some huge ratios (alloc) partly reflect V8's optimizer eliding work rather than
-  the compiled lane being absurd; both are honest "what you get" numbers.
-- Ops sized so one call is tens-of-µs to low-ms; per-call wasm FFI overhead
-  (~sub-µs) is negligible at these sizes.
+The largest runtime work remains allocation, object representation, high-overhead array callbacks, and common string scans/copies.

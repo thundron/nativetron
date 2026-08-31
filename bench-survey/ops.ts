@@ -328,7 +328,10 @@ export function strJoin(n: number): number {
 export function strUpper(n: number): number {
   const str = mkStr(n);
   let s: number = 0;
-  for (let r = 0; r < 200; r++) s += str.toUpperCase().length;
+  for (let r = 0; r < 200; r++) {
+    const upper = (str + r).toUpperCase();
+    s += upper.length + upper.charCodeAt(0) + upper.charCodeAt(upper.length - 1);
+  }
   return s;
 }
 
