@@ -47,6 +47,98 @@
       "returns": "i32"
     },
     {
+      "name": "ntOnMenuAction",
+      "symbol": "nt_on_menu_action",
+      "params": [
+        {
+          "callback": {
+            "id": "menu_action",
+            "params": [
+              "i32",
+              {
+                "context": "menu_action"
+              }
+            ],
+            "returns": "void",
+            "lifetime": "retained"
+          }
+        },
+        {
+          "context": "menu_action"
+        }
+      ],
+      "returns": "void"
+    },
+    {
+      "name": "ntMenuReset",
+      "symbol": "nt_menu_reset",
+      "params": [],
+      "returns": "void"
+    },
+    {
+      "name": "ntMenuAdd",
+      "symbol": "nt_menu_add",
+      "params": [
+        "string",
+        "i32",
+        "string",
+        "string",
+        "i32"
+      ],
+      "returns": "i32"
+    },
+    {
+      "name": "ntMenuItemCount",
+      "symbol": "nt_menu_item_count",
+      "params": [],
+      "returns": "i32"
+    },
+    {
+      "name": "ntOnTrayAction",
+      "symbol": "nt_on_tray_action",
+      "params": [
+        {
+          "callback": {
+            "id": "tray_action",
+            "params": [
+              "i32",
+              {
+                "context": "tray_action"
+              }
+            ],
+            "returns": "void",
+            "lifetime": "retained"
+          }
+        },
+        {
+          "context": "tray_action"
+        }
+      ],
+      "returns": "void"
+    },
+    {
+      "name": "ntTraySet",
+      "symbol": "nt_tray_set",
+      "params": [
+        "i32",
+        "string",
+        "string"
+      ],
+      "returns": "i32"
+    },
+    {
+      "name": "ntTrayRemove",
+      "symbol": "nt_tray_remove",
+      "params": [],
+      "returns": "void"
+    },
+    {
+      "name": "ntTrayPresent",
+      "symbol": "nt_tray_present",
+      "params": [],
+      "returns": "i32"
+    },
+    {
       "name": "ntClipboardWrite",
       "symbol": "nt_clipboard_write",
       "params": [

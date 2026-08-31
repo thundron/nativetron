@@ -16,9 +16,9 @@
     { "name": "save dialog", "status": "yes", "module": "framework/desktop.ts", "export": "saveDialog", "note": "synchronous native modal" },
     { "name": "open external URL", "status": "yes", "module": "framework/desktop.ts", "export": "openExternal" },
     { "name": "notifications", "status": "different", "module": "framework/desktop.ts", "export": "notify", "note": "submitted through deprecated NSUserNotification; delivery and permission behavior are not yet production-grade" },
-    { "name": "application menu", "status": "no" },
+    { "name": "application menu", "status": "yes", "module": "framework/menu.ts", "exports": ["setApplicationMenu", "getApplicationMenuItemCount"], "note": "top-level menus, separators, command-key equivalents, enabled state, compiled callbacks" },
     { "name": "context menu", "status": "no" },
-    { "name": "tray/status item", "status": "no" },
+    { "name": "tray/status item", "status": "yes", "module": "framework/menu.ts", "exports": ["setTray", "removeTray", "hasTray"], "note": "text status item with tooltip and compiled click callback; image and attached menu are not implemented" },
     { "name": "file associations", "status": "no" },
     { "name": "global shortcuts", "status": "no" }
   ]

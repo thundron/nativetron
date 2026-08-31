@@ -5,6 +5,7 @@ import { IpcRenderer } from "../ipc/renderer.js";
 import { encodeUtf8, decodeUtf8 } from "../ipc/codec.js";
 import { minimizeWindow, showWindow, hideWindow, getWindowState } from "../framework/window.js";
 import { readClipboard, writeClipboard, openExternal, notify } from "../framework/desktop.js";
+import { setApplicationMenu, getApplicationMenuItemCount, setTray, removeTray, hasTray } from "../framework/menu.js";
 
 const ipc = new IpcRenderer();
 
@@ -120,6 +121,23 @@ async function selftest(): Promise<void> {
   quit();
 }
 
+function menuSelftest(): void {
+  const menuOk = setApplicationMenu([
+    { label: "File", items: [
+      { label: "First", key: "1", action: () => {} },
+      { label: "-" },
+      { label: "Disabled", enabled: false },
+    ] },
+    { label: "Edit", items: [{ label: "Copy", key: "c", action: () => {} }] },
+  ]);
+  const trayOk = setTray("NT", "nativetron self-test", () => {});
+  const present = hasTray();
+  removeTray();
+  const ok = menuOk && getApplicationMenuItemCount() === 4 && trayOk && present && !hasTray();
+  console.log(ok ? "NT_MENU_SELFTEST=OK" : "NT_MENU_SELFTEST=FAIL");
+  quit();
+}
+
 function desktopSelftest(): void {
   const previous = readClipboard();
   const expected = "nativetron clipboard café 😀";
@@ -163,6 +181,7 @@ ipc.onOpen(() => {
   if (process.env.NT_SELFTEST === "ipc") selftest();
   if (process.env.NT_SELFTEST === "window") windowSelftest();
   if (process.env.NT_SELFTEST === "desktop") desktopSelftest();
+  if (process.env.NT_SELFTEST === "menu") menuSelftest();
 });
 ipc.onClose(() => { quit(); });
 ipc.connect(+(process.env.NT_IPC_PORT ?? "0"), "127.0.0.1");
