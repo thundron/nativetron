@@ -2,7 +2,7 @@
 
 Platform: macOS arm64.
 
-17 supported, 2 partial, 1 unsupported.
+17 supported, 3 partial, 0 unsupported.
 
 | capability | status | note |
 |---|---|---|
@@ -14,8 +14,8 @@ Platform: macOS arm64.
 | show / hide / focus | yes |  |
 | close | yes |  |
 | window state | yes | minimized, maximized, visible, focused, fullscreen |
-| multiple windows | no |  |
-| window events | yes | move, resize, minimize, restore, focus, blur, fullscreen enter/exit, and close from native NSWindow notifications |
+| multiple windows | different | secondary native webviews load explicit HTML or URLs and expose title, size, state, actions, events, and cleanup; they do not have independent compiled DOM Host ABI renderer roots |
+| window events | yes | window id plus move, resize, minimize, restore, focus, blur, fullscreen enter/exit, and close from native NSWindow notifications |
 | clipboard text | yes |  |
 | open file/directory dialog | yes | synchronous native modal |
 | save dialog | yes | synchronous native modal |

@@ -66,6 +66,42 @@
       "returns": "void"
     },
     {
+      "name": "ntCreateWindow",
+      "symbol": "nt_window_create",
+      "params": ["string", "i32", "i32", "string", "i32"],
+      "returns": "i32"
+    },
+    {
+      "name": "ntWindowSetTitleFor",
+      "symbol": "nt_window_set_title_for",
+      "params": ["i32", "string"],
+      "returns": "void"
+    },
+    {
+      "name": "ntWindowSetSizeFor",
+      "symbol": "nt_window_set_size_for",
+      "params": ["i32", "i32", "i32"],
+      "returns": "void"
+    },
+    {
+      "name": "ntWindowActionFor",
+      "symbol": "nt_window_action_for",
+      "params": ["i32", "i32"],
+      "returns": "void"
+    },
+    {
+      "name": "ntWindowStateFor",
+      "symbol": "nt_window_state_for",
+      "params": ["i32"],
+      "returns": "i32"
+    },
+    {
+      "name": "ntWindowCount",
+      "symbol": "nt_window_count",
+      "params": [],
+      "returns": "i32"
+    },
+    {
       "name": "ntOnMenuAction",
       "symbol": "nt_on_menu_action",
       "params": [

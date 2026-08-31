@@ -39,6 +39,13 @@ id g_main_menu = nullptr;
 id g_status_item = nullptr;
 id g_context_menu = nullptr;
 id g_tray_menu = nullptr;
+struct ExtraWindow {
+  int32_t id;
+  webview::webview *view;
+};
+std::vector<ExtraWindow> g_extra_windows;
+std::vector<webview::webview *> g_pending_window_deletes;
+int32_t g_next_window_id = 1;
 EventHandlerRef g_shortcut_event_handler = nullptr;
 std::vector<EventHotKeyRef> g_shortcut_refs;
 std::vector<std::string> g_menu_names;
@@ -59,6 +66,34 @@ id native_window() {
   auto result = g_w->window();
   if (!result.ok()) return nullptr;
   return static_cast<id>(result.value());
+}
+
+id native_extra_window(const ExtraWindow &entry) {
+  auto result = entry.view->window();
+  return result.ok() ? static_cast<id>(result.value()) : nullptr;
+}
+
+ExtraWindow *extra_window(int32_t id_value) {
+  for (auto &entry : g_extra_windows) if (entry.id == id_value) return &entry;
+  return nullptr;
+}
+
+int32_t native_window_id(id window) {
+  if (window == native_window()) return 0;
+  for (const auto &entry : g_extra_windows) {
+    if (window == native_extra_window(entry)) return entry.id;
+  }
+  return -1;
+}
+
+void retire_extra_window(int32_t id_value) {
+  for (size_t i = 0; i < g_extra_windows.size(); i++) {
+    if (g_extra_windows[i].id == id_value) {
+      g_pending_window_deletes.push_back(g_extra_windows[i].view);
+      g_extra_windows.erase(g_extra_windows.begin() + static_cast<long>(i));
+      return;
+    }
+  }
 }
 
 std::string native_text(id value) {
@@ -106,13 +141,46 @@ id action_target() {
                           : name == "NSWindowDidEnterFullScreenNotification" ? 7
                           : name == "NSWindowDidExitFullScreenNotification" ? 8
                           : name == "NSWindowWillCloseNotification" ? 9 : 0;
-                      if (code != 0) g_window_cb(code, g_window_ctx);
+                      id window = objc::msg_send<id>(notification, objc::selector("object"));
+                      int32_t window_id = native_window_id(window);
+                      if (code == 9 && window_id > 0) retire_extra_window(window_id);
+                      if (code != 0 && window_id >= 0) g_window_cb(window_id * 16 + code, g_window_ctx);
                     }),
                     "v@:@");
     objc_registerClassPair(cls);
   }
   g_action_target = objc::Class_new(cls);
   return g_action_target;
+}
+
+const char *window_event_names[] = {
+    "NSWindowDidMoveNotification", "NSWindowDidResizeNotification",
+    "NSWindowDidMiniaturizeNotification", "NSWindowDidDeminiaturizeNotification",
+    "NSWindowDidBecomeKeyNotification", "NSWindowDidResignKeyNotification",
+    "NSWindowDidEnterFullScreenNotification", "NSWindowDidExitFullScreenNotification",
+    "NSWindowWillCloseNotification",
+};
+
+void observe_window(id window) {
+  using namespace webview::detail;
+  using namespace webview::detail::cocoa;
+  if (!window) return;
+  id center = objc::msg_send<id>(objc::get_class("NSNotificationCenter"),
+                                  objc::selector("defaultCenter"));
+  for (const char *name : window_event_names) {
+    objc::msg_send<void>(center, objc::selector("addObserver:selector:name:object:"),
+                         action_target(), objc::selector("nativetronWindowEvent:"),
+                         NSString_stringWithUTF8String(name), window);
+  }
+}
+
+void unobserve_window(id window) {
+  using namespace webview::detail;
+  if (!window || !g_action_target) return;
+  id center = objc::msg_send<id>(objc::get_class("NSNotificationCenter"),
+                                  objc::selector("defaultCenter"));
+  objc::msg_send<void>(center, objc::selector("removeObserver:name:object:"),
+                       g_action_target, static_cast<id>(nullptr), window);
 }
 
 id main_menu() {
@@ -310,24 +378,119 @@ void nt_on_window_event(nt_action_cb cb, void *ctx) {
   if (g_window_observing) return;
   id window = native_window();
   if (!window) return;
-  id center = objc::msg_send<id>(objc::get_class("NSNotificationCenter"),
-                                  objc::selector("defaultCenter"));
-  const char *names[] = {
-      "NSWindowDidMoveNotification", "NSWindowDidResizeNotification",
-      "NSWindowDidMiniaturizeNotification", "NSWindowDidDeminiaturizeNotification",
-      "NSWindowDidBecomeKeyNotification", "NSWindowDidResignKeyNotification",
-      "NSWindowDidEnterFullScreenNotification", "NSWindowDidExitFullScreenNotification",
-      "NSWindowWillCloseNotification",
-  };
-  for (const char *name : names) {
-    objc::msg_send<void>(center, objc::selector("addObserver:selector:name:object:"),
-                         action_target(), objc::selector("nativetronWindowEvent:"),
-                         NSString_stringWithUTF8String(name), window);
-  }
+  observe_window(window);
+  for (const auto &entry : g_extra_windows) observe_window(native_extra_window(entry));
   g_window_observing = true;
 #else
   (void)cb;
   (void)ctx;
+#endif
+}
+
+int32_t nt_window_create(const uint8_t *title, size_t title_n, int32_t width,
+                         int32_t height, const uint8_t *content, size_t content_n,
+                         int32_t is_html) {
+#if defined(__APPLE__)
+  auto *view = new webview::webview(false, nullptr);
+  int32_t id_value = g_next_window_id++;
+  g_extra_windows.push_back({id_value, view});
+  view->set_title(sv(title, title_n));
+  view->set_size(width, height, WEBVIEW_HINT_NONE);
+  if (is_html != 0) view->set_html(sv(content, content_n));
+  else view->navigate(sv(content, content_n));
+  if (g_window_observing) observe_window(native_extra_window(g_extra_windows.back()));
+  return id_value;
+#else
+  (void)title;
+  (void)title_n;
+  (void)width;
+  (void)height;
+  (void)content;
+  (void)content_n;
+  (void)is_html;
+  return 0;
+#endif
+}
+
+void nt_window_set_title_for(int32_t id_value, const uint8_t *title, size_t title_n) {
+#if defined(__APPLE__)
+  ExtraWindow *entry = extra_window(id_value);
+  if (entry) entry->view->set_title(sv(title, title_n));
+#else
+  (void)id_value;
+  (void)title;
+  (void)title_n;
+#endif
+}
+
+void nt_window_set_size_for(int32_t id_value, int32_t width, int32_t height) {
+#if defined(__APPLE__)
+  ExtraWindow *entry = extra_window(id_value);
+  if (entry) entry->view->set_size(width, height, WEBVIEW_HINT_NONE);
+#else
+  (void)id_value;
+  (void)width;
+  (void)height;
+#endif
+}
+
+void nt_window_action_for(int32_t id_value, int32_t action) {
+#if defined(__APPLE__)
+  using namespace webview::detail;
+  ExtraWindow *entry = extra_window(id_value);
+  if (!entry) return;
+  id window = native_extra_window(*entry);
+  if (!window) return;
+  if (action == 7) {
+    objc::msg_send<void>(window, objc::selector("close"));
+    unobserve_window(window);
+    if (extra_window(id_value)) {
+      retire_extra_window(id_value);
+      if (g_window_cb) g_window_cb(id_value * 16 + 9, g_window_ctx);
+    }
+    return;
+  }
+  if (action == 1) objc::msg_send<void>(window, objc::selector("miniaturize:"), nullptr);
+  else if (action == 2 && !objc::msg_send<bool>(window, objc::selector("isZoomed")))
+    objc::msg_send<void>(window, objc::selector("zoom:"), nullptr);
+  else if (action == 3) objc::msg_send<void>(window, objc::selector("toggleFullScreen:"), nullptr);
+  else if (action == 4) {
+    objc::msg_send<void>(window, objc::selector("deminiaturize:"), nullptr);
+    objc::msg_send<void>(window, objc::selector("makeKeyAndOrderFront:"), nullptr);
+  } else if (action == 5) objc::msg_send<void>(window, objc::selector("orderOut:"), nullptr);
+  else if (action == 6) objc::msg_send<void>(window, objc::selector("makeKeyAndOrderFront:"), nullptr);
+#else
+  (void)id_value;
+  (void)action;
+#endif
+}
+
+int32_t nt_window_state_for(int32_t id_value) {
+#if defined(__APPLE__)
+  using namespace webview::detail;
+  ExtraWindow *entry = extra_window(id_value);
+  if (!entry) return 0;
+  id window = native_extra_window(*entry);
+  if (!window) return 0;
+  int32_t state = 0;
+  if (objc::msg_send<bool>(window, objc::selector("isMiniaturized"))) state |= 1;
+  if (objc::msg_send<bool>(window, objc::selector("isZoomed"))) state |= 2;
+  if (objc::msg_send<bool>(window, objc::selector("isVisible"))) state |= 4;
+  if (objc::msg_send<bool>(window, objc::selector("isKeyWindow"))) state |= 8;
+  auto style = objc::msg_send<unsigned long>(window, objc::selector("styleMask"));
+  if ((style & (1UL << 14)) != 0) state |= 16;
+  return state;
+#else
+  (void)id_value;
+  return 0;
+#endif
+}
+
+int32_t nt_window_count(void) {
+#if defined(__APPLE__)
+  return static_cast<int32_t>(g_extra_windows.size()) + (g_w ? 1 : 0);
+#else
+  return g_w ? 1 : 0;
 #endif
 }
 
@@ -861,6 +1024,8 @@ int nt_pump(void) {
                          objc::selector("flush"));
     g_dirty = false;
   }
+  for (auto *view : g_pending_window_deletes) delete view;
+  g_pending_window_deletes.clear();
   return g_quit ? 1 : 0;
 }
 
@@ -879,6 +1044,17 @@ void nt_activate(void) {}
 
 void nt_terminate(void) {
   g_quit = true;
+#if defined(__APPLE__)
+  for (auto &entry : g_extra_windows) {
+    id window = native_extra_window(entry);
+    unobserve_window(window);
+    if (window) webview::detail::objc::msg_send<void>(window, webview::detail::objc::selector("close"));
+    delete entry.view;
+  }
+  g_extra_windows.clear();
+  for (auto *view : g_pending_window_deletes) delete view;
+  g_pending_window_deletes.clear();
+#endif
   if (g_w) {
     g_w->terminate();
   }

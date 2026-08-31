@@ -3,7 +3,7 @@ import { el, txt, dyn, attr, on, mountTo, each, type El, type KeyedItem } from "
 import { signal } from "../framework/reactive.js";
 import { IpcRenderer } from "../ipc/renderer.js";
 import { encodeUtf8, decodeUtf8 } from "../ipc/codec.js";
-import { getWindowState, hideWindow, minimizeWindow, onWindowEvent, showWindow } from "../framework/window.js";
+import { closeWindowFor, createWindow, getWindowCount, getWindowState, getWindowStateFor, hideWindow, hideWindowFor, minimizeWindow, onAnyWindowEvent, onWindowEvent, setWindowSizeFor, setWindowTitleFor, showWindow, showWindowFor } from "../framework/window.js";
 import { readClipboard, writeClipboard, openExternal, notify } from "../framework/desktop.js";
 import { getApplicationMenuItemCount, getContextMenuItemCount, getTrayMenuItemCount, hasTray, removeTray, setApplicationMenu, setContextMenu, setTray, setTrayImage, setTrayMenu } from "../framework/menu.js";
 import { getGlobalShortcutCount, registerGlobalShortcut, unregisterAllGlobalShortcuts } from "../framework/shortcuts.js";
@@ -223,6 +223,41 @@ function desktopSelftest(): void {
   quit();
 }
 
+function multipleWindowSelftest(): void {
+  let id = 0;
+  let sawResize = false;
+  let sawClose = false;
+  onAnyWindowEvent((windowId, event) => {
+    if (windowId !== id) return;
+    if (event === "resize") sawResize = true;
+    if (event === "close") sawClose = true;
+  });
+  id = createWindow({
+    title: "Nativetron secondary",
+    width: 320,
+    height: 180,
+    source: "html",
+    content: "<!doctype html><meta charset=utf-8><h1>secondary</h1>",
+  });
+  setWindowTitleFor(id, "Nativetron secondary updated");
+  setWindowSizeFor(id, 360, 200);
+  setTimeout(() => {
+    const visible = getWindowStateFor(id).visible;
+    hideWindowFor(id);
+    const hidden = !getWindowStateFor(id).visible;
+    showWindowFor(id);
+    const shown = getWindowStateFor(id).visible;
+    closeWindowFor(id);
+    setTimeout(() => {
+      const count = getWindowCount();
+      const ok = id > 0 && visible && hidden && shown && sawResize && sawClose && count === 1;
+      if (!ok) console.log("NT_MULTIPLE_WINDOW_DEBUG=" + id + "," + visible + "," + hidden + "," + shown + "," + sawResize + "," + sawClose + "," + count);
+      console.log(ok ? "NT_MULTIPLE_WINDOW_SELFTEST=OK" : "NT_MULTIPLE_WINDOW_SELFTEST=FAIL");
+      quit();
+    }, 100);
+  }, 200);
+}
+
 function windowSelftest(): void {
   let sawMinimize = false;
   let sawRestore = false;
@@ -266,6 +301,7 @@ ipc.onOpen(() => {
   ipc.send("renderer:log", encodeUtf8("connected"));
   if (process.env.NT_SELFTEST === "ipc") selftest();
   if (process.env.NT_SELFTEST === "window") windowSelftest();
+  if (process.env.NT_SELFTEST === "multiwindow") multipleWindowSelftest();
   if (process.env.NT_SELFTEST === "desktop") desktopSelftest();
   if (process.env.NT_SELFTEST === "menu") menuSelftest();
   if (process.env.NT_SELFTEST === "shortcut") shortcutSelftest();
