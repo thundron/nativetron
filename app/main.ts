@@ -5,6 +5,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { IpcMain } from "../ipc/main.js";
 import { encodeUtf8, decodeUtf8 } from "../ipc/codec.js";
+import { reviewRelease, type ReleaseReviewRequest } from "../pyrus/release-review.js";
 
 const ipc = new IpcMain();
 
@@ -36,6 +37,11 @@ ipc.handle("fs:read", async (payload: Uint8Array) => {
 ipc.handle("fs:stat", async (payload: Uint8Array) => {
   const s = await stat(decodeUtf8(payload));
   return encodeUtf8(s.isDirectory() ? "dir" : "file " + s.size);
+});
+
+ipc.handle("pyrus:review-release", (payload: Uint8Array) => {
+  const request = JSON.parse(decodeUtf8(payload)) as ReleaseReviewRequest;
+  return Promise.resolve(encodeUtf8(JSON.stringify(reviewRelease(request))));
 });
 
 ipc.handle("proc:run", (payload: Uint8Array) => {

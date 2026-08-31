@@ -54,6 +54,7 @@ mountTo(el("main", [Counter()]));
 | `host/` | DOM host runtime used by both lanes |
 | `native/` | C++ webview wrapper exposing a C ABI |
 | `desktop/` | generated desktop capability contract |
+| `pyrus/` | compiled Pyrus release-review workflow and compatibility notes |
 | `app/`, `web/` | desktop and browser entry points |
 | `bench/` | benchmarks against React and Electron |
 

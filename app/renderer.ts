@@ -6,6 +6,8 @@ import { encodeUtf8, decodeUtf8 } from "../ipc/codec.js";
 import { minimizeWindow, showWindow, hideWindow, getWindowState } from "../framework/window.js";
 import { readClipboard, writeClipboard, openExternal, notify } from "../framework/desktop.js";
 import { setApplicationMenu, getApplicationMenuItemCount, setTray, removeTray, hasTray } from "../framework/menu.js";
+import { SAMPLE_REVIEW, SAFE_REVIEW } from "../pyrus/sample.js";
+import type { ReleaseReview, ReleaseReviewRequest } from "../pyrus/release-review.js";
 
 const ipc = new IpcRenderer();
 
@@ -13,6 +15,7 @@ const count = signal(0);
 const items = signal<string[]>(["alpha", "beta", "gamma"]);
 const nativeOut = signal("(nothing yet)");
 const home = signal("");
+const releaseOut = signal("(not reviewed)");
 let seq = 0;
 
 function button(label: string, handler: () => void): El {
@@ -68,6 +71,28 @@ function List(): El {
   ]);
 }
 
+function requestReleaseReview(request: ReleaseReviewRequest): Promise<ReleaseReview> {
+  return ipc.invoke("pyrus:review-release", encodeUtf8(JSON.stringify(request)))
+    .then((payload: Uint8Array) => JSON.parse(decodeUtf8(payload)) as ReleaseReview);
+}
+
+function PyrusReleaseReview(): El {
+  return el("section", [
+    el("h2", [txt("Pyrus release review")]),
+    button("Review sample release", () => {
+      releaseOut.set("…");
+      requestReleaseReview(SAMPLE_REVIEW)
+        .then((review: ReleaseReview) => {
+          const codes: string[] = [];
+          for (let i = 0; i < review.findings.length; i++) codes.push(review.findings[i]!.code);
+          releaseOut.set((review.blocking ? "blocked: " : "clear: ") + codes.join(", "));
+        })
+        .catch((e: unknown) => { releaseOut.set("error: " + (e instanceof Error ? e.message : "failed")); });
+    }),
+    el("pre", [attr(el("span", [dyn(() => releaseOut.get())]), "style", "white-space:pre-wrap")]),
+  ]);
+}
+
 function Native(): El {
   return el("section", [
     el("h2", [txt("Native capability (main process)")]),
@@ -93,6 +118,7 @@ mountTo(el("main", [
   el("p", [txt("Renderer drives the DOM. Main process does native work over IPC.")]),
   Counter(),
   List(),
+  PyrusReleaseReview(),
   Native(),
 ]));
 
@@ -118,6 +144,21 @@ async function selftest(): Promise<void> {
     uname.trim() === "Darwin" &&
     refused === "no handler for channel: does:not:exist";
   console.log(ok ? "NT_IPC_SELFTEST=OK" : "NT_IPC_SELFTEST=FAIL " + nativeOut.get());
+  quit();
+}
+
+async function pyrusSelftest(): Promise<void> {
+  const unsafe = await requestReleaseReview(SAMPLE_REVIEW);
+  const safe = await requestReleaseReview(SAFE_REVIEW);
+  const expected = ["local-state", "secret-file", "credential-pattern", "unexpected-binary",
+    "nested-generated-output", "large-addition", "deletion"];
+  let codesMatch = unsafe.findings.length === expected.length;
+  for (let i = 0; i < expected.length && codesMatch; i++) {
+    if (unsafe.findings[i]!.code !== expected[i]) codesMatch = false;
+  }
+  const ok = unsafe.blocking && unsafe.changelog.currentVersionPresent && codesMatch &&
+    !safe.blocking && safe.findings.length === 0;
+  console.log(ok ? "NT_PYRUS_SELFTEST=OK" : "NT_PYRUS_SELFTEST=FAIL");
   quit();
 }
 
@@ -182,6 +223,7 @@ ipc.onOpen(() => {
   if (process.env.NT_SELFTEST === "window") windowSelftest();
   if (process.env.NT_SELFTEST === "desktop") desktopSelftest();
   if (process.env.NT_SELFTEST === "menu") menuSelftest();
+  if (process.env.NT_SELFTEST === "pyrus") pyrusSelftest();
 });
 ipc.onClose(() => { quit(); });
 ipc.connect(+(process.env.NT_IPC_PORT ?? "0"), "127.0.0.1");
