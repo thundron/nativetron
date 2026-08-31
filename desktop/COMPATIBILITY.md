@@ -2,7 +2,7 @@
 
 Platform: macOS arm64.
 
-14 supported, 2 partial, 4 unsupported.
+15 supported, 2 partial, 3 unsupported.
 
 | capability | status | note |
 |---|---|---|
@@ -22,8 +22,8 @@ Platform: macOS arm64.
 | open external URL | yes |  |
 | notifications | different | submitted through deprecated NSUserNotification; delivery and permission behavior are not yet production-grade |
 | application menu | yes | top-level menus, separators, command-key equivalents, enabled state, compiled callbacks |
-| context menu | no |  |
-| tray/status item | yes | text status item with tooltip and compiled click callback; image and attached menu are not implemented |
+| context menu | yes | separators, enabled state, and compiled callbacks; showContextMenu must run while macOS has a current UI event |
+| tray/status item | yes | text, tooltip, file-backed template or color image, attached menu, enabled state, separators, and compiled callbacks |
 | file associations | different | document types and URL schemes are registered in Info.plist; runtime open-file and open-URL event delivery is not implemented |
 | global shortcuts | no |  |
 

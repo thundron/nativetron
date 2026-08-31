@@ -94,6 +94,49 @@
       "returns": "i32"
     },
     {
+      "name": "ntOnContextAction",
+      "symbol": "nt_on_context_action",
+      "params": [
+        {
+          "callback": {
+            "id": "context_action",
+            "params": [
+              "i32",
+              { "context": "context_action" }
+            ],
+            "returns": "void",
+            "lifetime": "retained"
+          }
+        },
+        { "context": "context_action" }
+      ],
+      "returns": "void"
+    },
+    {
+      "name": "ntContextMenuReset",
+      "symbol": "nt_context_menu_reset",
+      "params": [],
+      "returns": "void"
+    },
+    {
+      "name": "ntContextMenuAdd",
+      "symbol": "nt_context_menu_add",
+      "params": ["i32", "string", "i32"],
+      "returns": "i32"
+    },
+    {
+      "name": "ntContextMenuCount",
+      "symbol": "nt_context_menu_count",
+      "params": [],
+      "returns": "i32"
+    },
+    {
+      "name": "ntContextMenuShow",
+      "symbol": "nt_context_menu_show",
+      "params": [],
+      "returns": "i32"
+    },
+    {
       "name": "ntOnTrayAction",
       "symbol": "nt_on_tray_action",
       "params": [
@@ -124,6 +167,30 @@
         "string",
         "string"
       ],
+      "returns": "i32"
+    },
+    {
+      "name": "ntTraySetImage",
+      "symbol": "nt_tray_set_image",
+      "params": ["string", "i32"],
+      "returns": "i32"
+    },
+    {
+      "name": "ntTrayMenuReset",
+      "symbol": "nt_tray_menu_reset",
+      "params": [],
+      "returns": "void"
+    },
+    {
+      "name": "ntTrayMenuAdd",
+      "symbol": "nt_tray_menu_add",
+      "params": ["i32", "string", "i32"],
+      "returns": "i32"
+    },
+    {
+      "name": "ntTrayMenuCount",
+      "symbol": "nt_tray_menu_count",
+      "params": [],
       "returns": "i32"
     },
     {

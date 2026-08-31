@@ -5,7 +5,7 @@ import { IpcRenderer } from "../ipc/renderer.js";
 import { encodeUtf8, decodeUtf8 } from "../ipc/codec.js";
 import { minimizeWindow, showWindow, hideWindow, getWindowState } from "../framework/window.js";
 import { readClipboard, writeClipboard, openExternal, notify } from "../framework/desktop.js";
-import { setApplicationMenu, getApplicationMenuItemCount, setTray, removeTray, hasTray } from "../framework/menu.js";
+import { getApplicationMenuItemCount, getContextMenuItemCount, getTrayMenuItemCount, hasTray, removeTray, setApplicationMenu, setContextMenu, setTray, setTrayImage, setTrayMenu } from "../framework/menu.js";
 import { SAMPLE_REVIEW, SAFE_REVIEW } from "../pyrus/sample.js";
 import type { ReleaseReview, ReleaseReviewRequest } from "../pyrus/release-review.js";
 
@@ -171,10 +171,28 @@ function menuSelftest(): void {
     ] },
     { label: "Edit", items: [{ label: "Copy", key: "c", action: () => {} }] },
   ]);
+  const contextOk = setContextMenu([
+    { label: "Inspect", action: () => {} },
+    { label: "-" },
+    { label: "Disabled", enabled: false },
+  ]);
   const trayOk = setTray("NT", "nativetron self-test", () => {});
+  const trayMenuOk = setTrayMenu([
+    { label: "Open", action: () => {} },
+    { label: "-" },
+    { label: "Quit", action: () => {} },
+  ]);
+  const imageOk = setTrayImage(
+    "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/GenericApplicationIcon.icns",
+    true,
+  );
+  const imageRefused = !setTrayImage("", true);
   const present = hasTray();
+  const trayCount = getTrayMenuItemCount();
   removeTray();
-  const ok = menuOk && getApplicationMenuItemCount() === 4 && trayOk && present && !hasTray();
+  const ok = menuOk && getApplicationMenuItemCount() === 4 &&
+    contextOk && getContextMenuItemCount() === 3 && trayOk && trayMenuOk &&
+    trayCount === 3 && imageOk && imageRefused && present && !hasTray();
   console.log(ok ? "NT_MENU_SELFTEST=OK" : "NT_MENU_SELFTEST=FAIL");
   quit();
 }

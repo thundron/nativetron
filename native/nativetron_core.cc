@@ -24,11 +24,15 @@ nt_action_cb g_menu_cb = nullptr;
 void *g_menu_ctx = nullptr;
 nt_action_cb g_tray_cb = nullptr;
 void *g_tray_ctx = nullptr;
+nt_action_cb g_context_cb = nullptr;
+void *g_context_ctx = nullptr;
 
 #if defined(__APPLE__)
 id g_action_target = nullptr;
 id g_main_menu = nullptr;
 id g_status_item = nullptr;
+id g_context_menu = nullptr;
+id g_tray_menu = nullptr;
 std::vector<std::string> g_menu_names;
 std::vector<id> g_menus;
 #endif
@@ -74,6 +78,12 @@ id action_target() {
                       if (g_tray_cb) g_tray_cb(static_cast<int32_t>(tag), g_tray_ctx);
                     }),
                     "v@:@");
+    class_addMethod(cls, objc::selector("nativetronContextAction:"),
+                    (IMP)(+[](id, SEL, id sender) {
+                      auto tag = objc::msg_send<long>(sender, objc::selector("tag"));
+                      if (g_context_cb) g_context_cb(static_cast<int32_t>(tag), g_context_ctx);
+                    }),
+                    "v@:@");
     objc_registerClassPair(cls);
   }
   g_action_target = objc::Class_new(cls);
@@ -113,6 +123,34 @@ id application_menu(const std::string &name) {
   g_menus.push_back(menu);
   objc::msg_send<void>(menu, objc::selector("release"));
   return menu;
+}
+
+id fresh_menu(const char *title) {
+  using namespace webview::detail;
+  using namespace webview::detail::cocoa;
+  id alloc = objc::msg_send<id>(objc::get_class("NSMenu"), objc::selector("alloc"));
+  return objc::msg_send<id>(alloc, objc::selector("initWithTitle:"),
+                            NSString_stringWithUTF8String(title));
+}
+
+id action_item(SEL action, int32_t id_value, const std::string &label,
+               const std::string &key, bool enabled) {
+  using namespace webview::detail;
+  using namespace webview::detail::cocoa;
+  if (label == "-") {
+    return objc::msg_send<id>(objc::get_class("NSMenuItem"),
+                              objc::selector("separatorItem"));
+  }
+  id alloc = objc::msg_send<id>(objc::get_class("NSMenuItem"),
+                                 objc::selector("alloc"));
+  id item = objc::msg_send<id>(alloc,
+                               objc::selector("initWithTitle:action:keyEquivalent:"),
+                               NSString_stringWithUTF8String(label), action,
+                               NSString_stringWithUTF8String(key));
+  objc::msg_send<void>(item, objc::selector("setTarget:"), action_target());
+  objc::msg_send<void>(item, objc::selector("setTag:"), static_cast<long>(id_value));
+  objc::msg_send<void>(item, objc::selector("setEnabled:"), static_cast<BOOL>(enabled));
+  return item;
 }
 #endif
 } // namespace
@@ -280,6 +318,70 @@ int32_t nt_menu_item_count(void) {
 #endif
 }
 
+void nt_on_context_action(nt_action_cb cb, void *ctx) {
+  g_context_cb = cb;
+  g_context_ctx = ctx;
+}
+
+void nt_context_menu_reset(void) {
+#if defined(__APPLE__)
+  using namespace webview::detail;
+  if (g_context_menu) objc::msg_send<void>(g_context_menu, objc::selector("release"));
+  g_context_menu = fresh_menu("Context");
+#endif
+}
+
+int32_t nt_context_menu_add(int32_t id_value, const uint8_t *label, size_t label_n,
+                            int32_t enabled) {
+#if defined(__APPLE__)
+  using namespace webview::detail;
+  if (!g_context_menu) nt_context_menu_reset();
+  std::string text = sv(label, label_n);
+  id item = action_item(objc::selector("nativetronContextAction:"), id_value,
+                        text, "", enabled != 0);
+  objc::msg_send<void>(g_context_menu, objc::selector("addItem:"), item);
+  if (text != "-") objc::msg_send<void>(item, objc::selector("release"));
+  return 1;
+#else
+  (void)id_value;
+  (void)label;
+  (void)label_n;
+  (void)enabled;
+  return 0;
+#endif
+}
+
+int32_t nt_context_menu_count(void) {
+#if defined(__APPLE__)
+  using namespace webview::detail;
+  if (!g_context_menu) return 0;
+  return static_cast<int32_t>(
+      objc::msg_send<long>(g_context_menu, objc::selector("numberOfItems")));
+#else
+  return 0;
+#endif
+}
+
+int32_t nt_context_menu_show(void) {
+#if defined(__APPLE__)
+  using namespace webview::detail;
+  using namespace webview::detail::cocoa;
+  if (!g_context_menu) return 0;
+  id app = NSApplication_get_sharedApplication();
+  id event = objc::msg_send<id>(app, objc::selector("currentEvent"));
+  id window = native_window();
+  if (!event || !window) return 0;
+  id view = objc::msg_send<id>(window, objc::selector("contentView"));
+  if (!view) return 0;
+  objc::msg_send<void>(objc::get_class("NSMenu"),
+                       objc::selector("popUpContextMenu:withEvent:forView:"),
+                       g_context_menu, event, view);
+  return 1;
+#else
+  return 0;
+#endif
+}
+
 void nt_on_tray_action(nt_action_cb cb, void *ctx) {
   g_tray_cb = cb;
   g_tray_ctx = ctx;
@@ -307,6 +409,7 @@ int32_t nt_tray_set(int32_t id_value, const uint8_t *title, size_t title_n,
   objc::msg_send<void>(button, objc::selector("setAction:"),
                        objc::selector("nativetronTrayAction:"));
   objc::msg_send<void>(button, objc::selector("setTag:"), static_cast<long>(id_value));
+  if (g_tray_menu) objc::msg_send<void>(g_status_item, objc::selector("setMenu:"), g_tray_menu);
   return 1;
 #else
   (void)id_value;
@@ -318,14 +421,84 @@ int32_t nt_tray_set(int32_t id_value, const uint8_t *title, size_t title_n,
 #endif
 }
 
+int32_t nt_tray_set_image(const uint8_t *path, size_t path_n, int32_t template_image) {
+#if defined(__APPLE__)
+  using namespace webview::detail;
+  using namespace webview::detail::cocoa;
+  if (!g_status_item || path_n == 0) return 0;
+  id button = objc::msg_send<id>(g_status_item, objc::selector("button"));
+  if (!button) return 0;
+  id alloc = objc::msg_send<id>(objc::get_class("NSImage"), objc::selector("alloc"));
+  id image = objc::msg_send<id>(alloc, objc::selector("initWithContentsOfFile:"),
+                                 NSString_stringWithUTF8String(sv(path, path_n)));
+  if (!image) return 0;
+  objc::msg_send<void>(image, objc::selector("setTemplate:"),
+                       static_cast<BOOL>(template_image != 0));
+  objc::msg_send<void>(button, objc::selector("setImage:"), image);
+  objc::msg_send<void>(image, objc::selector("release"));
+  return 1;
+#else
+  (void)path;
+  (void)path_n;
+  (void)template_image;
+  return 0;
+#endif
+}
+
+void nt_tray_menu_reset(void) {
+#if defined(__APPLE__)
+  using namespace webview::detail;
+  if (g_tray_menu) objc::msg_send<void>(g_tray_menu, objc::selector("release"));
+  g_tray_menu = fresh_menu("Tray");
+  if (g_status_item) objc::msg_send<void>(g_status_item, objc::selector("setMenu:"), g_tray_menu);
+#endif
+}
+
+int32_t nt_tray_menu_add(int32_t id_value, const uint8_t *label, size_t label_n,
+                         int32_t enabled) {
+#if defined(__APPLE__)
+  using namespace webview::detail;
+  if (!g_tray_menu) nt_tray_menu_reset();
+  std::string text = sv(label, label_n);
+  id item = action_item(objc::selector("nativetronTrayAction:"), id_value,
+                        text, "", enabled != 0);
+  objc::msg_send<void>(g_tray_menu, objc::selector("addItem:"), item);
+  if (text != "-") objc::msg_send<void>(item, objc::selector("release"));
+  if (g_status_item) objc::msg_send<void>(g_status_item, objc::selector("setMenu:"), g_tray_menu);
+  return 1;
+#else
+  (void)id_value;
+  (void)label;
+  (void)label_n;
+  (void)enabled;
+  return 0;
+#endif
+}
+
+int32_t nt_tray_menu_count(void) {
+#if defined(__APPLE__)
+  using namespace webview::detail;
+  if (!g_tray_menu) return 0;
+  return static_cast<int32_t>(
+      objc::msg_send<long>(g_tray_menu, objc::selector("numberOfItems")));
+#else
+  return 0;
+#endif
+}
+
 void nt_tray_remove(void) {
 #if defined(__APPLE__)
   using namespace webview::detail;
   if (!g_status_item) return;
   id bar = objc::msg_send<id>(objc::get_class("NSStatusBar"),
                                objc::selector("systemStatusBar"));
+  objc::msg_send<void>(g_status_item, objc::selector("setMenu:"), static_cast<id>(nullptr));
   objc::msg_send<void>(bar, objc::selector("removeStatusItem:"), g_status_item);
   g_status_item = nullptr;
+  if (g_tray_menu) {
+    objc::msg_send<void>(g_tray_menu, objc::selector("release"));
+    g_tray_menu = nullptr;
+  }
 #endif
 }
 
