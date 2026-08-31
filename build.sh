@@ -13,7 +13,7 @@ node "$ROOT/desktop/generate.mjs" --check
 # Platform link flags for the webview library (injected into scriptc's clang
 # link step via the clang-driver CCC_OVERRIDE_OPTIONS hook; '+' appends args).
 case "$(uname -s)" in
-  Darwin) LINK='+-lc++ +-framework +WebKit +-framework +Cocoa +-framework +Carbon' ;;
+  Darwin) LINK='+-lc++ +-framework +WebKit +-framework +Cocoa +-framework +Carbon +-framework +UserNotifications' ;;
   Linux)  LINK="$(pkg-config --libs gtk+-3.0 webkit2gtk-4.1 2>/dev/null | sed 's/ */ +/g; s/^/+/')" ;;
   *) LINK='' ;;
 esac

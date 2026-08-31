@@ -5,6 +5,7 @@
 #include <CoreFoundation/CoreFoundation.h>
 #endif
 
+#include <atomic>
 #include <cstddef>
 #include <cstdlib>
 #include <cstdint>
@@ -32,6 +33,11 @@ void *g_window_ctx = nullptr;
 bool g_window_observing = false;
 nt_action_cb g_shortcut_cb = nullptr;
 void *g_shortcut_ctx = nullptr;
+nt_action_cb g_notification_permission_cb = nullptr;
+void *g_notification_permission_ctx = nullptr;
+std::atomic<int32_t> g_notification_permission_result{-1};
+bool g_notification_permission_waiting = false;
+uint64_t g_notification_id = 0;
 
 #if defined(__APPLE__)
 id g_action_target = nullptr;
@@ -50,6 +56,30 @@ EventHandlerRef g_shortcut_event_handler = nullptr;
 std::vector<EventHotKeyRef> g_shortcut_refs;
 std::vector<std::string> g_menu_names;
 std::vector<id> g_menus;
+
+struct BlockDescriptor {
+  uintptr_t reserved;
+  uintptr_t size;
+  const char *signature;
+};
+
+struct NotificationPermissionBlock {
+  void *isa;
+  int32_t flags;
+  int32_t reserved;
+  void (*invoke)(NotificationPermissionBlock *, bool, id);
+  BlockDescriptor *descriptor;
+};
+
+void notification_permission_complete(NotificationPermissionBlock *, bool granted, id error) {
+  g_notification_permission_result.store(granted && !error ? 1 : 0);
+}
+
+BlockDescriptor g_notification_permission_descriptor{
+    0, sizeof(NotificationPermissionBlock), "v@?B@"};
+NotificationPermissionBlock g_notification_permission_block{
+    static_cast<void *>(_NSConcreteGlobalBlock), (1 << 28) | (1 << 30), 0,
+    &notification_permission_complete, &g_notification_permission_descriptor};
 #endif
 
 std::string sv(const uint8_t *p, size_t n) {
@@ -912,24 +942,72 @@ void nt_save_dialog(nt_text_cb cb, void *ctx) {
 #endif
 }
 
+int32_t nt_notifications_available(void) {
+#if defined(__APPLE__)
+  return webview::detail::objc::get_class("UNUserNotificationCenter") ? 1 : 0;
+#else
+  return 0;
+#endif
+}
+
+void nt_on_notification_permission(nt_action_cb cb, void *ctx) {
+  g_notification_permission_cb = cb;
+  g_notification_permission_ctx = ctx;
+}
+
+int32_t nt_request_notification_permission(void) {
+#if defined(__APPLE__)
+  using namespace webview::detail;
+  if (g_notification_permission_waiting || !g_notification_permission_cb) return 0;
+  Class center_class = objc::get_class("UNUserNotificationCenter");
+  if (!center_class) return 0;
+  id center = objc::msg_send<id>(center_class, objc::selector("currentNotificationCenter"));
+  if (!center) return 0;
+  g_notification_permission_result.store(-1);
+  g_notification_permission_waiting = true;
+  objc::msg_send<void>(center,
+                       objc::selector("requestAuthorizationWithOptions:completionHandler:"),
+                       static_cast<unsigned long>(6), &g_notification_permission_block);
+  return 1;
+#else
+  return 0;
+#endif
+}
+
 int32_t nt_notify(const uint8_t *title, size_t title_n,
                   const uint8_t *body, size_t body_n) {
 #if defined(__APPLE__)
   using namespace webview::detail;
   using namespace webview::detail::cocoa;
   if (title_n == 0) return 0;
+  Class center_class = objc::get_class("UNUserNotificationCenter");
+  Class content_class = objc::get_class("UNMutableNotificationContent");
+  Class request_class = objc::get_class("UNNotificationRequest");
+  if (!center_class || !content_class || !request_class) return 0;
   objc::autoreleasepool arp;
-  id note = objc::msg_send<id>(objc::get_class("NSUserNotification"),
-                                objc::selector("alloc"));
-  note = objc::msg_send<id>(note, objc::selector("init"));
-  objc::msg_send<void>(note, objc::selector("setTitle:"),
+  id content = objc::msg_send<id>(content_class, objc::selector("alloc"));
+  content = objc::msg_send<id>(content, objc::selector("init"));
+  objc::msg_send<void>(content, objc::selector("setTitle:"),
                        NSString_stringWithUTF8String(sv(title, title_n)));
-  objc::msg_send<void>(note, objc::selector("setInformativeText:"),
+  objc::msg_send<void>(content, objc::selector("setBody:"),
                        NSString_stringWithUTF8String(sv(body, body_n)));
-  id center = objc::msg_send<id>(objc::get_class("NSUserNotificationCenter"),
-                                  objc::selector("defaultUserNotificationCenter"));
-  objc::msg_send<void>(center, objc::selector("deliverNotification:"), note);
-  objc::msg_send<void>(note, objc::selector("release"));
+  Class sound_class = objc::get_class("UNNotificationSound");
+  if (sound_class) {
+    id sound = objc::msg_send<id>(sound_class, objc::selector("defaultSound"));
+    objc::msg_send<void>(content, objc::selector("setSound:"), sound);
+  }
+  std::string identifier = "nativetron-" + std::to_string(++g_notification_id);
+  id request = objc::msg_send<id>(
+      request_class, objc::selector("requestWithIdentifier:content:trigger:"),
+      NSString_stringWithUTF8String(identifier), content, static_cast<id>(nullptr));
+  id center = objc::msg_send<id>(center_class, objc::selector("currentNotificationCenter"));
+  if (!request || !center) {
+    objc::msg_send<void>(content, objc::selector("release"));
+    return 0;
+  }
+  objc::msg_send<void>(center, objc::selector("addNotificationRequest:withCompletionHandler:"),
+                       request, static_cast<id>(nullptr));
+  objc::msg_send<void>(content, objc::selector("release"));
   return 1;
 #else
   (void)title;
@@ -1023,6 +1101,13 @@ int nt_pump(void) {
     objc::msg_send<void>(objc::get_class("CATransaction"),
                          objc::selector("flush"));
     g_dirty = false;
+  }
+  int32_t permission = g_notification_permission_result.exchange(-1);
+  if (permission >= 0 && g_notification_permission_waiting) {
+    nt_action_cb cb = g_notification_permission_cb;
+    void *ctx = g_notification_permission_ctx;
+    g_notification_permission_waiting = false;
+    if (cb) cb(permission, ctx);
   }
   for (auto *view : g_pending_window_deletes) delete view;
   g_pending_window_deletes.clear();

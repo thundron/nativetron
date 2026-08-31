@@ -2,7 +2,7 @@
 
 Platform: macOS arm64.
 
-17 supported, 3 partial, 0 unsupported.
+18 supported, 2 partial, 0 unsupported.
 
 | capability | status | note |
 |---|---|---|
@@ -20,7 +20,7 @@ Platform: macOS arm64.
 | open file/directory dialog | yes | synchronous native modal |
 | save dialog | yes | synchronous native modal |
 | open external URL | yes |  |
-| notifications | different | submitted through deprecated NSUserNotification; delivery and permission behavior are not yet production-grade |
+| notifications | yes | UserNotifications authorization is asynchronous and callbacks return on the compiled runtime pump; delivery requires a properly bundled and signed application identity |
 | application menu | yes | top-level menus, separators, command-key equivalents, enabled state, compiled callbacks |
 | context menu | yes | separators, enabled state, and compiled callbacks; showContextMenu must run while macOS has a current UI event |
 | tray/status item | yes | text, tooltip, file-backed template or color image, attached menu, enabled state, separators, and compiled callbacks |

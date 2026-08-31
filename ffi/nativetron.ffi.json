@@ -385,6 +385,37 @@
       "returns": "void"
     },
     {
+      "name": "ntNotificationsAvailable",
+      "symbol": "nt_notifications_available",
+      "params": [],
+      "returns": "i32"
+    },
+    {
+      "name": "ntOnNotificationPermission",
+      "symbol": "nt_on_notification_permission",
+      "params": [
+        {
+          "callback": {
+            "id": "notification_permission",
+            "params": [
+              "i32",
+              { "context": "notification_permission" }
+            ],
+            "returns": "void",
+            "lifetime": "retained"
+          }
+        },
+        { "context": "notification_permission" }
+      ],
+      "returns": "void"
+    },
+    {
+      "name": "ntRequestNotificationPermission",
+      "symbol": "nt_request_notification_permission",
+      "params": [],
+      "returns": "i32"
+    },
+    {
       "name": "ntNotify",
       "symbol": "nt_notify",
       "params": [

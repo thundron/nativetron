@@ -4,7 +4,7 @@ import { signal } from "../framework/reactive.js";
 import { IpcRenderer } from "../ipc/renderer.js";
 import { encodeUtf8, decodeUtf8 } from "../ipc/codec.js";
 import { closeWindowFor, createWindow, getWindowCount, getWindowState, getWindowStateFor, hideWindow, hideWindowFor, minimizeWindow, onAnyWindowEvent, onWindowEvent, setWindowSizeFor, setWindowTitleFor, showWindow, showWindowFor } from "../framework/window.js";
-import { readClipboard, writeClipboard, openExternal, notify } from "../framework/desktop.js";
+import { notificationsAvailable, notify, openExternal, readClipboard, writeClipboard } from "../framework/desktop.js";
 import { getApplicationMenuItemCount, getContextMenuItemCount, getTrayMenuItemCount, hasTray, removeTray, setApplicationMenu, setContextMenu, setTray, setTrayImage, setTrayMenu } from "../framework/menu.js";
 import { getGlobalShortcutCount, registerGlobalShortcut, unregisterAllGlobalShortcuts } from "../framework/shortcuts.js";
 import { SAMPLE_REVIEW, SAFE_REVIEW } from "../pyrus/sample.js";
@@ -218,7 +218,7 @@ function desktopSelftest(): void {
   writeClipboard(expected);
   const actual = readClipboard();
   writeClipboard(previous);
-  const ok = actual === expected && !openExternal("") && !notify("", "");
+  const ok = actual === expected && notificationsAvailable() && !openExternal("") && !notify("", "");
   console.log(ok ? "NT_DESKTOP_SELFTEST=OK" : "NT_DESKTOP_SELFTEST=FAIL");
   quit();
 }
