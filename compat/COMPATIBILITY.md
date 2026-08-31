@@ -10,7 +10,7 @@ compile error, not a runtime failure.
 
 ## React hooks
 
-6 of 18 implemented.
+7 of 18 implemented.
 
 | | supported | |
 |---|---|---|
@@ -20,7 +20,7 @@ compile error, not a runtime failure.
 | `useMemo` | yes | tracks reads automatically; no dependency array |
 | `useCallback` | yes | identity passthrough; components run once so it is a no-op |
 | `useRef` | yes | plain { current } box; no host-node refs |
-| `useContext` | no | no context propagation yet |
+| `useContext` | yes | returns a getter captured from the nearest compiled provider |
 | `useLayoutEffect` | no | no separate commit phase |
 | `useImperativeHandle` | no |  |
 | `useSyncExternalStore` | no |  |
@@ -35,13 +35,13 @@ compile error, not a runtime failure.
 
 ## React top-level API
 
-0 of 16 implemented.
+1 of 16 implemented.
 
 | | supported | |
 |---|---|---|
 | `createElement` | different | the JSX factory is h() in framework/jsx.ts |
 | `Fragment` | no | <>...</> has no factory yet |
-| `createContext` | no |  |
+| `createContext` | yes | Provider children build lazily under a context stack; provider values are reactive getters |
 | `forwardRef` | no |  |
 | `memo` | no | components run once; there is no re-render to skip |
 | `lazy` | no | no dynamic import in a compiled binary |

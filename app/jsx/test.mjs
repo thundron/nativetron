@@ -30,8 +30,14 @@ assert.equal(got.spreadOrder, "explicit", "spread merge order was deterministic"
 assert.equal(got.spreadTitle, "tone:hot", "function-valued spread prop remained reactive");
 assert.equal(got.generalTags, "B,I,EM", "element-valued expression roots were inserted in order");
 assert.equal(got.generalText, "storedcalledinline", "element-valued expressions preserved content");
+assert.equal(got.contextDefault, "default", "consumer outside provider used the default");
+assert.equal(got.contextValue, "light", "provider value remained reactive");
+assert.equal(got.contextNested, "nested", "nearest nested provider won");
+assert.equal(got.contextAfterNested, "light", "outer provider was restored after nesting");
+assert.equal(got.contextDefaultAfter, "default", "provider stack was restored after its children");
+assert.equal(got.contextParent, "context-demo", "provider added no wrapper element");
 
-console.log("ok   props, spreads, expression children, conditionals, keyed list, reactive attributes, fragments");
+console.log("ok   props, spreads, expression children, context, conditionals, keyed list, reactive attributes, fragments");
 
 const mixedSrc = join(here, ".mixed-child.tsx");
 const mixedOut = join(here, ".mixed-child.generated.ts");

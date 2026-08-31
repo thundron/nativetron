@@ -1,4 +1,5 @@
 import { signal, effect, computed } from "../framework/reactive.js";
+import type { El } from "../framework/ui.js";
 
 export type Getter<T> = () => T;
 export type Setter<T> = (v: T) => void;
@@ -35,4 +36,38 @@ export interface Ref<T> {
 
 export function useRef<T>(initial: T): Ref<T> {
   return { current: initial };
+}
+
+export interface ContextProviderProps<T> {
+  value: T;
+  children?: El[];
+}
+
+export interface Context<T> {
+  defaultValue: T;
+  stack: Getter<T>[];
+  Provider: (props: ContextProviderProps<T>) => El;
+}
+
+function providerMustBeJsx<T>(_props: ContextProviderProps<T>): El {
+  throw new Error("Context.Provider must be used through compiled JSX");
+}
+
+export function createContext<T>(defaultValue: T): Context<T> {
+  return { defaultValue, stack: [], Provider: providerMustBeJsx<T> };
+}
+
+export function useContext<T>(context: Context<T>): Getter<T> {
+  const n = context.stack.length;
+  if (n === 0) return () => context.defaultValue;
+  return context.stack[n - 1]!;
+}
+
+export function provide<T>(context: Context<T>, value: Getter<T>, build: () => El): El {
+  context.stack.push(value);
+  try {
+    return build();
+  } finally {
+    context.stack.pop();
+  }
 }

@@ -149,8 +149,25 @@ function lowerJsx(context) {
     if (ts.isJsxSelfClosingElement(node) || ts.isJsxElement(node)) {
       const open = ts.isJsxElement(node) ? node.openingElement : node;
       const tag = open.tagName.getText();
+      const provider = tag.endsWith(".Provider");
       const props = attrsOf(open, isComponent(tag));
       const kids = ts.isJsxElement(node) ? childrenOf(node) : [];
+      if (provider) {
+        if (props.kind === ts.SyntaxKind.NullKeyword) {
+          throw new Error("a context provider needs a value prop");
+        }
+        const contextName = tag.slice(0, -".Provider".length);
+        const value = f.createPropertyAccessExpression(
+          f.createParenthesizedExpression(props),
+          "value",
+        );
+        const subtree = f.createCallExpression(f.createIdentifier("frag"), undefined, [
+          f.createArrayLiteralExpression(kids, false),
+        ]);
+        return markElement(f.createCallExpression(f.createIdentifier("provide"), undefined, [
+          f.createIdentifier(contextName), thunk(value), thunk(subtree),
+        ]));
+      }
       if (isComponent(tag)) {
         const args = [];
         if (props.kind !== ts.SyntaxKind.NullKeyword || kids.length > 0) {

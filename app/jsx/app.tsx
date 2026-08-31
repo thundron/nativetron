@@ -1,7 +1,7 @@
 import { mount, run, selftestEval } from "../../framework/dom.js";
 import { h, applyProps } from "../../framework/jsx.js";
 import { mountTo, each, show, dynAttr, nothing, frag, type El, type KeyedItem } from "../../framework/ui.js";
-import { useState } from "../../compat/react.js";
+import { useState, createContext, useContext, provide } from "../../compat/react.js";
 
 interface CounterProps {
   label: string;
@@ -17,6 +17,35 @@ function Counter(props: CounterProps): El {
       <p style={count() > 5 ? "color:#b00" : "color:#111"}>count: {count()}</p>
       {count() > 5 ? <p>over five</p> : <p>five or fewer</p>}
       {count() > 8 && <p>and over eight</p>}
+    </section>
+  );
+}
+
+const Theme = createContext("default");
+
+interface ContextTextProps {
+  className: string;
+}
+
+function ContextText(props: ContextTextProps): El {
+  const theme = useContext(Theme);
+  return <p class={props.className}>{theme()}</p>;
+}
+
+function ContextDemo(): El {
+  const [theme, setTheme] = useState("dark");
+  return (
+    <section class="context-demo">
+      <ContextText className="context-default" />
+      <Theme.Provider value={theme()}>
+        <ContextText className="context-value" />
+        <Theme.Provider value="nested">
+          <ContextText className="context-nested" />
+        </Theme.Provider>
+        <ContextText className="context-after-nested" />
+      </Theme.Provider>
+      <ContextText className="context-default-after" />
+      <button onclick={() => setTheme("light")}>Change context</button>
     </section>
   );
 }
@@ -86,6 +115,7 @@ mountTo(
     <h1>Compiled JSX</h1>
     <Counter {...counterDefaults} label="By three" step={3} />
     <SpreadAttrs />
+    <ContextDemo />
     <GeneralChildren />
     <Fragmented />
     <Items />
@@ -99,7 +129,8 @@ if (process.env.NT_SELFTEST === "jsx") {
         'var add=b.filter(function(x){return x.textContent==="Add"})[0];' +
         'var rm=b.filter(function(x){return x.textContent==="Remove first"})[0];' +
         'var spread=b.filter(function(x){return x.textContent==="Spread"})[0];' +
-        'inc.click();inc.click();inc.click();spread.click();add.click();rm.click();' +
+        'var context=b.filter(function(x){return x.textContent==="Change context"})[0];' +
+        'inc.click();inc.click();inc.click();spread.click();context.click();add.click();rm.click();' +
         'setTimeout(function(){' +
         'var p=[].slice.call(document.querySelectorAll("p"))' +
         '.filter(function(x){return x.textContent.indexOf("count:")===0})[0];' +
@@ -115,7 +146,13 @@ if (process.env.NT_SELFTEST === "jsx") {
         'spreadTitle:spread.getAttribute("title"),' +
         'generalTags:[].slice.call(document.querySelector(".general-children").children)' +
         '.map(function(x){return x.tagName}).join(","),' +
-        'generalText:document.querySelector(".general-children").textContent})}))},500);',
+        'generalText:document.querySelector(".general-children").textContent,' +
+        'contextDefault:document.querySelector(".context-default").textContent,' +
+        'contextValue:document.querySelector(".context-value").textContent,' +
+        'contextNested:document.querySelector(".context-nested").textContent,' +
+        'contextAfterNested:document.querySelector(".context-after-nested").textContent,' +
+        'contextDefaultAfter:document.querySelector(".context-default-after").textContent,' +
+        'contextParent:document.querySelector(".context-value").parentElement.className})}))},500);',
     );
   }, 300);
 }
