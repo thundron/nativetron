@@ -7,6 +7,7 @@ mkdir -p "$ROOT/build"
 
 node "$ROOT/abi/generate.mjs" --check
 node "$ROOT/canvas/generate.mjs" --check
+node "$ROOT/compat/generate.mjs" --check
 
 # Platform link flags for the webview library (injected into scriptc's clang
 # link step via the clang-driver CCC_OVERRIDE_OPTIONS hook; '+' appends args).

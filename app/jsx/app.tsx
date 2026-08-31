@@ -1,43 +1,49 @@
-import { mount, run, selftestRead } from "../../framework/dom.js";
+import { mount, run } from "../../framework/dom.js";
 import { h } from "../../framework/jsx.js";
 import { mountTo, type El } from "../../framework/ui.js";
-import { signal } from "../../framework/reactive.js";
-
-const count = signal(0);
-const items = signal<string[]>(["alpha", "beta", "gamma"]);
+import { useState, useMemo, useEffect } from "../../compat/react.js";
 
 function Counter(): El {
+  const [count, setCount] = useState(0);
+  const doubled = useMemo(() => count() * 2);
+
+  useEffect(() => {
+    console.log("[effect] count is now " + count());
+  });
+
   return (
     <section>
       <h2>Counter</h2>
-      <button style="margin-right:8px" onclick={() => count.set(count.get() + 1)}>Increment</button>
-      <p>{() => `count: ${count.get()}`}</p>
+      <button style="margin-right:8px" onclick={() => setCount(count() + 1)}>Increment</button>
+      <p>count: {count()}</p>
+      <p>doubled: {doubled()}</p>
     </section>
   );
 }
 
-function List(): El {
+function Items(): El {
+  const [items, setItems] = useState<string[]>(["alpha", "beta", "gamma"]);
   return (
     <section>
-      <h2>List</h2>
+      <h2>Items</h2>
       <button style="margin-right:8px" onclick={() => {
-        const next = items.get().slice();
+        const next = items().slice();
         next.push("item-" + (next.length + 1));
-        items.set(next);
+        setItems(next);
       }}>Add</button>
-      <button onclick={() => { const next = items.get().slice(); next.shift(); items.set(next); }}>Remove first</button>
-      <p>{() => `${items.get().length} items`}</p>
+      <button onclick={() => { const next = items().slice(); next.shift(); setItems(next); }}>Remove first</button>
+      <p>{items().length} items</p>
     </section>
   );
 }
 
-mount("nativetron — JSX", 520, 460);
+mount("nativetron — React-style, compiled", 560, 480);
 mountTo(
   <main>
-    <h1>JSX, compiled to native</h1>
-    <p style="color:#666">No JS engine. No virtual DOM.</p>
+    <h1>useState, compiled</h1>
+    <p style="color:#666">No React runtime. No virtual DOM. No JS engine.</p>
     <Counter />
-    <List />
+    <Items />
   </main>,
 );
 run();

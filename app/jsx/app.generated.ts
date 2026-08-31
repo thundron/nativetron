@@ -1,31 +1,42 @@
-// generated from app.tsx — do not edit
+// generated from app.tsx by app/jsx/build.mjs — do not edit
 import { mount, run } from "../../framework/dom.js";
 import { h } from "../../framework/jsx.js";
 import { mountTo } from "../../framework/ui.js";
-import { signal } from "../../framework/reactive.js";
-const count = signal(0);
-const items = signal(["alpha", "beta", "gamma"]);
+import { useState, useMemo, useEffect } from "../../compat/react.js";
 function Counter() {
+    const [count, setCount] = useState(0);
+    const doubled = useMemo(() => count() * 2);
+    useEffect(() => {
+        console.log("[effect] count is now " + count());
+    });
     return (h("section", null,
         h("h2", null, "Counter"),
-        h("button", { style: "margin-right:8px", onclick: () => count.set(count.get() + 1) }, "Increment"),
-        h("p", null, () => `count: ${count.get()}`)));
+        h("button", { style: "margin-right:8px", onclick: () => setCount(count() + 1) }, "Increment"),
+        h("p", null,
+            "count: ",
+            () => "" + (count())),
+        h("p", null,
+            "doubled: ",
+            () => "" + (doubled()))));
 }
-function List() {
+function Items() {
+    const [items, setItems] = useState(["alpha", "beta", "gamma"]);
     return (h("section", null,
-        h("h2", null, "List"),
+        h("h2", null, "Items"),
         h("button", { style: "margin-right:8px", onclick: () => {
-                const next = items.get().slice();
+                const next = items().slice();
                 next.push("item-" + (next.length + 1));
-                items.set(next);
+                setItems(next);
             } }, "Add"),
-        h("button", { onclick: () => { const next = items.get().slice(); next.shift(); items.set(next); } }, "Remove first"),
-        h("p", null, () => `${items.get().length} items`)));
+        h("button", { onclick: () => { const next = items().slice(); next.shift(); setItems(next); } }, "Remove first"),
+        h("p", null,
+            () => "" + (items().length),
+            " items")));
 }
-mount("nativetron — JSX", 520, 460);
+mount("nativetron — React-style, compiled", 560, 480);
 mountTo(h("main", null,
-    h("h1", null, "JSX, compiled to native"),
-    h("p", { style: "color:#666" }, "No JS engine. No virtual DOM."),
+    h("h1", null, "useState, compiled"),
+    h("p", { style: "color:#666" }, "No React runtime. No virtual DOM. No JS engine."),
     h(Counter, null),
-    h(List, null)));
+    h(Items, null)));
 run();

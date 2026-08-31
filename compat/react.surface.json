@@ -1,0 +1,224 @@
+{
+  "note": "React's public surface. 'yes' entries must be exported by compat/react.ts; generate.mjs --check enforces that.",
+  "hooks": [
+    {
+      "name": "useState",
+      "status": "yes",
+      "note": "returns [getter, setter]; the getter is a function, not a value"
+    },
+    {
+      "name": "useReducer",
+      "status": "yes",
+      "note": "returns [getter, dispatch]"
+    },
+    {
+      "name": "useEffect",
+      "status": "yes",
+      "note": "tracks reads automatically; no dependency array"
+    },
+    {
+      "name": "useMemo",
+      "status": "yes",
+      "note": "tracks reads automatically; no dependency array"
+    },
+    {
+      "name": "useCallback",
+      "status": "yes",
+      "note": "identity passthrough; components run once so it is a no-op"
+    },
+    {
+      "name": "useRef",
+      "status": "yes",
+      "note": "plain { current } box; no host-node refs"
+    },
+    {
+      "name": "useContext",
+      "status": "no",
+      "note": "no context propagation yet"
+    },
+    {
+      "name": "useLayoutEffect",
+      "status": "no",
+      "note": "no separate commit phase"
+    },
+    {
+      "name": "useImperativeHandle",
+      "status": "no"
+    },
+    {
+      "name": "useSyncExternalStore",
+      "status": "no"
+    },
+    {
+      "name": "useDeferredValue",
+      "status": "no",
+      "note": "no concurrent scheduling"
+    },
+    {
+      "name": "useTransition",
+      "status": "no",
+      "note": "no concurrent scheduling"
+    },
+    {
+      "name": "useOptimistic",
+      "status": "no"
+    },
+    {
+      "name": "useActionState",
+      "status": "no"
+    },
+    {
+      "name": "useInsertionEffect",
+      "status": "no"
+    },
+    {
+      "name": "useDebugValue",
+      "status": "no"
+    },
+    {
+      "name": "useId",
+      "status": "no"
+    },
+    {
+      "name": "use",
+      "status": "no",
+      "note": "requires suspense"
+    }
+  ],
+  "api": [
+    {
+      "name": "createElement",
+      "status": "different",
+      "note": "the JSX factory is h() in framework/jsx.ts"
+    },
+    {
+      "name": "Fragment",
+      "status": "no",
+      "note": "<>...</> has no factory yet"
+    },
+    {
+      "name": "createContext",
+      "status": "no"
+    },
+    {
+      "name": "forwardRef",
+      "status": "no"
+    },
+    {
+      "name": "memo",
+      "status": "no",
+      "note": "components run once; there is no re-render to skip"
+    },
+    {
+      "name": "lazy",
+      "status": "no",
+      "note": "no dynamic import in a compiled binary"
+    },
+    {
+      "name": "Suspense",
+      "status": "no"
+    },
+    {
+      "name": "startTransition",
+      "status": "no"
+    },
+    {
+      "name": "Profiler",
+      "status": "no"
+    },
+    {
+      "name": "StrictMode",
+      "status": "no",
+      "note": "no double-invoke pass"
+    },
+    {
+      "name": "Children",
+      "status": "no"
+    },
+    {
+      "name": "cloneElement",
+      "status": "no"
+    },
+    {
+      "name": "isValidElement",
+      "status": "no"
+    },
+    {
+      "name": "createRef",
+      "status": "no"
+    },
+    {
+      "name": "Component",
+      "status": "no",
+      "note": "class components are not supported"
+    },
+    {
+      "name": "PureComponent",
+      "status": "no"
+    }
+  ],
+  "jsx": [
+    {
+      "name": "host elements",
+      "status": "yes",
+      "note": "<div>, <button>, ..."
+    },
+    {
+      "name": "component elements",
+      "status": "yes",
+      "note": "<Counter /> calls the function once"
+    },
+    {
+      "name": "attributes",
+      "status": "yes",
+      "note": "string-valued; evaluated once"
+    },
+    {
+      "name": "event handlers",
+      "status": "yes",
+      "note": "onclick -> click; any on* prop whose value is a function"
+    },
+    {
+      "name": "text children",
+      "status": "yes"
+    },
+    {
+      "name": "expression children",
+      "status": "yes",
+      "note": "auto-wrapped into a reactive binding and coerced to string"
+    },
+    {
+      "name": "props on components",
+      "status": "no",
+      "note": "component functions take no arguments yet"
+    },
+    {
+      "name": "fragments",
+      "status": "no"
+    },
+    {
+      "name": "spread props",
+      "status": "no"
+    },
+    {
+      "name": "array / .map() children",
+      "status": "no",
+      "note": "use each() from framework/ui.ts for keyed lists"
+    },
+    {
+      "name": "element-valued expression children",
+      "status": "no",
+      "note": "a bound child is coerced to string; nest the element directly"
+    },
+    {
+      "name": "conditional rendering",
+      "status": "no",
+      "note": "a bound child is text, so a false branch renders as text"
+    },
+    {
+      "name": "reactive attributes",
+      "status": "no",
+      "note": "attributes are written once at construction"
+    }
+  ]
+}
