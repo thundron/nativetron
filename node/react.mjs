@@ -2,6 +2,7 @@ import ReactReconciler from "react-reconciler";
 import { DefaultEventPriority } from "react-reconciler/constants.js";
 
 const TEXT = Symbol("text");
+const isText = (c) => typeof c === "string" || typeof c === "number";
 
 export function createRenderer(win) {
   let nextId = 1;
@@ -61,6 +62,7 @@ export function createRenderer(win) {
       const inst = { id, type, kind: "element", slots: new Map(), handlers: new Map() };
       win.enc.createElement(id, type);
       setProps(inst, props, null);
+      if (isText(props.children)) win.enc.setText(id, String(props.children));
       return inst;
     },
 
@@ -79,11 +81,16 @@ export function createRenderer(win) {
     removeChildFromContainer(container, child) { win.enc.remove(child.id); },
 
     commitTextUpdate(inst, oldText, newText) { if (oldText !== newText) win.enc.setText(inst.id, newText); },
-    commitUpdate(inst, type, prev, next) { setProps(inst, next, prev); },
+    commitUpdate(inst, type, prev, next) {
+      setProps(inst, next, prev);
+      if (isText(next.children) && next.children !== prev.children) {
+        win.enc.setText(inst.id, String(next.children));
+      }
+    },
 
     finalizeInitialChildren() { return false; },
     prepareUpdate() { return true; },
-    shouldSetTextContent() { return false; },
+    shouldSetTextContent(type, props) { return isText(props.children); },
     getRootHostContext() { return {}; },
     getChildHostContext(parent) { return parent; },
     getPublicInstance(inst) { return inst; },
@@ -113,6 +120,10 @@ export function createRenderer(win) {
   const container = reconciler.createContainer({ id: 0 }, 0, null, false, null, "nt", () => {}, null);
   return {
     render(element) { reconciler.updateContainer(element, container, null, null); },
+    renderSync(element) {
+      reconciler.updateContainerSync(element, container, null, null);
+      reconciler.flushSyncWork();
+    },
   };
 }
 

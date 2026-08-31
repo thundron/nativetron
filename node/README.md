@@ -42,3 +42,22 @@ addressed by slot; the host only knows a listener exists.
 
 Not covered: portals, suspense, refs to host nodes, controlled inputs,
 synthetic event objects (handlers receive the host's value string).
+
+## Cost against the compiled lane
+
+10k rows, op stream produced with no window and no host apply, so it is
+comparable to the guest encode number in `bench/codec`. Medians of 7.
+
+| | react (node) | compiled |
+|---|---:|---:|
+| mount, produce ops | 25.28 ms | 1.50 ms |
+| mount wire bytes | 407,803 | 347,773 |
+| update, produce ops | 30.22 ms | — |
+| update wire bytes | 227,746 | 227,779 |
+
+React costs roughly 17x the compiled encoder to produce the same mount, and
+carries 1.17x the bytes: the compiled lane emits one `ELEMENT_WITH_TEXT` where
+the reconciler emits `CREATE_ELEMENT` plus `SET_TEXT`. Update wire size matches.
+
+`shouldSetTextContent` for single string/number children is worth 19% of mount
+time and 18% of mount bytes against creating separate text nodes.
