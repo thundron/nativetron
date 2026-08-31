@@ -52,13 +52,14 @@ function lowerJsx(context) {
       f.createParenthesizedExpression(expr),
     ));
 
-  const attrsOf = (node, dynamicOut) => {
+  const attrsOf = (node, component) => {
     const attrs = node.attributes.properties;
     if (attrs.length === 0) return f.createNull();
     const props = [];
     for (const a of attrs) {
       if (ts.isJsxSpreadAttribute(a)) {
-        throw new Error("spread props are not supported (see compat/COMPATIBILITY.md)");
+        props.push(f.createSpreadAssignment(a.expression));
+        continue;
       }
       const name = ts.isIdentifier(a.name) ? a.name.text : a.name.getText();
       let value;
@@ -67,23 +68,10 @@ function lowerJsx(context) {
       else value = a.initializer.expression;
       const isHandler = name.startsWith("on");
       const isStatic = ts.isStringLiteral(value) || name === "key";
-      if (dynamicOut !== null && !isHandler && !isStatic) {
-        dynamicOut.push([name, value]);
-        continue;
-      }
+      if (!component && !isHandler && !isStatic) value = stringThunk(value);
       props.push(f.createPropertyAssignment(f.createStringLiteral(name), value));
     }
     return props.length === 0 ? f.createNull() : f.createObjectLiteralExpression(props, false);
-  };
-
-  const withDynAttrs = (expr, dynamic) => {
-    let out = expr;
-    for (const [name, value] of dynamic) {
-      out = f.createCallExpression(f.createIdentifier("dynAttr"), undefined, [
-        out, f.createStringLiteral(name), stringThunk(value),
-      ]);
-    }
-    return out;
   };
 
   const childrenOf = (node) => {
@@ -133,8 +121,7 @@ function lowerJsx(context) {
     if (ts.isJsxSelfClosingElement(node) || ts.isJsxElement(node)) {
       const open = ts.isJsxElement(node) ? node.openingElement : node;
       const tag = open.tagName.getText();
-      const dynamic = [];
-      const props = attrsOf(open, isComponent(tag) ? null : dynamic);
+      const props = attrsOf(open, isComponent(tag));
       const kids = ts.isJsxElement(node) ? childrenOf(node) : [];
       if (isComponent(tag)) {
         const args = [];
@@ -157,14 +144,11 @@ function lowerJsx(context) {
         const withProps = props.kind === ts.SyntaxKind.NullKeyword
           ? each
           : f.createCallExpression(f.createIdentifier("applyProps"), undefined, [each, props]);
-        return withDynAttrs(withProps, dynamic);
+        return withProps;
       }
-      return withDynAttrs(
-        f.createCallExpression(f.createIdentifier("h"), undefined, [
-          f.createStringLiteral(tag), props, ...kids,
-        ]),
-        dynamic,
-      );
+      return f.createCallExpression(f.createIdentifier("h"), undefined, [
+        f.createStringLiteral(tag), props, ...kids,
+      ]);
     }
 
     if (ts.isJsxFragment(node)) {

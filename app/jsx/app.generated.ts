@@ -9,7 +9,16 @@ interface CounterProps {
 }
 function Counter(props: CounterProps): El {
     const [count, setCount] = useState(0);
-    return (h("section", null, h("h2", null, () => "" + (props.label)), h("button", { "style": "margin-right:8px", "onclick": () => setCount(count() + props.step) }, "Increment"), dynAttr(h("p", null, "count: ", () => "" + (count())), "style", () => "" + (count() > 5 ? "color:#b00" : "color:#111")), show(() => count() > 5, () => h("p", null, "over five"), () => h("p", null, "five or fewer")), show(() => count() > 8, () => h("p", null, "and over eight"), nothing)));
+    return (h("section", null, h("h2", null, () => "" + (props.label)), h("button", { "style": "margin-right:8px", "onclick": () => setCount(count() + props.step) }, "Increment"), h("p", { "style": () => "" + (count() > 5 ? "color:#b00" : "color:#111") }, "count: ", () => "" + (count())), show(() => count() > 5, () => h("p", null, "over five"), () => h("p", null, "five or fewer")), show(() => count() > 8, () => h("p", null, "and over eight"), nothing)));
+}
+function SpreadAttrs(): El {
+    const [tone, setTone] = useState("cold");
+    const spread = {
+        class: "before",
+        "data-order": "spread",
+        title: () => "tone:" + tone(),
+    };
+    return (h("button", { ...spread, "class": "after", "data-order": "explicit", "onclick": () => setTone("hot") }, "Spread"));
 }
 function Fragmented(): El {
     return (frag([h("p", { "class": "fragment-a" }, "fragment alpha"), h("p", { "class": "fragment-b" }, "fragment beta")]));
@@ -23,14 +32,16 @@ function Items(): El {
         } }, "Add"), h("button", { "onclick": () => { const next = items().slice(); next.shift(); setItems(next); } }, "Remove first"), applyProps(each("ul", () => items().map((x: string) => ({ key: "" + (x), el: h("li", null, () => "" + (x)) }))), { "class": "items" }), h("p", null, () => "" + (items().length), " items")));
 }
 mount("nativetron — JSX", 560, 560);
-mountTo(h("main", null, h("h1", null, "Compiled JSX"), Counter({ "label": "By three", "step": 3 }), Fragmented(), Items()));
+const counterDefaults: CounterProps = { label: "By one", step: 1 };
+mountTo(h("main", null, h("h1", null, "Compiled JSX"), Counter({ ...counterDefaults, "label": "By three", "step": 3 }), SpreadAttrs(), Fragmented(), Items()));
 if (process.env.NT_SELFTEST === "jsx") {
     setTimeout(() => {
         selftestEval('var b=[].slice.call(document.querySelectorAll("button"));' +
             'var inc=b.filter(function(x){return x.textContent==="Increment"})[0];' +
             'var add=b.filter(function(x){return x.textContent==="Add"})[0];' +
             'var rm=b.filter(function(x){return x.textContent==="Remove first"})[0];' +
-            'inc.click();inc.click();inc.click();add.click();rm.click();' +
+            'var spread=b.filter(function(x){return x.textContent==="Spread"})[0];' +
+            'inc.click();inc.click();inc.click();spread.click();add.click();rm.click();' +
             'setTimeout(function(){' +
             'var p=[].slice.call(document.querySelectorAll("p"))' +
             '.filter(function(x){return x.textContent.indexOf("count:")===0})[0];' +
@@ -40,7 +51,10 @@ if (process.env.NT_SELFTEST === "jsx") {
             'countStyle:p.getAttribute("style"),' +
             'items:[].slice.call(ul.children).map(function(li){return li.textContent}).join(","),' +
             'fragmentParent:document.querySelector(".fragment-a").parentElement.tagName,' +
-            'fragmentAdjacent:document.querySelector(".fragment-a").nextElementSibling.className})}))},500);');
+            'fragmentAdjacent:document.querySelector(".fragment-a").nextElementSibling.className,' +
+            'spreadClass:spread.getAttribute("class"),' +
+            'spreadOrder:spread.getAttribute("data-order"),' +
+            'spreadTitle:spread.getAttribute("title")})}))},500);');
     }, 300);
 }
 run();

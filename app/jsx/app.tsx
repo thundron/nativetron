@@ -21,6 +21,18 @@ function Counter(props: CounterProps): El {
   );
 }
 
+function SpreadAttrs(): El {
+  const [tone, setTone] = useState("cold");
+  const spread = {
+    class: "before",
+    "data-order": "spread",
+    title: () => "tone:" + tone(),
+  };
+  return (
+    <button {...spread} class="after" data-order="explicit" onclick={() => setTone("hot")}>Spread</button>
+  );
+}
+
 function Fragmented(): El {
   return (
     <>
@@ -48,10 +60,13 @@ function Items(): El {
 }
 
 mount("nativetron — JSX", 560, 560);
+const counterDefaults: CounterProps = { label: "By one", step: 1 };
+
 mountTo(
   <main>
     <h1>Compiled JSX</h1>
-    <Counter label="By three" step={3} />
+    <Counter {...counterDefaults} label="By three" step={3} />
+    <SpreadAttrs />
     <Fragmented />
     <Items />
   </main>,
@@ -63,7 +78,8 @@ if (process.env.NT_SELFTEST === "jsx") {
         'var inc=b.filter(function(x){return x.textContent==="Increment"})[0];' +
         'var add=b.filter(function(x){return x.textContent==="Add"})[0];' +
         'var rm=b.filter(function(x){return x.textContent==="Remove first"})[0];' +
-        'inc.click();inc.click();inc.click();add.click();rm.click();' +
+        'var spread=b.filter(function(x){return x.textContent==="Spread"})[0];' +
+        'inc.click();inc.click();inc.click();spread.click();add.click();rm.click();' +
         'setTimeout(function(){' +
         'var p=[].slice.call(document.querySelectorAll("p"))' +
         '.filter(function(x){return x.textContent.indexOf("count:")===0})[0];' +
@@ -73,7 +89,10 @@ if (process.env.NT_SELFTEST === "jsx") {
         'countStyle:p.getAttribute("style"),' +
         'items:[].slice.call(ul.children).map(function(li){return li.textContent}).join(","),' +
         'fragmentParent:document.querySelector(".fragment-a").parentElement.tagName,' +
-        'fragmentAdjacent:document.querySelector(".fragment-a").nextElementSibling.className})}))},500);',
+        'fragmentAdjacent:document.querySelector(".fragment-a").nextElementSibling.className,' +
+        'spreadClass:spread.getAttribute("class"),' +
+        'spreadOrder:spread.getAttribute("data-order"),' +
+        'spreadTitle:spread.getAttribute("title")})}))},500);',
     );
   }, 300);
 }

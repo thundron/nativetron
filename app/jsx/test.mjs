@@ -24,6 +24,9 @@ assert.equal(got.countStyle, "color:#b00", "reactive attribute recomputed");
 assert.equal(got.items, "beta,gamma,item-4", "keyed list: appended and removed by key");
 assert.equal(got.fragmentParent, "MAIN", "fragment added no wrapper element");
 assert.equal(got.fragmentAdjacent, "fragment-b", "fragment roots remained adjacent siblings");
+assert.equal(got.spreadClass, "after", "explicit prop after spread won");
+assert.equal(got.spreadOrder, "explicit", "spread merge order was deterministic");
+assert.equal(got.spreadTitle, "tone:hot", "function-valued spread prop remained reactive");
 
-console.log("ok   component props, conditionals, keyed list, reactive attributes, fragments");
+console.log("ok   props, spreads, conditionals, keyed list, reactive attributes, fragments");
 console.log("jsx: all checks passed");

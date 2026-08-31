@@ -1,7 +1,7 @@
-import { el, txt, dyn, attr, on, type El } from "./ui.js";
+import { el, txt, dyn, attr, on, dynAttr, type El } from "./ui.js";
 
 export type Child = El | string | number | (() => string);
-export type PropValue = string | (() => void);
+export type PropValue = string | number | boolean | (() => string) | (() => void);
 
 export function h(
   tag: string | (() => El),
@@ -27,8 +27,12 @@ export function applyProps(e: El, props: Record<string, PropValue> | null): El {
   for (let i = 0; i < names.length; i++) {
     const k = names[i]!;
     const v = props[k]!;
-    if (typeof v === "function") out = on(out, eventName(k), v);
-    else out = attr(out, k, v);
+    if (typeof v === "function") {
+      if (k.startsWith("on")) out = on(out, eventName(k), v);
+      else out = dynAttr(out, k, v as () => string);
+    } else if (typeof v === "string") out = attr(out, k, v);
+    else if (typeof v === "number") out = attr(out, k, "" + v);
+    else out = attr(out, k, v ? "true" : "false");
   }
   return out;
 }

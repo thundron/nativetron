@@ -199,7 +199,8 @@
     },
     {
       "name": "spread props",
-      "status": "no"
+      "status": "yes",
+      "note": "source-order last-write-wins; function-valued non-event host props are reactive getters"
     },
     {
       "name": "array / .map() children",
