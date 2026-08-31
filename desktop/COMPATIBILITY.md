@@ -2,7 +2,7 @@
 
 Platform: macOS arm64.
 
-18 supported, 2 partial, 0 unsupported.
+19 supported, 1 partial, 0 unsupported.
 
 | capability | status | note |
 |---|---|---|
@@ -24,7 +24,7 @@ Platform: macOS arm64.
 | application menu | yes | top-level menus, separators, command-key equivalents, enabled state, compiled callbacks |
 | context menu | yes | separators, enabled state, and compiled callbacks; showContextMenu must run while macOS has a current UI event |
 | tray/status item | yes | text, tooltip, file-backed template or color image, attached menu, enabled state, separators, and compiled callbacks |
-| file associations | different | document types and URL schemes are registered in Info.plist; runtime open-file and open-URL event delivery is not implemented |
+| file and URL associations | yes | Info.plist document types and URL schemes enter the compiled main process through Apple Events and are forwarded to renderer handlers over bounded IPC |
 | global shortcuts | yes | letters, digits, and F1-F12 with command, option, control, and shift modifiers through native Carbon hotkeys |
 
 Generated from `desktop/surface.json`; do not edit directly.

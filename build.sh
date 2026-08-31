@@ -33,7 +33,9 @@ CCC_OVERRIDE_OPTIONS="$LINK" \
     --ffi ffi/nativetron.ffi.json -o build/renderer
 
 echo "[3/3] main.ts -> build/main (native)"
-node "$SCRIPTC" build app/main.ts --backend c -o build/main
+CCC_OVERRIDE_OPTIONS="$LINK" \
+  node "$SCRIPTC" build app/main.ts --backend c \
+    --ffi ffi/associations.ffi.json -o build/main
 
 echo "OK -> $ROOT/build/main (spawns build/renderer)"
 

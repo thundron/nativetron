@@ -7,7 +7,43 @@ import { IpcMain } from "../ipc/main.js";
 import { encodeUtf8, decodeUtf8 } from "../ipc/codec.js";
 import { reviewRelease, type ReleaseReviewRequest } from "../pyrus/release-review.js";
 
+declare function ntOnOpenFile(cb: (path: string) => void): void;
+declare function ntOnOpenUrl(cb: (url: string) => void): void;
+declare function ntAssociationsStart(): number;
+declare function ntAssociationsSelftest(file: string, url: string): number;
+declare function ntPump(): number;
+
 const ipc = new IpcMain();
+const pendingOpenFiles: string[] = [];
+const pendingOpenUrls: string[] = [];
+ntOnOpenFile((path: string) => {
+  if (ipc.send("app:open-file", encodeUtf8(path))) return;
+  if (pendingOpenFiles.length < 256) pendingOpenFiles.push(path);
+  else console.log("[association] dropped open-file event: pending queue full");
+});
+ntOnOpenUrl((url: string) => {
+  if (ipc.send("app:open-url", encodeUtf8(url))) return;
+  if (pendingOpenUrls.length < 256) pendingOpenUrls.push(url);
+  else console.log("[association] dropped open-url event: pending queue full");
+});
+const associationsStarted = ntAssociationsStart() === 1;
+if (!associationsStarted) console.log("[association] Apple Event registration failed");
+setInterval(() => { ntPump(); }, 8);
+
+ipc.onConnect(() => {
+  for (let i = 0; i < pendingOpenFiles.length; i++)
+    ipc.send("app:open-file", encodeUtf8(pendingOpenFiles[i]!));
+  for (let i = 0; i < pendingOpenUrls.length; i++)
+    ipc.send("app:open-url", encodeUtf8(pendingOpenUrls[i]!));
+  pendingOpenFiles.splice(0, pendingOpenFiles.length);
+  pendingOpenUrls.splice(0, pendingOpenUrls.length);
+});
+
+ipc.on("app:test-associations", (_payload: Uint8Array) => {
+  if (process.env.NT_SELFTEST === "associations" && associationsStarted) {
+    ntAssociationsSelftest("/tmp/nativetron association.nativetron", "nativetron://open?value=caf%C3%A9");
+  }
+});
 
 ipc.handle("os:homedir", (payload: Uint8Array) => {
   return Promise.resolve(encodeUtf8(homedir()));

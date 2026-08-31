@@ -19,7 +19,7 @@
     { "name": "application menu", "status": "yes", "module": "framework/menu.ts", "exports": ["setApplicationMenu", "getApplicationMenuItemCount"], "note": "top-level menus, separators, command-key equivalents, enabled state, compiled callbacks" },
     { "name": "context menu", "status": "yes", "module": "framework/menu.ts", "exports": ["setContextMenu", "showContextMenu", "getContextMenuItemCount"], "note": "separators, enabled state, and compiled callbacks; showContextMenu must run while macOS has a current UI event" },
     { "name": "tray/status item", "status": "yes", "module": "framework/menu.ts", "exports": ["setTray", "setTrayImage", "setTrayMenu", "getTrayMenuItemCount", "removeTray", "hasTray"], "note": "text, tooltip, file-backed template or color image, attached menu, enabled state, separators, and compiled callbacks" },
-    { "name": "file associations", "status": "different", "module": "packaging/nativetron.config.json", "contract": true, "note": "document types and URL schemes are registered in Info.plist; runtime open-file and open-URL event delivery is not implemented" },
+    { "name": "file and URL associations", "status": "yes", "module": "framework/associations.ts", "exports": ["onOpenFile", "onOpenUrl"], "contract": true, "note": "Info.plist document types and URL schemes enter the compiled main process through Apple Events and are forwarded to renderer handlers over bounded IPC" },
     { "name": "global shortcuts", "status": "yes", "module": "framework/shortcuts.ts", "exports": ["registerGlobalShortcut", "unregisterAllGlobalShortcuts", "getGlobalShortcutCount"], "note": "letters, digits, and F1-F12 with command, option, control, and shift modifiers through native Carbon hotkeys" }
   ]
 }

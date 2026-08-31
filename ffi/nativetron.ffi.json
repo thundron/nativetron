@@ -8,6 +8,56 @@
       "returns": "void"
     },
     {
+      "name": "ntOnOpenFile",
+      "symbol": "nt_on_open_file",
+      "params": [
+        {
+          "callback": {
+            "id": "open_file_event",
+            "params": [
+              "string",
+              { "context": "open_file_event" }
+            ],
+            "returns": "void",
+            "lifetime": "retained"
+          }
+        },
+        { "context": "open_file_event" }
+      ],
+      "returns": "void"
+    },
+    {
+      "name": "ntOnOpenUrl",
+      "symbol": "nt_on_open_url",
+      "params": [
+        {
+          "callback": {
+            "id": "open_url_event",
+            "params": [
+              "string",
+              { "context": "open_url_event" }
+            ],
+            "returns": "void",
+            "lifetime": "retained"
+          }
+        },
+        { "context": "open_url_event" }
+      ],
+      "returns": "void"
+    },
+    {
+      "name": "ntAssociationsStart",
+      "symbol": "nt_associations_start",
+      "params": [],
+      "returns": "i32"
+    },
+    {
+      "name": "ntAssociationsSelftest",
+      "symbol": "nt_associations_selftest",
+      "params": ["string", "string"],
+      "returns": "i32"
+    },
+    {
       "name": "ntAddInit",
       "symbol": "nt_add_init",
       "params": [

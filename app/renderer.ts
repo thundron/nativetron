@@ -7,10 +7,15 @@ import { closeWindowFor, createWindow, getWindowCount, getWindowState, getWindow
 import { notificationsAvailable, notify, openExternal, readClipboard, writeClipboard } from "../framework/desktop.js";
 import { getApplicationMenuItemCount, getContextMenuItemCount, getTrayMenuItemCount, hasTray, removeTray, setApplicationMenu, setContextMenu, setTray, setTrayImage, setTrayMenu } from "../framework/menu.js";
 import { getGlobalShortcutCount, registerGlobalShortcut, unregisterAllGlobalShortcuts } from "../framework/shortcuts.js";
+import { onOpenFile, onOpenUrl } from "../framework/associations.js";
 import { SAMPLE_REVIEW, SAFE_REVIEW } from "../pyrus/sample.js";
 import type { ReleaseReview, ReleaseReviewRequest } from "../pyrus/release-review.js";
 
 const ipc = new IpcRenderer();
+let associatedFile = "";
+let associatedUrl = "";
+onOpenFile(ipc, (path: string) => { associatedFile = path; });
+onOpenUrl(ipc, (url: string) => { associatedUrl = url; });
 
 const count = signal(0);
 const items = signal<string[]>(["alpha", "beta", "gamma"]);
@@ -223,6 +228,16 @@ function desktopSelftest(): void {
   quit();
 }
 
+function associationsSelftest(): void {
+  ipc.send("app:test-associations", new Uint8Array(0));
+  setTimeout(() => {
+    const ok = associatedFile === "/tmp/nativetron association.nativetron" &&
+      associatedUrl === "nativetron://open?value=caf%C3%A9";
+    console.log(ok ? "NT_ASSOCIATIONS_SELFTEST=OK" : "NT_ASSOCIATIONS_SELFTEST=FAIL");
+    quit();
+  }, 150);
+}
+
 function multipleWindowSelftest(): void {
   let id = 0;
   let sawResize = false;
@@ -302,6 +317,7 @@ ipc.onOpen(() => {
   if (process.env.NT_SELFTEST === "ipc") selftest();
   if (process.env.NT_SELFTEST === "window") windowSelftest();
   if (process.env.NT_SELFTEST === "multiwindow") multipleWindowSelftest();
+  if (process.env.NT_SELFTEST === "associations") associationsSelftest();
   if (process.env.NT_SELFTEST === "desktop") desktopSelftest();
   if (process.env.NT_SELFTEST === "menu") menuSelftest();
   if (process.env.NT_SELFTEST === "shortcut") shortcutSelftest();

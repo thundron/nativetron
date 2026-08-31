@@ -24,14 +24,15 @@ export class IpcMain {
     this.eventFns.push(fn);
   }
 
-  send(channel: string, payload: Uint8Array): void {
+  send(channel: string, payload: Uint8Array): boolean {
     const p = this.peer;
-    if (p === null) return;
+    if (p === null) return false;
     const w = new FrameWriter();
     w.u8(FRAME_EVENT);
     w.str(channel);
     w.bytes(payload);
     p.write(w.finish());
+    return true;
   }
 
   onConnect(fn: () => void): void {

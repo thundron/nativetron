@@ -38,6 +38,10 @@ void *g_notification_permission_ctx = nullptr;
 std::atomic<int32_t> g_notification_permission_result{-1};
 bool g_notification_permission_waiting = false;
 uint64_t g_notification_id = 0;
+nt_text_cb g_open_file_cb = nullptr;
+void *g_open_file_ctx = nullptr;
+nt_text_cb g_open_url_cb = nullptr;
+void *g_open_url_ctx = nullptr;
 
 #if defined(__APPLE__)
 id g_action_target = nullptr;
@@ -177,6 +181,38 @@ id action_target() {
                       if (code != 0 && window_id >= 0) g_window_cb(window_id * 16 + code, g_window_ctx);
                     }),
                     "v@:@");
+    class_addMethod(cls, objc::selector("nativetronOpenURL:withReplyEvent:"),
+                    (IMP)(+[](id, SEL, id event, id) {
+                      if (!g_open_url_cb) return;
+                      id descriptor = objc::msg_send<id>(
+                          event, objc::selector("paramDescriptorForKeyword:"),
+                          static_cast<unsigned int>(0x2d2d2d2d));
+                      std::string value = native_text(
+                          objc::msg_send<id>(descriptor, objc::selector("stringValue")));
+                      if (!value.empty() && value.size() <= 32768)
+                        g_open_url_cb(reinterpret_cast<const uint8_t *>(value.data()),
+                                      value.size(), g_open_url_ctx);
+                    }),
+                    "v@:@@");
+    class_addMethod(cls, objc::selector("nativetronOpenDocuments:withReplyEvent:"),
+                    (IMP)(+[](id, SEL, id event, id) {
+                      if (!g_open_file_cb) return;
+                      id descriptor = objc::msg_send<id>(
+                          event, objc::selector("paramDescriptorForKeyword:"),
+                          static_cast<unsigned int>(0x2d2d2d2d));
+                      long count = objc::msg_send<long>(descriptor, objc::selector("numberOfItems"));
+                      for (long i = 1; i <= count; i++) {
+                        id item = objc::msg_send<id>(descriptor,
+                                                     objc::selector("descriptorAtIndex:"), i);
+                        id url = objc::msg_send<id>(item, objc::selector("fileURLValue"));
+                        std::string value = native_text(
+                            objc::msg_send<id>(url, objc::selector("path")));
+                        if (!value.empty() && value.size() <= 32768)
+                          g_open_file_cb(reinterpret_cast<const uint8_t *>(value.data()),
+                                         value.size(), g_open_file_ctx);
+                      }
+                    }),
+                    "v@:@@");
     objc_registerClassPair(cls);
   }
   g_action_target = objc::Class_new(cls);
@@ -322,6 +358,90 @@ void nt_init(void) {
     }
     return ""; // resolve the page-side promise with nothing
   });
+}
+
+void nt_on_open_file(nt_text_cb cb, void *ctx) {
+  g_open_file_cb = cb;
+  g_open_file_ctx = ctx;
+}
+
+void nt_on_open_url(nt_text_cb cb, void *ctx) {
+  g_open_url_cb = cb;
+  g_open_url_ctx = ctx;
+}
+
+int32_t nt_associations_start(void) {
+#if defined(__APPLE__)
+  using namespace webview::detail;
+  using namespace webview::detail::cocoa;
+  id app = NSApplication_get_sharedApplication();
+  objc::msg_send<void>(app, objc::selector("finishLaunching"));
+  id manager = objc::msg_send<id>(objc::get_class("NSAppleEventManager"),
+                                   objc::selector("sharedAppleEventManager"));
+  if (!manager) return 0;
+  id target = action_target();
+  objc::msg_send<void>(manager,
+                       objc::selector("setEventHandler:andSelector:forEventClass:andEventID:"),
+                       target, objc::selector("nativetronOpenURL:withReplyEvent:"),
+                       static_cast<unsigned int>(0x4755524c),
+                       static_cast<unsigned int>(0x4755524c));
+  objc::msg_send<void>(manager,
+                       objc::selector("setEventHandler:andSelector:forEventClass:andEventID:"),
+                       target, objc::selector("nativetronOpenDocuments:withReplyEvent:"),
+                       static_cast<unsigned int>(0x61657674),
+                       static_cast<unsigned int>(0x6f646f63));
+  return 1;
+#else
+  return 0;
+#endif
+}
+
+int32_t nt_associations_selftest(const uint8_t *file, size_t file_n,
+                                  const uint8_t *url, size_t url_n) {
+#if defined(__APPLE__)
+  using namespace webview::detail;
+  using namespace webview::detail::cocoa;
+  if (!g_open_file_cb || !g_open_url_cb) return 0;
+  Class descriptor_class = objc::get_class("NSAppleEventDescriptor");
+  id target = action_target();
+  id url_event = objc::msg_send<id>(
+      descriptor_class,
+      objc::selector("appleEventWithEventClass:eventID:targetDescriptor:returnID:transactionID:"),
+      static_cast<unsigned int>(0x4755524c), static_cast<unsigned int>(0x4755524c),
+      static_cast<id>(nullptr), static_cast<short>(-1), static_cast<int32_t>(0));
+  id url_value = objc::msg_send<id>(
+      descriptor_class, objc::selector("descriptorWithString:"),
+      NSString_stringWithUTF8String(sv(url, url_n)));
+  objc::msg_send<void>(url_event, objc::selector("setParamDescriptor:forKeyword:"),
+                       url_value, static_cast<unsigned int>(0x2d2d2d2d));
+  objc::msg_send<void>(target, objc::selector("nativetronOpenURL:withReplyEvent:"),
+                       url_event, static_cast<id>(nullptr));
+
+  id file_url = objc::msg_send<id>(objc::get_class("NSURL"),
+                                    objc::selector("fileURLWithPath:"),
+                                    NSString_stringWithUTF8String(sv(file, file_n)));
+  id file_value = objc::msg_send<id>(descriptor_class,
+                                      objc::selector("descriptorWithFileURL:"), file_url);
+  id list = objc::msg_send<id>(descriptor_class, objc::selector("listDescriptor"));
+  objc::msg_send<void>(list, objc::selector("insertDescriptor:atIndex:"),
+                       file_value, static_cast<long>(1));
+  id file_event = objc::msg_send<id>(
+      descriptor_class,
+      objc::selector("appleEventWithEventClass:eventID:targetDescriptor:returnID:transactionID:"),
+      static_cast<unsigned int>(0x61657674), static_cast<unsigned int>(0x6f646f63),
+      static_cast<id>(nullptr), static_cast<short>(-1), static_cast<int32_t>(0));
+  objc::msg_send<void>(file_event, objc::selector("setParamDescriptor:forKeyword:"),
+                       list, static_cast<unsigned int>(0x2d2d2d2d));
+  objc::msg_send<void>(target, objc::selector("nativetronOpenDocuments:withReplyEvent:"),
+                       file_event, static_cast<id>(nullptr));
+  return 1;
+#else
+  (void)file;
+  (void)file_n;
+  (void)url;
+  (void)url_n;
+  return 0;
+#endif
 }
 
 void nt_add_init(const uint8_t *s, size_t n) {

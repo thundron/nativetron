@@ -13,5 +13,11 @@
       "extensions": ["nativetron"],
       "role": "Editor"
     }
+  ],
+  "urlSchemes": [
+    {
+      "name": "Nativetron URL",
+      "schemes": ["nativetron"]
+    }
   ]
 }
