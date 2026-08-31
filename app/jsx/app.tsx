@@ -21,6 +21,25 @@ function Counter(props: CounterProps): El {
   );
 }
 
+interface BadgeProps {
+  text: string;
+}
+
+function Badge(props: BadgeProps): El {
+  return <i>{props.text}</i>;
+}
+
+function GeneralChildren(): El {
+  const stored: El = <b>stored</b>;
+  return (
+    <section class="general-children">
+      {stored}
+      {Badge({ text: "called" })}
+      {<em>inline</em>}
+    </section>
+  );
+}
+
 function SpreadAttrs(): El {
   const [tone, setTone] = useState("cold");
   const spread = {
@@ -67,6 +86,7 @@ mountTo(
     <h1>Compiled JSX</h1>
     <Counter {...counterDefaults} label="By three" step={3} />
     <SpreadAttrs />
+    <GeneralChildren />
     <Fragmented />
     <Items />
   </main>,
@@ -92,7 +112,10 @@ if (process.env.NT_SELFTEST === "jsx") {
         'fragmentAdjacent:document.querySelector(".fragment-a").nextElementSibling.className,' +
         'spreadClass:spread.getAttribute("class"),' +
         'spreadOrder:spread.getAttribute("data-order"),' +
-        'spreadTitle:spread.getAttribute("title")})}))},500);',
+        'spreadTitle:spread.getAttribute("title"),' +
+        'generalTags:[].slice.call(document.querySelector(".general-children").children)' +
+        '.map(function(x){return x.tagName}).join(","),' +
+        'generalText:document.querySelector(".general-children").textContent})}))},500);',
     );
   }, 300);
 }

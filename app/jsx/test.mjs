@@ -1,5 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
+import { writeFileSync, rmSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
 
@@ -27,6 +28,30 @@ assert.equal(got.fragmentAdjacent, "fragment-b", "fragment roots remained adjace
 assert.equal(got.spreadClass, "after", "explicit prop after spread won");
 assert.equal(got.spreadOrder, "explicit", "spread merge order was deterministic");
 assert.equal(got.spreadTitle, "tone:hot", "function-valued spread prop remained reactive");
+assert.equal(got.generalTags, "B,I,EM", "element-valued expression roots were inserted in order");
+assert.equal(got.generalText, "storedcalledinline", "element-valued expressions preserved content");
 
-console.log("ok   props, spreads, conditionals, keyed list, reactive attributes, fragments");
+console.log("ok   props, spreads, expression children, conditionals, keyed list, reactive attributes, fragments");
+
+const mixedSrc = join(here, ".mixed-child.tsx");
+const mixedOut = join(here, ".mixed-child.generated.ts");
+try {
+  writeFileSync(mixedSrc, `
+import { h } from "../../framework/jsx.js";
+import { type El } from "../../framework/ui.js";
+function mixed(flag: boolean): El | string {
+  return flag ? h("b", null, "element") : "text";
+}
+const root: El = <main>{mixed(true)}</main>;
+`);
+  const refused = spawnSync(process.execPath, [join(here, "build.mjs"), mixedSrc, mixedOut], {
+    encoding: "utf8",
+  });
+  assert.notEqual(refused.status, 0, "mixed element/primitive expression child should be refused");
+  assert.match(refused.stderr + refused.stdout, /cannot mix element and non-element values/);
+} finally {
+  rmSync(mixedSrc, { force: true });
+  rmSync(mixedOut, { force: true });
+}
+
 console.log("jsx: all checks passed");

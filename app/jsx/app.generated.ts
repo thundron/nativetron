@@ -11,6 +11,16 @@ function Counter(props: CounterProps): El {
     const [count, setCount] = useState(0);
     return (h("section", null, h("h2", null, () => "" + (props.label)), h("button", { "style": "margin-right:8px", "onclick": () => setCount(count() + props.step) }, "Increment"), h("p", { "style": () => "" + (count() > 5 ? "color:#b00" : "color:#111") }, "count: ", () => "" + (count())), show(() => count() > 5, () => h("p", null, "over five"), () => h("p", null, "five or fewer")), show(() => count() > 8, () => h("p", null, "and over eight"), nothing)));
 }
+interface BadgeProps {
+    text: string;
+}
+function Badge(props: BadgeProps): El {
+    return h("i", null, () => "" + (props.text));
+}
+function GeneralChildren(): El {
+    const stored: El = h("b", null, "stored");
+    return (h("section", { "class": "general-children" }, stored, Badge({ text: "called" }), h("em", null, "inline")));
+}
 function SpreadAttrs(): El {
     const [tone, setTone] = useState("cold");
     const spread = {
@@ -33,7 +43,7 @@ function Items(): El {
 }
 mount("nativetron — JSX", 560, 560);
 const counterDefaults: CounterProps = { label: "By one", step: 1 };
-mountTo(h("main", null, h("h1", null, "Compiled JSX"), Counter({ ...counterDefaults, "label": "By three", "step": 3 }), SpreadAttrs(), Fragmented(), Items()));
+mountTo(h("main", null, h("h1", null, "Compiled JSX"), Counter({ ...counterDefaults, "label": "By three", "step": 3 }), SpreadAttrs(), GeneralChildren(), Fragmented(), Items()));
 if (process.env.NT_SELFTEST === "jsx") {
     setTimeout(() => {
         selftestEval('var b=[].slice.call(document.querySelectorAll("button"));' +
@@ -54,7 +64,10 @@ if (process.env.NT_SELFTEST === "jsx") {
             'fragmentAdjacent:document.querySelector(".fragment-a").nextElementSibling.className,' +
             'spreadClass:spread.getAttribute("class"),' +
             'spreadOrder:spread.getAttribute("data-order"),' +
-            'spreadTitle:spread.getAttribute("title")})}))},500);');
+            'spreadTitle:spread.getAttribute("title"),' +
+            'generalTags:[].slice.call(document.querySelector(".general-children").children)' +
+            '.map(function(x){return x.tagName}).join(","),' +
+            'generalText:document.querySelector(".general-children").textContent})}))},500);');
     }, 300);
 }
 run();

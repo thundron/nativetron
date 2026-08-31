@@ -58,7 +58,7 @@ compile error, not a runtime failure.
 
 ## JSX
 
-12 of 13 supported.
+13 of 13 supported.
 
 | | supported | |
 |---|---|---|
@@ -72,7 +72,7 @@ compile error, not a runtime failure.
 | `fragments` | yes | <>...</> returns multiple root nodes without a wrapper element |
 | `spread props` | yes | source-order last-write-wins; function-valued non-event host props are reactive getters |
 | `array / .map() children` | yes | an inline .map() with a key prop lowers to a keyed each() |
-| `element-valued expression children` | different | only through a conditional; a bare element expression is coerced to string |
+| `element-valued expression children` | yes | typed El expressions are inserted directly; mixed element/primitive unions are refused |
 | `conditional rendering` | yes | ternary and && over elements lower to show(); the arms are wrapped in a span |
 | `reactive attributes` | yes | non-literal, non-handler attributes recompute when their reads change |
 

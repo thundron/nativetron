@@ -1,5 +1,5 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { existsSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 
@@ -20,8 +20,8 @@ function resolveScriptc() {
 }
 
 const ts = createRequire(join(scriptcRoot, "package.json"))("typescript");
-const src = process.argv[2] ?? join(here, "app.tsx");
-const out = process.argv[3] ?? join(here, "app.generated.ts");
+const src = resolve(process.argv[2] ?? join(here, "app.tsx"));
+const out = resolve(process.argv[3] ?? join(here, "app.generated.ts"));
 
 const isComponent = (tag) => /^[A-Z]/.test(tag);
 
@@ -36,6 +36,29 @@ const isComponent = (tag) => /^[A-Z]/.test(tag);
  */
 function lowerJsx(context) {
   const f = context.factory;
+  const emittedElements = new Set();
+
+  const markElement = (expr) => {
+    emittedElements.add(expr);
+    return expr;
+  };
+
+  const elementKind = (expr) => {
+    if (emittedElements.has(expr)) return 1;
+    const original = ts.getOriginalNode(expr);
+    const type = checker.getTypeAtLocation(original);
+    if ((type.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) !== 0) return 0;
+    const parts = type.isUnion() ? type.types : [type];
+    let elements = 0;
+    let values = 0;
+    for (const part of parts) {
+      if ((part.flags & (ts.TypeFlags.Never | ts.TypeFlags.Null | ts.TypeFlags.Undefined)) !== 0) continue;
+      values++;
+      if (checker.getPropertyOfType(part, "roots") !== undefined) elements++;
+    }
+    if (elements === 0) return 0;
+    return elements === values ? 1 : 2;
+  };
 
   const isStaticText = (e) =>
     ts.isStringLiteral(e) || ts.isNumericLiteral(e) ||
@@ -94,18 +117,23 @@ function lowerJsx(context) {
         if (isMapCall(e)) { out.push(listChild(f, e)); continue; }
         if (ts.isBinaryExpression(e) &&
             e.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken &&
-            looksLikeElement(e.right)) {
+            elementKind(e.right) === 1) {
           out.push(f.createCallExpression(f.createIdentifier("show"), undefined, [
             thunk(e.left), thunk(e.right),
             f.createIdentifier("nothing"),
           ]));
           continue;
         }
-        if (ts.isConditionalExpression(e) && looksLikeElement(e.whenTrue)) {
+        if (ts.isConditionalExpression(e) && elementKind(e.whenTrue) === 1) {
           out.push(f.createCallExpression(f.createIdentifier("show"), undefined, [
             thunk(e.condition), thunk(e.whenTrue), thunk(e.whenFalse),
           ]));
           continue;
+        }
+        const kind = elementKind(e);
+        if (kind === 1) { out.push(e); continue; }
+        if (kind === 2) {
+          throw new Error("an expression child cannot mix element and non-element values; use a conditional");
         }
         out.push(stringThunk(e));
         continue;
@@ -134,7 +162,7 @@ function lowerJsx(context) {
             f.createPropertyAssignment("children", f.createArrayLiteralExpression(kids, false)),
           ], false);
         }
-        return f.createCallExpression(f.createIdentifier(tag), undefined, args);
+        return markElement(f.createCallExpression(f.createIdentifier(tag), undefined, args));
       }
       const only = onlyMapChild(node);
       if (only !== null) {
@@ -144,17 +172,17 @@ function lowerJsx(context) {
         const withProps = props.kind === ts.SyntaxKind.NullKeyword
           ? each
           : f.createCallExpression(f.createIdentifier("applyProps"), undefined, [each, props]);
-        return withProps;
+        return markElement(withProps);
       }
-      return f.createCallExpression(f.createIdentifier("h"), undefined, [
+      return markElement(f.createCallExpression(f.createIdentifier("h"), undefined, [
         f.createStringLiteral(tag), props, ...kids,
-      ]);
+      ]));
     }
 
     if (ts.isJsxFragment(node)) {
-      return f.createCallExpression(f.createIdentifier("frag"), undefined, [
+      return markElement(f.createCallExpression(f.createIdentifier("frag"), undefined, [
         f.createArrayLiteralExpression(childrenOf(node), false),
-      ]);
+      ]));
     }
     return node;
   };
@@ -219,17 +247,22 @@ function lowerJsx(context) {
       e.expression.name.text === "map";
   }
 
-  function looksLikeElement(e) {
-    return ts.isJsxElement(e) || ts.isJsxSelfClosingElement(e) || ts.isJsxFragment(e) ||
-      ts.isCallExpression(e);
-  }
-
   function listChild(f, e) {
     return f.createCallExpression(f.createIdentifier("list"), undefined, [thunk(e)]);
   }
 }
 
-const sourceFile = ts.createSourceFile(src, readFileSync(src, "utf8"), ts.ScriptTarget.ES2022, true, ts.ScriptKind.TSX);
+const program = ts.createProgram([join(here, "jsx-env.d.ts"), src], {
+  target: ts.ScriptTarget.ES2022,
+  module: ts.ModuleKind.NodeNext,
+  moduleResolution: ts.ModuleResolutionKind.NodeNext,
+  jsx: ts.JsxEmit.Preserve,
+  strict: true,
+  skipLibCheck: true,
+});
+const sourceFile = program.getSourceFile(src);
+if (sourceFile === undefined) throw new Error("cannot load " + src);
+const checker = program.getTypeChecker();
 const lowered = ts.transform(sourceFile, [lowerJsx]).transformed[0];
 const printed = ts.createPrinter().printFile(lowered);
 

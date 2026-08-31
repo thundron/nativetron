@@ -209,8 +209,8 @@
     },
     {
       "name": "element-valued expression children",
-      "status": "different",
-      "note": "only through a conditional; a bare element expression is coerced to string"
+      "status": "yes",
+      "note": "typed El expressions are inserted directly; mixed element/primitive unions are refused"
     },
     {
       "name": "conditional rendering",
