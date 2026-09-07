@@ -170,6 +170,41 @@ async function processSecuritySelftest(): Promise<void> {
   quit();
 }
 
+async function pyrusCapabilitiesSelftest(): Promise<void> {
+  let valid = false;
+  let invalid = false;
+  let oversized = false;
+  try {
+    const reply = await ipc.invoke(
+      "pyrus:pear-capabilities",
+      encodeUtf8("Pear Runtime; SemVer=3.2.4-beta.1+build.9, Key=abc"),
+    );
+    const result = JSON.parse(decodeUtf8(reply)) as {
+      state: string;
+      supported: boolean;
+      contract: string | null;
+      version: { raw: string } | null;
+      capabilities: string[];
+    };
+    valid = result.state === "supported" && result.supported &&
+      result.contract === "pear-3.2-ndjson" && result.version !== null &&
+      result.version.raw === "3.2.4-beta.1" && result.capabilities.length === 14;
+  } catch (_error) {
+  }
+  try {
+    await ipc.invoke("pyrus:pear-capabilities", encodeUtf8("Version=3.2.4"));
+  } catch (error) {
+    invalid = error instanceof Error && error.message === "Pear returned invalid SemVer metadata";
+  }
+  try {
+    await ipc.invoke("pyrus:pear-capabilities", new Uint8Array(64 * 1024 + 1));
+  } catch (error) {
+    oversized = error instanceof Error && error.message === "Pear version metadata exceeds the output limit";
+  }
+  console.log(valid && invalid && oversized ? "NT_PYRUS_CAPABILITIES_SELFTEST=OK" : "NT_PYRUS_CAPABILITIES_SELFTEST=FAIL");
+  quit();
+}
+
 async function pyrusBuildHashSelftest(): Promise<void> {
   const target = process.env.NT_PYRUS_BUILD_ROOT ?? "";
   const expectedHash = process.env.NT_PYRUS_BUILD_HASH ?? "";
@@ -403,6 +438,7 @@ ipc.onOpen(() => {
   if (process.env.NT_SELFTEST === "pyrus") pyrusSelftest();
   if (process.env.NT_SELFTEST === "pyrus-ndjson") pyrusNDJSONSelftest();
   if (process.env.NT_SELFTEST === "pyrus-output") pyrusOutputSelftest();
+  if (process.env.NT_SELFTEST === "pyrus-capabilities") pyrusCapabilitiesSelftest();
   if (process.env.NT_SELFTEST === "pyrus-build-hash") pyrusBuildHashSelftest();
   if (process.env.NT_SELFTEST === "process-security") processSecuritySelftest();
 });

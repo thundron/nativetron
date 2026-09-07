@@ -10,6 +10,7 @@ import { summarizeNDJSON } from "../pyrus/ndjson.js";
 import { sanitizeOutput } from "../pyrus/output-sanitizer.js";
 import { runBoundedProcess } from "../pyrus/process-runner.js";
 import { hashBuildDirectory } from "../pyrus/build-hash.js";
+import { capabilitiesFromVersionOutput } from "../pyrus/capabilities.js";
 
 declare function ntOnOpenFile(cb: (path: string) => void): void;
 declare function ntOnOpenUrl(cb: (url: string) => void): void;
@@ -90,6 +91,11 @@ ipc.handle("pyrus:sanitize-output", (payload: Uint8Array) => {
 ipc.handle("pyrus:review-release", (payload: Uint8Array) => {
   const request = JSON.parse(decodeUtf8(payload)) as ReleaseReviewRequest;
   return Promise.resolve(encodeUtf8(JSON.stringify(reviewRelease(request))));
+});
+
+ipc.handle("pyrus:pear-capabilities", (payload: Uint8Array) => {
+  if (payload.length > 64 * 1024) throw new Error("Pear version metadata exceeds the output limit");
+  return Promise.resolve(encodeUtf8(JSON.stringify(capabilitiesFromVersionOutput(decodeUtf8(payload)))));
 });
 
 ipc.handle("pyrus:hash-build", async (payload: Uint8Array) => {

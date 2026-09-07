@@ -42,6 +42,17 @@ Differences:
 
 This port drove exact `string.codePointAt` optional results and string-pattern `string.replace` support in scriptc's C and LLVM backends. Function replacement callbacks remain an explicit `SC1120` refusal.
 
+## Pear capability gate
+
+Sources: `project-pyrus/src/main/pear/capabilities.js` and `src/shared/runtime-contracts.js`.
+
+The compiled gate extracts bounded `SemVer=` metadata, strips build metadata, preserves prerelease values, enforces Pear 3.2.0 as the minimum structured-operation version, and distinguishes the exact 3.2 contract from later fallback versions. `app/main.ts` exposes it as `pyrus:pear-capabilities`; input is capped at the original 64 KiB executable-inspection output limit.
+
+Differences:
+
+- The compiled API accepts version strings or typed `PearVersion` records. Arbitrary object-shaped version inputs remain outside this slice.
+- Returned records and capability arrays are not frozen. They remain private values serialized immediately by the main-process handler.
+
 ## Build output hash
 
 Source: `project-pyrus/src/main/workflows/build-runtime.js`.

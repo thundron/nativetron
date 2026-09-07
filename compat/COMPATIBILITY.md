@@ -79,7 +79,7 @@ compile error, not a runtime failure.
 
 ## Node builtins
 
-175 of 238 members lower statically, projected from
+176 of 239 members lower statically, projected from
 scriptc's manifest at compiler 0.0.35.
 
 | module | lowers | missing |
@@ -96,7 +96,7 @@ scriptc's manifest at compiler 0.0.35.
 | `util` | 2 | 1 |
 | `cluster` | 4 | 0 |
 | `diagnostics_channel` | 6 | 0 |
-| `fs` | 25 | 0 |
+| `fs` | 26 | 0 |
 | `fs/promises` | 15 | 0 |
 | `net` | 3 | 0 |
 | `os` | 10 | 0 |
