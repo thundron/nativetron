@@ -42,6 +42,14 @@ Differences:
 
 This port drove exact `string.codePointAt` optional results and string-pattern `string.replace` support in scriptc's C and LLVM backends. Function replacement callbacks remain an explicit `SC1120` refusal.
 
+## Pear links
+
+Source: `project-pyrus/src/main/links/pear-link.js`.
+
+The compiled parser preserves stable and versioned z-base-32/hex authorities, safe-integer fork and length checks, path depth and decoded-segment limits, percent-decoding failures, encoded separator and dot-segment rejection, fragment validation, and canonical/base-kind classification. `app/main.ts` exposes it as `pyrus:parse-link` with a 16 KiB pre-parse IPC cap.
+
+Difference: returned records and path arrays are not frozen. They remain private values serialized immediately by the main-process handler.
+
 ## Untrusted structured data
 
 Source: `project-pyrus/src/main/links/untrusted-data.js`.

@@ -13,6 +13,7 @@ import { hashBuildDirectory } from "../pyrus/build-hash.js";
 import { capabilitiesFromVersionOutput } from "../pyrus/capabilities.js";
 import { buildVersionedArgv } from "../pyrus/argv.js";
 import { sanitizeData } from "../pyrus/untrusted-data.js";
+import { parsePearLink } from "../pyrus/pear-link.js";
 
 declare function ntOnOpenFile(cb: (path: string) => void): void;
 declare function ntOnOpenUrl(cb: (url: string) => void): void;
@@ -93,6 +94,11 @@ ipc.handle("pyrus:sanitize-output", (payload: Uint8Array) => {
 ipc.handle("pyrus:review-release", (payload: Uint8Array) => {
   const request = JSON.parse(decodeUtf8(payload)) as ReleaseReviewRequest;
   return Promise.resolve(encodeUtf8(JSON.stringify(reviewRelease(request))));
+});
+
+ipc.handle("pyrus:parse-link", (payload: Uint8Array) => {
+  if (payload.length > 16 * 1024) throw new Error("Pear link exceeds the IPC limit");
+  return Promise.resolve(encodeUtf8(JSON.stringify(parsePearLink(decodeUtf8(payload)))));
 });
 
 ipc.handle("pyrus:sanitize-data", (payload: Uint8Array) => {

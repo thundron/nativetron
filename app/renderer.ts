@@ -170,6 +170,40 @@ async function processSecuritySelftest(): Promise<void> {
   quit();
 }
 
+async function pyrusPearLinkSelftest(): Promise<void> {
+  const key = "y".repeat(52);
+  let valid = false;
+  let unsafe = false;
+  let oversized = false;
+  try {
+    const reply = await ipc.invoke(
+      "pyrus:parse-link",
+      encodeUtf8("pear://" + key + "/folder/caf%C3%A9#section%20one"),
+    );
+    const result = JSON.parse(decodeUtf8(reply)) as {
+      kind: string;
+      baseKind: string;
+      path: string | null;
+      hash: string | null;
+    };
+    valid = result.kind === "hash" && result.baseKind === "stable" &&
+      result.path === "/folder/café" && result.hash === "section one";
+  } catch (_error) {
+  }
+  try {
+    await ipc.invoke("pyrus:parse-link", encodeUtf8("pear://" + key + "/a%2Fb"));
+  } catch (error) {
+    unsafe = error instanceof Error && error.message === "Pear link path segment is unsafe";
+  }
+  try {
+    await ipc.invoke("pyrus:parse-link", new Uint8Array(16 * 1024 + 1));
+  } catch (error) {
+    oversized = error instanceof Error && error.message === "Pear link exceeds the IPC limit";
+  }
+  console.log(valid && unsafe && oversized ? "NT_PYRUS_PEAR_LINK_SELFTEST=OK" : "NT_PYRUS_PEAR_LINK_SELFTEST=FAIL");
+  quit();
+}
+
 async function pyrusUntrustedDataSelftest(): Promise<void> {
   let valid = false;
   let unsafe = false;
@@ -518,6 +552,7 @@ ipc.onOpen(() => {
   if (process.env.NT_SELFTEST === "pyrus") pyrusSelftest();
   if (process.env.NT_SELFTEST === "pyrus-ndjson") pyrusNDJSONSelftest();
   if (process.env.NT_SELFTEST === "pyrus-output") pyrusOutputSelftest();
+  if (process.env.NT_SELFTEST === "pyrus-pear-link") pyrusPearLinkSelftest();
   if (process.env.NT_SELFTEST === "pyrus-untrusted-data") pyrusUntrustedDataSelftest();
   if (process.env.NT_SELFTEST === "pyrus-argv") pyrusArgvSelftest();
   if (process.env.NT_SELFTEST === "pyrus-capabilities") pyrusCapabilitiesSelftest();
