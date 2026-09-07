@@ -10,34 +10,34 @@ compile error, not a runtime failure.
 
 ## React hooks
 
-9 of 18 implemented.
+8 supported, 6 different, 4 unsupported.
 
-| | supported | |
+| | status | |
 |---|---|---|
 | `useState` | yes | returns [getter, setter]; the getter is a function, not a value |
 | `useReducer` | yes | returns [getter, dispatch] |
-| `useEffect` | yes | tracks reads automatically; no dependency array |
-| `useMemo` | yes | tracks reads automatically; no dependency array |
-| `useCallback` | yes | identity passthrough; components run once so it is a no-op |
+| `useEffect` | different | runs immediately, tracks signal reads instead of its accepted dependency array, and invokes cleanup before rerun or unmount |
+| `useMemo` | yes | tracks reads automatically; an accepted dependency array is ignored |
+| `useCallback` | yes | identity passthrough; components run once, and an accepted dependency array is ignored |
 | `useRef` | yes | plain { current } box; a host ref receives a compiled { id } handle |
 | `useContext` | yes | returns a getter captured from the nearest compiled provider |
-| `useLayoutEffect` | different | runs immediately as an automatically tracked effect; there is no separate layout commit phase |
-| `useImperativeHandle` | yes | sets a component ref once; there is no dependency array or rerender phase |
+| `useLayoutEffect` | different | runs immediately as an automatically tracked effect with cleanup; its accepted dependency array is ignored and there is no separate layout commit phase |
+| `useImperativeHandle` | yes | sets a component ref once and clears it on component removal; its accepted dependency array is ignored |
 | `useSyncExternalStore` | no |  |
 | `useDeferredValue` | different | returns the value immediately; there is no deferred scheduler |
 | `useTransition` | different | returns [false, start]; start runs synchronously |
 | `useOptimistic` | no |  |
 | `useActionState` | no |  |
-| `useInsertionEffect` | different | runs immediately as an automatically tracked effect; there is no insertion phase |
+| `useInsertionEffect` | different | runs immediately as an automatically tracked effect with cleanup; its accepted dependency array is ignored and there is no insertion phase |
 | `useDebugValue` | different | accepted as a no-op; no React DevTools runtime is shipped |
 | `useId` | yes | returns a stable process-local id; server hydration prefixes are not applicable |
 | `use` | no | requires suspense |
 
 ## React top-level API
 
-3 of 16 implemented.
+3 supported, 5 different, 8 unsupported.
 
-| | supported | |
+| | status | |
 |---|---|---|
 | `createElement` | different | the JSX factory is h() in framework/jsx.ts |
 | `Fragment` | yes | named Fragment and <>...</> both return multiple roots without a wrapper |
@@ -60,10 +60,10 @@ compile error, not a runtime failure.
 
 14 of 14 supported.
 
-| | supported | |
+| | status | |
 |---|---|---|
 | `host elements` | yes | <div>, <button>, ... |
-| `component elements` | yes | <Counter /> calls the function once |
+| `component elements` | yes | <Counter /> calls the function once and owns its effects until removal |
 | `attributes` | yes | string literals are set once; other expressions become reactive |
 | `event handlers` | yes | onclick -> click; any on* prop whose value is a function |
 | `text children` | yes |  |
@@ -75,7 +75,7 @@ compile error, not a runtime failure.
 | `element-valued expression children` | yes | typed El expressions are inserted directly; mixed element/primitive unions are refused |
 | `conditional rendering` | yes | ternary and && over elements lower to show(); the arms are wrapped in a span |
 | `reactive attributes` | yes | non-literal, non-handler attributes recompute when their reads change |
-| `ref attributes` | yes | host refs receive { id }; component refs are ordinary ref props; host refs are not yet cleared when an ancestor is removed |
+| `ref attributes` | yes | host refs receive { id } and clear on removal; component refs are ordinary ref props |
 
 ## Node builtins
 

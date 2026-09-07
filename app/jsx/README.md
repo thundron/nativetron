@@ -7,17 +7,18 @@ scriptc accepts `.ts`, not `.tsx`, so JSX is transformed first:
       node "$SCRIPTC" build app/jsx/app.generated.ts --backend c \
         --ffi ffi/nativetron.ffi.json -o build/jsx-app
 
-`build.mjs` uses TypeScript's own transpiler with `jsxFactory: "h"`.
-`framework/jsx.ts` maps the emitted calls onto `framework/ui.ts`:
+`build.mjs` uses TypeScript's AST, checker, and printer while preserving type
+annotations. `framework/jsx.ts` maps the emitted calls onto `framework/ui.ts`:
 
     h("div", props, ...children)   -> el / attr / on
-    h(Component, null)             -> Component()
+    <Component />                  -> component(() => Component())
     string child                   -> txt
     () => string child             -> dyn   (the reactive binding)
 
 Components are plain functions returning `El`. State is `signal()`. There is no
-virtual DOM and no diff: `dyn` subscribes at compile time, so an update writes
-the changed text directly.
+virtual DOM: `dyn` subscribes at compile time, so an update writes the changed
+text directly. Component scopes dispose subscriptions, effect cleanups,
+listeners, and refs when their roots are removed.
 
 Handlers are props whose value is a function; `onclick` becomes the `click`
 listener. Everything else becomes an attribute.
@@ -27,8 +28,8 @@ listener. Everything else becomes an attribute.
 | JSX | emitted |
 |---|---|
 | `<div a="1">x</div>` | `h("div", { a: "1" }, "x")` |
-| `<Comp a={1} />` | `Comp({ a: 1 })` — a direct call, no factory |
-| `<Comp>{x}</Comp>` | `Comp({ children: [...] })` |
+| `<Comp a={1} />` | `component(() => Comp({ a: 1 }))` — one call in an owned effect scope |
+| `<Comp>{x}</Comp>` | `component(() => Comp({ children: [...] }))` |
 | `{expr}` | `() => "" + (expr)` — a reactive text binding |
 | `<div style={e}>` | `dynAttr(..., "style", () => "" + (e))` |
 | `<ul>{xs.map(x => <li key={x}>..</li>)}</ul>` | `each("ul", () => xs.map(x => ({ key, el })))` |

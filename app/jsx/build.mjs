@@ -29,7 +29,7 @@ const isComponent = (tag) => /^[A-Z]/.test(tag);
  * components can take different shapes:
  *
  *   <div a="1">x</div>   ->  h("div", { a: "1" }, "x")
- *   <Comp a={1} />       ->  Comp({ a: 1 })          (a direct call)
+ *   <Comp a={1} />       ->  component(() => Comp({ a: 1 }))
  *   {expr}               ->  () => "" + (expr)       (a reactive binding)
  *   {list.map(...)}      ->  listChild(() => ...)    (a keyed list)
  *   {cond ? a : b}       ->  when(() => cond, ...)   via `show`
@@ -179,7 +179,8 @@ function lowerJsx(context) {
             f.createPropertyAssignment("children", f.createArrayLiteralExpression(kids, false)),
           ], false);
         }
-        return markElement(f.createCallExpression(f.createIdentifier(tag), undefined, args));
+        const call = f.createCallExpression(f.createIdentifier(tag), undefined, args);
+        return markElement(f.createCallExpression(f.createIdentifier("component"), undefined, [thunk(call)]));
       }
       const only = onlyMapChild(node);
       if (only !== null) {

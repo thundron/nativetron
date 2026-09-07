@@ -57,7 +57,9 @@ function Counter(): El {
 mountTo(el("main", [Counter()]));
 ```
 
-`each(tag, build)` renders a keyed list and diffs it on change.
+`each(tag, build)` renders a keyed list and diffs it on change. Removing a
+component or keyed item disposes its reactive subscriptions, effect cleanup,
+listeners, and refs.
 
 ## Layout
 

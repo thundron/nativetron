@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const bin = join(here, "..", "..", "build", "jsx-app");
+const bin = process.env.NT_JSX_BIN ?? join(here, "..", "..", "build", "jsx-app");
 
 const r = spawnSync(bin, [], {
   env: { ...process.env, NT_SELFTEST: "jsx" },
@@ -23,6 +23,7 @@ assert.match(got.text, /and over eight/, "&& child appeared");
 assert.doesNotMatch(got.text, /five or fewer/, "ternary false arm removed");
 assert.equal(got.countStyle, "color:#b00", "reactive attribute recomputed");
 assert.equal(got.items, "beta,gamma,item-4", "keyed list: appended and removed by key");
+assert.equal(got.itemTitles, "count:3,count:3,count:3", "removed keyed effects were disposed before subscriber replay");
 assert.equal(got.fragmentParent, "MAIN", "fragment added no wrapper element");
 assert.equal(got.fragmentAdjacent, "fragment-b", "fragment roots remained adjacent siblings");
 assert.equal(got.spreadClass, "after", "explicit prop after spread won");
@@ -45,8 +46,13 @@ assert.equal(got.compatTags, "I,SPAN", "named Fragment and StrictMode added no w
 assert.equal(got.transitionPending, "settled", "synchronous transition reported no pending phase");
 assert.equal(got.transitionState, "transition-done", "useTransition ran its callback");
 assert.equal(got.legacyRef, "legacy:ready", "forwardRef adapted the legacy ref argument");
+assert.equal(
+  got.lifecycle,
+  "runs:2 cleanups:2 host:cleared component:cleared|runs:43 cleanups:42 host:set component:set",
+  "effect cleanup, disposal, remount, and ref clearing",
+);
 
-console.log("ok   props, spreads, expression children, context, refs, compatibility wrappers, conditionals, keyed list, reactive attributes, fragments");
+console.log("ok   props, spreads, expression children, context, refs, lifecycle cleanup, compatibility wrappers, conditionals, keyed list, reactive attributes, fragments");
 
 const mixedSrc = join(here, ".mixed-child.tsx");
 const mixedOut = join(here, ".mixed-child.generated.ts");

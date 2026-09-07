@@ -13,18 +13,18 @@
     },
     {
       "name": "useEffect",
-      "status": "yes",
-      "note": "tracks reads automatically; no dependency array"
+      "status": "different",
+      "note": "runs immediately, tracks signal reads instead of its accepted dependency array, and invokes cleanup before rerun or unmount"
     },
     {
       "name": "useMemo",
       "status": "yes",
-      "note": "tracks reads automatically; no dependency array"
+      "note": "tracks reads automatically; an accepted dependency array is ignored"
     },
     {
       "name": "useCallback",
       "status": "yes",
-      "note": "identity passthrough; components run once so it is a no-op"
+      "note": "identity passthrough; components run once, and an accepted dependency array is ignored"
     },
     {
       "name": "useRef",
@@ -39,12 +39,12 @@
     {
       "name": "useLayoutEffect",
       "status": "different",
-      "note": "runs immediately as an automatically tracked effect; there is no separate layout commit phase"
+      "note": "runs immediately as an automatically tracked effect with cleanup; its accepted dependency array is ignored and there is no separate layout commit phase"
     },
     {
       "name": "useImperativeHandle",
       "status": "yes",
-      "note": "sets a component ref once; there is no dependency array or rerender phase"
+      "note": "sets a component ref once and clears it on component removal; its accepted dependency array is ignored"
     },
     {
       "name": "useSyncExternalStore",
@@ -71,7 +71,7 @@
     {
       "name": "useInsertionEffect",
       "status": "different",
-      "note": "runs immediately as an automatically tracked effect; there is no insertion phase"
+      "note": "runs immediately as an automatically tracked effect with cleanup; its accepted dependency array is ignored and there is no insertion phase"
     },
     {
       "name": "useDebugValue",
@@ -174,7 +174,7 @@
     {
       "name": "component elements",
       "status": "yes",
-      "note": "<Counter /> calls the function once"
+      "note": "<Counter /> calls the function once and owns its effects until removal"
     },
     {
       "name": "attributes",
@@ -233,7 +233,7 @@
     {
       "name": "ref attributes",
       "status": "yes",
-      "note": "host refs receive { id }; component refs are ordinary ref props; host refs are not yet cleared when an ancestor is removed"
+      "note": "host refs receive { id } and clear on removal; component refs are ordinary ref props"
     }
   ]
 }

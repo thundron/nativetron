@@ -1,8 +1,9 @@
-import { signal, effect, computed } from "../framework/reactive.js";
+import { signal, effect, computed, onScopeCleanup, type EffectBody } from "../framework/reactive.js";
 import { frag, type El } from "../framework/ui.js";
 
 export type Getter<T> = () => T;
 export type Setter<T> = (v: T) => void;
+export type DependencyList<T = never> = T[];
 
 export function useState<T>(initial: T): [Getter<T>, Setter<T>] {
   const s = signal(initial);
@@ -17,24 +18,24 @@ export function useReducer<S, A>(
   return [() => s.get(), (action: A) => s.set(reduce(s.get(), action))];
 }
 
-export function useEffect(fn: () => void): void {
+export function useEffect<D = never>(fn: EffectBody, _deps?: DependencyList<D>): void {
   effect(fn);
 }
 
-export function useLayoutEffect(fn: () => void): void {
+export function useLayoutEffect<D = never>(fn: EffectBody, _deps?: DependencyList<D>): void {
   effect(fn);
 }
 
-export function useInsertionEffect(fn: () => void): void {
+export function useInsertionEffect<D = never>(fn: EffectBody, _deps?: DependencyList<D>): void {
   effect(fn);
 }
 
-export function useMemo<T>(fn: () => T): Getter<T> {
+export function useMemo<T, D = never>(fn: () => T, _deps?: DependencyList<D>): Getter<T> {
   const c = computed(fn);
   return () => c.get();
 }
 
-export function useCallback<T>(fn: T): T {
+export function useCallback<T, D = never>(fn: T, _deps?: DependencyList<D>): T {
   return fn;
 }
 
@@ -70,8 +71,15 @@ export function createRef<T>(): Ref<T | null> {
   return { current: null };
 }
 
-export function useImperativeHandle<T>(ref: Ref<T | null> | null, create: () => T): void {
-  if (ref !== null) ref.current = create();
+export function useImperativeHandle<T, D = never>(
+  ref: Ref<T | null> | null,
+  create: () => T,
+  _deps?: DependencyList<D>,
+): void {
+  if (ref !== null) {
+    ref.current = create();
+    onScopeCleanup(() => { ref.current = null; });
+  }
 }
 
 export interface ContextProviderProps<T> {

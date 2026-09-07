@@ -39,8 +39,10 @@ if (lying.length > 0) {
 const mark = (s) => (s === "yes" ? "yes" : s === "different" ? "different" : "no");
 const rows = (list) =>
   list.map((e) => `| \`${e.name}\` | ${mark(e.status)} | ${e.note ?? ""} |`).join("\n");
-const table = (list) => `| | supported | |\n|---|---|---|\n${rows(list)}`;
+const table = (list) => `| | status | |\n|---|---|---|\n${rows(list)}`;
 const count = (list, s) => list.filter((e) => e.status === s).length;
+const summary = (list) =>
+  `${count(list, "yes")} supported, ${count(list, "different")} different, ${count(list, "no")} unsupported.`;
 
 // Node support is projected from scriptc's own manifest, not restated here.
 const manifest = JSON.parse(
@@ -87,13 +89,13 @@ compile error, not a runtime failure.
 
 ## React hooks
 
-${count(react.hooks, "yes")} of ${react.hooks.length} implemented.
+${summary(react.hooks)}
 
 ${table(react.hooks)}
 
 ## React top-level API
 
-${count(react.api, "yes")} of ${react.api.length} implemented.
+${summary(react.api)}
 
 ${table(react.api)}
 

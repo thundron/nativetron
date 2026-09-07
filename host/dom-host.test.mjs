@@ -28,6 +28,11 @@ function makeNode(kind, tag) {
     },
     get textContent() { return this.kind === "element" ? this.children.map((c) => c.textContent).join("") : this._text; },
     get firstChild() { return this.children.length ? this.children[0] : null; },
+    get nextSibling() {
+      if (!this.parentNode) return null;
+      const i = this.parentNode.children.indexOf(this);
+      return this.parentNode.children[i + 1] || null;
+    },
     setAttribute(n, v) { this.attrs[n] = v; },
     removeAttribute(n) { delete this.attrs[n]; },
     appendChild(c) {
@@ -36,9 +41,11 @@ function makeNode(kind, tag) {
         c.children = [];
         return c;
       }
+      if (c.parentNode) c.parentNode.children.splice(c.parentNode.children.indexOf(c), 1);
       c.parentNode = this; this.children.push(c); return c;
     },
     insertBefore(c, ref) {
+      if (c.parentNode) c.parentNode.children.splice(c.parentNode.children.indexOf(c), 1);
       c.parentNode = this;
       const i = this.children.indexOf(ref);
       this.children.splice(i < 0 ? this.children.length : i, 0, c);
@@ -78,7 +85,7 @@ const te = new TextEncoder();
 const pushU32 = (v) => { enc.push(v & 0xff, (v >>> 8) & 0xff, (v >>> 16) & 0xff, (v >>> 24) & 0xff); };
 const pushStr = (s) => { const b = te.encode(s); pushU32(b.length); for (const x of b) enc.push(x); };
 const intern = (id, v) => { enc.push(OPS.INTERN); pushU32(id); pushStr(v); };
-intern(1, "h1"); intern(2, "button"); intern(3, "style"); intern(4, "click");
+intern(1, "h1"); intern(2, "button"); intern(3, "style"); intern(4, "click"); intern(6, "value");
 enc.push(OPS.CREATE_ELEMENT); pushU32(11); pushU32(1);
 enc.push(OPS.CREATE_TEXT); pushU32(12); pushStr("Bin");
 enc.push(OPS.APPEND); pushU32(0); pushU32(11);
@@ -93,7 +100,16 @@ nt.applyBin(new Uint8Array(enc));
 assert.equal(root2.children.length, 2, "binary: h1 + button");
 assert.equal(root2.children[0].children[0].textContent, "Bin");
 assert.equal(root2.children[1].attrs.style, "x");
-root2.children[1].listeners.click[0]({ target: {} });
+const button = root2.children[1];
+enc.length = 0;
+enc.push(OPS.REMOVE_ATTR); pushU32(13); pushU32(3);
+nt.applyBin(new Uint8Array(enc));
+assert.equal(button.attrs.style, undefined, "binary REMOVE_ATTR");
+enc.length = 0;
+enc.push(OPS.SET_PROP); pushU32(13); pushU32(6); pushStr("assigned");
+nt.applyBin(new Uint8Array(enc));
+assert.equal(button.value, "assigned", "binary SET_PROP");
+button.listeners.click[0]({ target: {} });
 assert.deepEqual(slotSeen, [4, ""], "binary: slot-based event");
 assert.equal(sent.length, 0, "binary lane posts no json event messages");
 enc.length = 0;
@@ -102,6 +118,15 @@ nt.applyBin(new Uint8Array(enc));
 assert.equal(root2.children[0].children[0].textContent, "Bin2", "binary SET_TEXT");
 enc.length = 0;
 intern(5, "li");
+enc.push(OPS.CREATE_ELEMENT); pushU32(24); pushU32(5);
+enc.push(OPS.APPEND); pushU32(0); pushU32(24);
+enc.push(OPS.INSERT_BEFORE); pushU32(0); pushU32(24); pushU32(11);
+nt.applyBin(new Uint8Array(enc));
+assert.equal(root2.children[0].tag, "li", "binary INSERT_BEFORE");
+enc.length = 0;
+enc.push(OPS.REMOVE); pushU32(24);
+nt.applyBin(new Uint8Array(enc));
+enc.length = 0;
 enc.push(OPS.ELEMENT_WITH_TEXT); pushU32(0); pushU32(20); pushU32(5); pushU32(21); pushStr("compound");
 nt.applyBin(new Uint8Array(enc));
 assert.equal(root2.children[root2.children.length - 1].tag, "li", "compound: element created");
@@ -111,11 +136,69 @@ enc.push(OPS.SET_TEXT); pushU32(21); pushStr("patched");
 nt.applyBin(new Uint8Array(enc));
 assert.equal(root2.children[root2.children.length - 1].textContent, "patched", "compound: text node id is addressable");
 enc.length = 0;
+enc.push(OPS.ELEMENT_WITH_TEXT); pushU32(0); pushU32(22); pushU32(5); pushU32(23); pushStr("");
+nt.applyBin(new Uint8Array(enc));
+enc.length = 0;
+enc.push(OPS.SET_TEXT); pushU32(23); pushStr("filled");
+nt.applyBin(new Uint8Array(enc));
+assert.equal(root2.children[root2.children.length - 1].textContent, "filled", "compound: empty text remains addressable");
+enc.length = 0;
+enc.push(OPS.REMOVE); pushU32(22);
+nt.applyBin(new Uint8Array(enc));
+enc.length = 0;
+enc.push(OPS.UNLISTEN); pushU32(13); pushU32(4);
+nt.applyBin(new Uint8Array(enc));
+assert.equal(button.listeners.click.length, 0, "binary UNLISTEN");
+enc.length = 0;
+enc.push(OPS.LISTEN); pushU32(13); pushU32(4); pushU32(5);
+nt.applyBin(new Uint8Array(enc));
+assert.equal(button.listeners.click.length, 1, "binary LISTEN after UNLISTEN");
+enc.length = 0;
 enc.push(OPS.REMOVE); pushU32(20);
 nt.applyBin(new Uint8Array(enc));
 enc.length = 0;
+enc.push(OPS.SET_TEXT); pushU32(21); pushStr("stale");
+assert.throws(() => nt.applyBin(new Uint8Array(enc)), "REMOVE clears descendant ids");
+enc.length = 0;
 enc.push(OPS.REMOVE); pushU32(13);
 nt.applyBin(new Uint8Array(enc));
+assert.equal(button.listeners.click.length, 0, "REMOVE detaches listeners");
 assert.equal(root2.children.length, 1, "binary REMOVE");
+
+enc.length = 0;
+enc.push(OPS.CREATE_ELEMENT); pushU32(30); pushU32(5);
+enc.push(OPS.CREATE_ELEMENT); pushU32(31); pushU32(2);
+enc.push(OPS.LISTEN); pushU32(31); pushU32(4); pushU32(6);
+enc.push(OPS.APPEND); pushU32(30); pushU32(31);
+enc.push(OPS.APPEND); pushU32(0); pushU32(30);
+nt.applyBin(new Uint8Array(enc));
+const rewrittenChild = root2.children[root2.children.length - 1].children[0];
+enc.length = 0;
+enc.push(OPS.SET_TEXT); pushU32(30); pushStr("replacement");
+nt.applyBin(new Uint8Array(enc));
+assert.equal(rewrittenChild.listeners.click.length, 0, "SET_TEXT detaches descendant listeners");
+enc.length = 0;
+enc.push(OPS.SET_ATTR); pushU32(31); pushU32(3); pushStr("stale");
+assert.throws(() => nt.applyBin(new Uint8Array(enc)), "SET_TEXT clears descendant ids");
+enc.length = 0;
+enc.push(OPS.REMOVE); pushU32(30);
+nt.applyBin(new Uint8Array(enc));
+
+enc.length = 0;
+enc.push(OPS.CREATE_ELEMENT); pushU32(65535); pushU32(5);
+enc.push(OPS.CREATE_ELEMENT); pushU32(65536); pushU32(5);
+enc.push(OPS.CREATE_TEXT); pushU32(65537); pushStr("overflow");
+enc.push(OPS.APPEND); pushU32(65536); pushU32(65537);
+enc.push(OPS.APPEND); pushU32(0); pushU32(65535);
+enc.push(OPS.APPEND); pushU32(0); pushU32(65536);
+nt.applyBin(new Uint8Array(enc));
+assert.equal(root2.children[root2.children.length - 1].textContent, "overflow", "overflow ids resolve");
+enc.length = 0;
+enc.push(OPS.REMOVE); pushU32(65535);
+enc.push(OPS.REMOVE); pushU32(65536);
+nt.applyBin(new Uint8Array(enc));
+enc.length = 0;
+enc.push(OPS.SET_TEXT); pushU32(65537); pushStr("stale");
+assert.throws(() => nt.applyBin(new Uint8Array(enc)), "overflow REMOVE clears descendant ids");
 
 console.log("DOM Host ABI: binary conformance checks passed");

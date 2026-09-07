@@ -1,7 +1,7 @@
 import { mount, run, selftestEval } from "../../framework/dom.js";
 import { h, applyProps } from "../../framework/jsx.js";
-import { mountTo, each, show, dynAttr, nothing, frag, type El, type KeyedItem, type ElementHandle } from "../../framework/ui.js";
-import { Fragment, StrictMode, createContext, createRef, forwardRef, memo, startTransition, useContext, useDebugValue, useDeferredValue, useId, useImperativeHandle, useInsertionEffect, useLayoutEffect, useRef, useState, useTransition, provide, type Ref } from "../../compat/react.js";
+import { mountTo, each, show, dynAttr, nothing, frag, component, type El, type KeyedItem, type ElementHandle } from "../../framework/ui.js";
+import { Fragment, StrictMode, createContext, createRef, forwardRef, memo, startTransition, useContext, useDebugValue, useDeferredValue, useEffect, useId, useImperativeHandle, useInsertionEffect, useLayoutEffect, useRef, useState, useTransition, provide, type Ref } from "../../compat/react.js";
 
 interface CounterProps {
   label: string;
@@ -60,7 +60,7 @@ interface RefChildProps {
 }
 
 function RefChild(props: RefChildProps): El {
-  useImperativeHandle(props.ref, () => ({ read: () => "component:" + props.label }));
+  useImperativeHandle(props.ref, () => ({ read: () => "component:" + props.label }), [props.label]);
   return <span>ref child</span>;
 }
 
@@ -102,7 +102,7 @@ interface LegacyRefProps {
 }
 
 const LegacyRefChild = forwardRef<DemoHandle, LegacyRefProps>((props: LegacyRefProps, ref: Ref<DemoHandle | null> | null) => {
-  useImperativeHandle(ref, () => ({ read: () => "legacy:" + props.label }));
+  useImperativeHandle(ref, () => ({ read: () => "legacy:" + props.label }), [props.label]);
   return <span class="legacy-ref-child">legacy ref child</span>;
 });
 
@@ -115,8 +115,8 @@ function CompatibilityDemo(): El {
   const legacyRef = createRef<DemoHandle>();
   const [legacyState, setLegacyState] = useState("legacy:pending");
   useDebugValue(idA);
-  useLayoutEffect(() => {});
-  useInsertionEffect(() => {});
+  useLayoutEffect(() => {}, [idA, pending]);
+  useInsertionEffect(() => {}, [deferred]);
   return (
     <section class="compatibility-demo" data-id-a={idA} data-id-b={idB}>
       <StrictMode>
@@ -169,6 +169,43 @@ function Fragmented(): El {
   );
 }
 
+let lifecycleRuns = 0;
+let lifecycleCleanups = 0;
+let updateLifecycleChild = (_value: number): void => {};
+const lifecycleRef = createRef<ElementHandle>();
+const lifecycleComponentRef = createRef<DemoHandle>();
+
+function LifecycleChild(): El {
+  const [value, setValue] = useState(0);
+  updateLifecycleChild = setValue;
+  useEffect(() => {
+    if (value() >= 0) lifecycleRuns++;
+    return () => { lifecycleCleanups++; };
+  }, [value()]);
+  useImperativeHandle(lifecycleComponentRef, () => ({ read: () => "lifecycle" }), ["lifecycle"]);
+  return <button class="lifecycle-child" ref={lifecycleRef} onclick={() => {}}>lifecycle child</button>;
+}
+
+function LifecycleDemo(): El {
+  const [visible, setVisible] = useState(true);
+  const [status, setStatus] = useState("pending");
+  return (
+    <section class="lifecycle-demo">
+      <button onclick={() => updateLifecycleChild(1)}>Update lifecycle child</button>
+      <button onclick={() => setVisible(!visible())}>Toggle lifecycle child</button>
+      <button onclick={() => {
+        const next =
+          "runs:" + lifecycleRuns + " cleanups:" + lifecycleCleanups +
+          (lifecycleRef.current === null ? " host:cleared" : " host:set") +
+          (lifecycleComponentRef.current === null ? " component:cleared" : " component:set");
+        setStatus(status() === "pending" ? next : status() + "|" + next);
+      }}>Read lifecycle state</button>
+      {visible() ? <LifecycleChild /> : <span class="lifecycle-empty">removed</span>}
+      <p class="lifecycle-status">{status()}</p>
+    </section>
+  );
+}
+
 function Items(): El {
   const [items, setItems] = useState<string[]>(["alpha", "beta", "gamma"]);
   return (
@@ -180,7 +217,7 @@ function Items(): El {
         setItems(next);
       }}>Add</button>
       <button onclick={() => { const next = items().slice(); next.shift(); setItems(next); }}>Remove first</button>
-      <ul class="items">{items().map((x: string) => <li key={x}>{x}</li>)}</ul>
+      <ul class="items">{items().map((x: string) => <li key={x} title={"count:" + items().length}>{x}</li>)}</ul>
       <p>{items().length} items</p>
     </section>
   );
@@ -199,6 +236,7 @@ mountTo(
     <CompatibilityDemo />
     <GeneralChildren />
     <Fragmented />
+    <LifecycleDemo />
     <Items />
   </main>,
 );
@@ -215,7 +253,13 @@ if (process.env.NT_SELFTEST === "jsx") {
         'var componentRef=b.filter(function(x){return x.textContent==="Read component ref"})[0];' +
         'var transition=b.filter(function(x){return x.textContent==="Run transition"})[0];' +
         'var legacyRef=b.filter(function(x){return x.textContent==="Read legacy ref"})[0];' +
+        'var updateLifecycle=b.filter(function(x){return x.textContent==="Update lifecycle child"})[0];' +
+        'var toggleLifecycle=b.filter(function(x){return x.textContent==="Toggle lifecycle child"})[0];' +
+        'var readLifecycle=b.filter(function(x){return x.textContent==="Read lifecycle state"})[0];' +
         'inc.click();inc.click();inc.click();spread.click();context.click();hostRef.click();componentRef.click();transition.click();legacyRef.click();add.click();rm.click();' +
+        'updateLifecycle.click();toggleLifecycle.click();updateLifecycle.click();readLifecycle.click();' +
+        'for(var q=0;q<20;q++){toggleLifecycle.click();updateLifecycle.click();toggleLifecycle.click();}' +
+        'toggleLifecycle.click();readLifecycle.click();' +
         'setTimeout(function(){' +
         'var p=[].slice.call(document.querySelectorAll("p"))' +
         '.filter(function(x){return x.textContent.indexOf("count:")===0})[0];' +
@@ -224,6 +268,7 @@ if (process.env.NT_SELFTEST === "jsx") {
         'JSON.stringify({text:document.getElementById("nt-root").textContent,' +
         'countStyle:p.getAttribute("style"),' +
         'items:[].slice.call(ul.children).map(function(li){return li.textContent}).join(","),' +
+        'itemTitles:[].slice.call(ul.children).map(function(li){return li.getAttribute("title")}).join(","),' +
         'fragmentParent:document.querySelector(".fragment-a").parentElement.tagName,' +
         'fragmentAdjacent:document.querySelector(".fragment-a").nextElementSibling.className,' +
         'spreadClass:spread.getAttribute("class"),' +
@@ -246,7 +291,8 @@ if (process.env.NT_SELFTEST === "jsx") {
         '.map(function(x){return x.tagName}).join(","),' +
         'transitionPending:document.querySelector(".transition-pending").textContent,' +
         'transitionState:document.querySelector(".transition-state").textContent,' +
-        'legacyRef:document.querySelector(".legacy-ref-state").textContent})}))},500);',
+        'legacyRef:document.querySelector(".legacy-ref-state").textContent,' +
+        'lifecycle:document.querySelector(".lifecycle-status").textContent})}))},500);',
     );
   }, 300);
 }

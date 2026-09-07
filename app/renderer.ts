@@ -107,7 +107,14 @@ function Native(): El {
     button("sha256", () => { ask("crypto:sha256", "nativetron"); }),
     button("List home", () => { ask("fs:list", home.get()); }),
     button("Run uname -a", () => { ask("proc:run", "/usr/bin/uname\n-a"); }),
-    button("Unknown channel", () => { ask("does:not:exist", ""); }),
+    button("Test IPC refusal", () => {
+      nativeOut.set("testing expected refusal…");
+      ipc.invoke("does:not:exist", encodeUtf8(""))
+        .then((_reply: Uint8Array) => { nativeOut.set("unexpected: request was accepted"); })
+        .catch((e: unknown) => {
+          nativeOut.set("expected refusal: " + (e instanceof Error ? e.message : "failed"));
+        });
+    }),
     el("pre", [
       attr(el("span", [dyn(() => nativeOut.get())]), "style", "white-space:pre-wrap"),
     ]),

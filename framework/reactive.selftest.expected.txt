@@ -7,3 +7,11 @@ computed doubled=8
 effect run #5: a=5
 computed doubled=10
 total effect runs=5
+pinned replay=1/1
+generation reuse=2
+signal generation reuse=2
+lifecycle run #1: value=0
+lifecycle cleanup #1
+lifecycle run #2: value=1
+lifecycle cleanup #2
+lifecycle totals=2/2

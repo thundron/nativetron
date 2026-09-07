@@ -2,7 +2,7 @@ import { instantiateFromBytes } from "./.scriptc/hostile-strings.mjs";
 import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 let bin = null;
-const api = await instantiateFromBytes(readFileSync("./.scriptc/hostile-strings.wasm"), { binOut: (b) => { bin = b.slice(); } });
+const api = await instantiateFromBytes(readFileSync(new URL("./.scriptc/hostile-strings.wasm", import.meta.url)), { binOut: (b) => { bin = b.slice(); } });
 const names = ["quote+backslash", "U+2028/U+2029", "</script> + img", 'break-out ");...("', "newline/tab", "NUL + control"];
 const B64 = /^[A-Za-z0-9+/]*={0,2}$/;
 for (let i = 0; i < 6; i++) {

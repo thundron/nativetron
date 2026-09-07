@@ -22,8 +22,10 @@ hosts             native/nativetron_core.cc + webview   (base64 over eval)
 ```
 
 The reconciler only speaks the DOM Host ABI, so both hosts run the same
-components. `app/renderer.ts` and `web/renderer.ts` differ only in how they
-mount and which transport they install.
+components. Component scopes own reactive effects, listeners, and refs; node
+removal disposes them before the host drops the subtree. `app/renderer.ts` and
+`web/renderer.ts` differ only in how they mount and which transport they
+install.
 
 ## Desktop
 
@@ -52,7 +54,8 @@ verified subpixel-exact against direct DOM calls.
 
 ## Limitations
 
-- No JSX. scriptc accepts `.ts` and `.js` entries only.
+- JSX requires the typed ahead-of-time transform in `app/jsx/build.mjs`; only
+  the generated compatibility surface is accepted.
 - Each lane needs its own entry file and a `profile.json` for the browser build.
 - No CLI, dev server or hot reload.
 - Bulk DOM work (mounting or rewriting thousands of nodes) costs more than an

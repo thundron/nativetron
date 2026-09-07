@@ -1,4 +1,4 @@
-import { effect } from "./reactive.js";
+import { effect, type Cleanup } from "./reactive.js";
 import {
   OP_CREATE_ELEMENT,
   OP_CREATE_TEXT,
@@ -91,6 +91,9 @@ export function setText(id: number, text: string): void {
 export function setAttr(id: number, name: string, value: string): void {
   const n = iref(name); u8(OP_SET_ATTR); u32(id); u32(n); str(value);
 }
+export function removeAttr(id: number, name: string): void {
+  const n = iref(name); u8(OP_REMOVE_ATTR); u32(id); u32(n);
+}
 export function append(parent: number, child: number): void {
   u8(OP_APPEND); u32(parent); u32(child);
 }
@@ -110,8 +113,8 @@ export function flush(): void {
   off = 0;
 }
 
-export function bindText(nodeId: number, compute: () => string): void {
-  effect(() => {
+export function bindText(nodeId: number, compute: () => string): Cleanup {
+  return effect(() => {
     setText(nodeId, compute());
     if (!building) flush();
   });
@@ -123,20 +126,35 @@ export interface NtEvent {
   value?: string;
 }
 type Handler = (ev: NtEvent) => void;
+function noopHandler(_ev: NtEvent): void {}
 const handlerKeys: string[] = [];
 const handlerFns: Handler[] = [];
+const handlerActive: boolean[] = [];
 
 export function on(id: number, type: string, h: Handler): void {
   const slot = handlerFns.length;
   handlerKeys.push(`${id}:${type}`);
   handlerFns.push(h);
+  handlerActive.push(true);
   const t = iref(type); u8(OP_LISTEN); u32(id); u32(t); u32(slot);
+}
+
+export function unlisten(id: number, type: string): void {
+  const key = `${id}:${type}`;
+  for (let i = 0; i < handlerKeys.length; i++) {
+    if (handlerKeys[i] === key) {
+      handlerActive[i] = false;
+      handlerKeys[i] = "";
+      handlerFns[i] = noopHandler;
+    }
+  }
+  const t = iref(type); u8(OP_UNLISTEN); u32(id); u32(t);
 }
 
 export function dispatch(ev: NtEvent): void {
   const key = `${ev.n}:${ev.t}`;
   for (let i = 0; i < handlerKeys.length; i++) {
-    if (handlerKeys[i] === key) {
+    if (handlerKeys[i] === key && handlerActive[i]) {
       handlerFns[i]!(ev);
       return;
     }
@@ -145,5 +163,5 @@ export function dispatch(ev: NtEvent): void {
 
 export function dispatchSlot(slot: number, value: string): void {
   const h = handlerFns[slot];
-  if (h !== undefined) h({ n: slot, t: "", value });
+  if (h !== undefined && handlerActive[slot]) h({ n: slot, t: "", value });
 }
