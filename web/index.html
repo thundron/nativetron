@@ -14,9 +14,10 @@
   <script src="../host/dom-host.js"></script>
   <script type="module">
     import { instantiateFromBytes } from "./.scriptc/renderer.mjs";
+    import { bindEventCallbacks } from "../host/event.generated.mjs";
 
     let api;
-    window.__nt_event = (slot, value) => { if (api) { if (value) api.nt_on_event_value(slot, value); else api.nt_on_event(slot); } };
+    bindEventCallbacks(window, () => api, "nt");
 
     const t0 = performance.now();
     const bytes = await (await fetch("./.scriptc/renderer.wasm")).arrayBuffer();

@@ -5,15 +5,6 @@ import { createHash, randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { IpcMain } from "../ipc/main.js";
 import { encodeUtf8, decodeUtf8 } from "../ipc/codec.js";
-import { reviewRelease, type ReleaseReviewRequest } from "../pyrus/release-review.js";
-import { summarizeNDJSON } from "../pyrus/ndjson.js";
-import { sanitizeOutput } from "../pyrus/output-sanitizer.js";
-import { runBoundedProcess } from "../pyrus/process-runner.js";
-import { hashBuildDirectory } from "../pyrus/build-hash.js";
-import { capabilitiesFromVersionOutput } from "../pyrus/capabilities.js";
-import { buildVersionedArgv } from "../pyrus/argv.js";
-import { sanitizeData } from "../pyrus/untrusted-data.js";
-import { parsePearLink } from "../pyrus/pear-link.js";
 
 declare function ntOnOpenFile(cb: (path: string) => void): void;
 declare function ntOnOpenUrl(cb: (url: string) => void): void;
@@ -83,74 +74,61 @@ ipc.handle("fs:stat", async (payload: Uint8Array) => {
   return encodeUtf8(s.isDirectory() ? "dir" : "file " + s.size);
 });
 
-ipc.handle("pyrus:parse-ndjson", (payload: Uint8Array) => {
-  return Promise.resolve(encodeUtf8(summarizeNDJSON(payload)));
-});
-
-ipc.handle("pyrus:sanitize-output", (payload: Uint8Array) => {
-  return Promise.resolve(encodeUtf8(sanitizeOutput(payload)));
-});
-
-ipc.handle("pyrus:review-release", (payload: Uint8Array) => {
-  const request = JSON.parse(decodeUtf8(payload)) as ReleaseReviewRequest;
-  return Promise.resolve(encodeUtf8(JSON.stringify(reviewRelease(request))));
-});
-
-ipc.handle("pyrus:parse-link", (payload: Uint8Array) => {
-  if (payload.length > 16 * 1024) throw new Error("Pear link exceeds the IPC limit");
-  return Promise.resolve(encodeUtf8(JSON.stringify(parsePearLink(decodeUtf8(payload)))));
-});
-
-ipc.handle("pyrus:sanitize-data", (payload: Uint8Array) => {
-  if (payload.length > 512 * 1024) throw new Error("structured data exceeds the IPC limit");
-  const value = JSON.parse(decodeUtf8(payload)) as unknown;
-  return Promise.resolve(encodeUtf8(JSON.stringify(sanitizeData(value))));
-});
-
-ipc.handle("pyrus:build-argv", (payload: Uint8Array) => {
-  if (payload.length > 128 * 1024) throw new Error("operation input exceeds the IPC limit");
-  const request = JSON.parse(decodeUtf8(payload)) as Record<string, unknown>;
-  if (request === null || typeof request !== "object" || Array.isArray(request))
-    throw new TypeError("operation request must be a plain object");
-  const keys = Object.keys(request);
-  for (let i = 0; i < keys.length; i++) {
-    const key = keys[i]!;
-    if (key !== "operation" && key !== "input")
-      throw new TypeError("operation request." + key + " is not allowed");
-  }
-  const operation = request["operation"];
-  if (typeof operation !== "string") throw new TypeError("operation must be a string");
-  const versionOutput = process.env.NT_PEAR_VERSION_OUTPUT ?? "";
-  if (Buffer.byteLength(versionOutput) > 64 * 1024)
-    throw new Error("Pear version metadata exceeds the output limit");
-  const capability = capabilitiesFromVersionOutput(versionOutput);
-  return Promise.resolve(encodeUtf8(JSON.stringify(buildVersionedArgv(capability, operation, request["input"]))));
-});
-
-ipc.handle("pyrus:pear-capabilities", (payload: Uint8Array) => {
-  if (payload.length > 64 * 1024) throw new Error("Pear version metadata exceeds the output limit");
-  return Promise.resolve(encodeUtf8(JSON.stringify(capabilitiesFromVersionOutput(decodeUtf8(payload)))));
-});
-
-ipc.handle("pyrus:hash-build", async (payload: Uint8Array) => {
-  const target = decodeUtf8(payload);
-  const allowed = process.env.NT_PYRUS_BUILD_ROOT ?? "";
-  if (allowed.length === 0 || target !== allowed) throw new Error("build hash target is not allowed");
-  const encoded = encodeUtf8(JSON.stringify(await hashBuildDirectory(target)));
-  if (encoded.length > 8 * 1024 * 1024 - 64) throw new Error("build hash result exceeds the IPC limit");
-  return encoded;
-});
-
-ipc.handle("proc:run", (payload: Uint8Array) => {
-  const parts = decodeUtf8(payload).split("\n");
-  const cmd = parts[0] ?? "";
-  if (cmd !== "/usr/bin/uname") throw new Error("process executable is not allowed");
-  if (parts.length !== 2 || (parts[1] !== "-a" && parts[1] !== "-s"))
-    throw new Error("process arguments are not allowed");
-  return runBoundedProcess(cmd, [parts[1]!]).then((result) => {
-    if (result.code === 0) return encodeUtf8(result.stdout);
-    const status = result.code === null ? "signal" : "" + result.code;
-    return encodeUtf8("exit " + status + "\n" + result.stderr);
+ipc.handle("proc:uname", (payload: Uint8Array) => {
+  const flag = decodeUtf8(payload);
+  if (flag !== "-a" && flag !== "-s") throw new Error("uname argument is not allowed");
+  return new Promise<Uint8Array>((resolve, reject) => {
+    const child = spawn("/usr/bin/uname", [flag], {
+      stdio: ["ignore", "pipe", "pipe"],
+      env: { PATH: "/usr/bin:/bin" },
+    });
+    let output = "";
+    let errorOutput = "";
+    let outputBytes = 0;
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      child.kill("SIGTERM");
+      reject(new Error("uname timed out"));
+    }, 5000);
+    child.stdout!.on("data", (data: Buffer) => {
+      if (settled) return;
+      outputBytes += data.length;
+      if (outputBytes > 4096) {
+        settled = true;
+        clearTimeout(timer);
+        child.kill("SIGTERM");
+        reject(new Error("uname output limit exceeded"));
+        return;
+      }
+      output += decodeUtf8(data);
+    });
+    child.stderr!.on("data", (data: Buffer) => {
+      if (settled) return;
+      outputBytes += data.length;
+      if (outputBytes > 4096) {
+        settled = true;
+        clearTimeout(timer);
+        child.kill("SIGTERM");
+        reject(new Error("uname output limit exceeded"));
+        return;
+      }
+      errorOutput += decodeUtf8(data);
+    });
+    child.on("error", (error: Error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      reject(error);
+    });
+    child.on("exit", (code: number | null) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (code === 0) resolve(encodeUtf8(output));
+      else reject(new Error("uname failed: " + (code === null ? "signal" : "" + code) + " " + errorOutput));
+    });
   });
 });
 
@@ -169,10 +147,8 @@ ipc.onListening((port: number) => {
       HOME: process.env.HOME ?? "",
       NT_SELFTEST: process.env.NT_SELFTEST ?? "",
       NT_BENCH_QUIT: process.env.NT_BENCH_QUIT ?? "",
+      NT_BENCH_START_MS: process.env.NT_BENCH_START_MS ?? "",
       NT_BLOCKING_RUN: process.env.NT_BLOCKING_RUN ?? "",
-      NT_PYRUS_BUILD_ROOT: process.env.NT_PYRUS_BUILD_ROOT ?? "",
-      NT_PYRUS_BUILD_HASH: process.env.NT_PYRUS_BUILD_HASH ?? "",
-      NT_PEAR_VERSION_MODE: process.env.NT_PEAR_VERSION_MODE ?? "",
     },
   });
   renderer.on("exit", (code: number | null) => {

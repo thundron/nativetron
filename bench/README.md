@@ -21,15 +21,15 @@ repeats, and alternates order. Only compare within one run.
 
 | metric | nativetron | react |
 |---|---|---|
-| interaction, median | 1.92 µs | 3.23 µs |
-| interaction, p95 | 2.55 µs | 3.45 µs |
-| payload, raw | 76.4 KB | 189.7 KB |
-| payload, gzipped | 37.9 KB | 59.3 KB |
-| 10k row update, median | 4.60 ms | 3.70 ms |
-| 10k row mount, median of 5 | 68 ms | 12 ms |
-| JS heap after 10k rows | 6.79 MB | 13.59 MB |
+| interaction, median | 2.05 µs | 3.20 µs |
+| interaction, p95 | 2.70 µs | 3.55 µs |
+| payload, raw | 91.2 KB | 189.7 KB |
+| payload, gzipped | 42.4 KB | 59.3 KB |
+| 10k row update, median | 4.70 ms | 3.70 ms |
+| 10k row mount, median of 5 | 74 ms | 12 ms |
+| JS heap after 10k rows | 6.81 MB | 10.52 MB |
 
-Mount splits about 30 ms guest / 30 ms host. The same 10k elements from plain
+Mount splits about 29 ms guest / 38 ms host. The same 10k elements from plain
 JS cost 5 ms via a fragment, 3 ms via `innerHTML`.
 
 A 10k sort is 2.1 ms in wasm vs 0.4 ms in V8. Comparators that subtract a numeric key (`a.f - b.f`,
@@ -37,7 +37,7 @@ A 10k sort is 2.1 ms in wasm vs 0.4 ms in V8. Comparators that subtract a numeri
 
 ## Canvas
 
-See `canvas/`: 20000 rects per frame cost 1.88 ms compiled against 0.83 ms
+See `canvas/`: 20000 rects per frame cost 1.91 ms compiled against 0.83 ms
 from direct JS calls, subpixel-identical.
 
 ## Transport, per frame
@@ -57,14 +57,14 @@ literal.
 
 | metric | nativetron | electron 44 |
 |---|---|---|
-| shipped artifact | 1.01 MiB | 287 MB |
-| cold start to first paint | 168 ms | 307 ms |
-| peak resident memory | 75 MB | 330 MB |
-| steady resident memory | 75 MB | 325 MB |
-| processes | 1 | 4 |
-| startup CPU | 8.0% | 20.6% |
+| shipped binaries | 0.69 MiB | 287 MB |
+| cold start to first paint | 285 ms | 230 ms |
+| peak resident memory | 98.1 MiB | 330.3 MiB |
+| steady resident memory | 98.1 MiB | 326.2 MiB |
+| processes | 2 | 4 |
+| startup CPU | 13.7% | 23.5% |
 
-Measured 2026-09-07 at scriptc `032123ab`: the bundle contains a 574,744-byte main and 501,784-byte renderer, or about 1.03 MiB including its launcher and metadata. The standalone JSX lifecycle app is 379,896 bytes; the browser renderer is 69,974 bytes of wasm plus 2,682 bytes of loader glue. Component ownership, cleanup, and reusable effect/signal slot tracking increased these artifacts from 574,744/483,432 desktop bytes, 326,168 JSX bytes, and 61,984 wasm bytes.
+Measured 2026-09-07 at scriptc `032123ab`. The benchmark launches the complete nativetron main/renderer pair and timestamps from the parent before process creation; the earlier renderer-only startup measurement was invalid. The shipped binaries are a 239,816-byte main and 481,512-byte renderer. The standalone JSX lifecycle app is 398,968 bytes; the browser renderer is 75,215 bytes of wasm plus 3,100 bytes of loader glue.
 
 Electron's helper processes are children and fully counted. The WKWebView
 content process is spawned by the system, so nativetron's resident memory is

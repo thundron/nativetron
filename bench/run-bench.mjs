@@ -85,21 +85,24 @@ function sampleTree(root) {
 }
 
 function measureStartup(spawnCmd, spawnArgs) {
-  const walls = []; // app self-quits on paint; spawnSync blocks to exit
-
-  let readyMs = null;
+  const walls = [];
+  const ready = [];
   for (let i = 0; i < STARTUP_RUNS; i++) {
-    const t0 = Date.now();
+    const started = Date.now();
     const r = spawnSync(spawnCmd, spawnArgs, {
-      env: { ...process.env, NT_BENCH_QUIT: "1" },
+      env: { ...process.env, NT_BENCH_QUIT: "1", NT_BENCH_START_MS: String(started) },
       encoding: "utf8",
       timeout: 30000,
     });
-    walls.push(Date.now() - t0);
-    const m = /NT_READY_MS=(\d+)/.exec((r.stdout || "") + (r.stderr || ""));
-    if (m) readyMs = Number(m[1]);
+    walls.push(Date.now() - started);
+    const output = (r.stdout || "") + (r.stderr || "");
+    const match = /NT_READY_MS=(\d+)/.exec(output);
+    if (r.status !== 0 || match === null) {
+      throw new Error(`startup probe failed for ${spawnCmd}:\n${output}`);
+    }
+    ready.push(Number(match[1]));
   }
-  return { wallMedian: median(walls), walls, readyMs };
+  return { readyMedian: median(ready), ready, wallMedian: median(walls), walls };
 }
 
 async function measureRuntime(spawnCmd, spawnArgs) {
@@ -126,7 +129,6 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const nt = {
   main: join(REPO, "build", "main"),
   renderer: join(REPO, "build", "renderer"),
-  core: join(REPO, "native", "nativetron_core.o"),
 };
 const ntBuilt = existsSync(nt.main) && existsSync(nt.renderer);
 const electron = resolveElectron();
@@ -141,14 +143,14 @@ log(`electron: ${electron ? "v" + electron.version + " (cached, de-quarantined)"
 log(`date: ${new Date().toISOString()}`);
 log("");
 
-const ntDisk = ntBuilt ? fileSize(nt.main) + fileSize(nt.renderer) + fileSize(nt.core) : 0;
+const ntDisk = ntBuilt ? fileSize(nt.main) + fileSize(nt.renderer) : 0;
 const elDisk = electron ? dirSizeBytes(electron.app) : 0;
 
 let ntStart = null, ntRun = null, elStart = null, elRun = null;
 if (ntBuilt) {
-  log("measuring nativetron (build/renderer)…");
-  ntStart = measureStartup(nt.renderer, []);
-  ntRun = await measureRuntime(nt.renderer, []);
+  log("measuring nativetron (build/main + renderer child)…");
+  ntStart = measureStartup(nt.main, []);
+  ntRun = await measureRuntime(nt.main, []);
 } else {
   log("nativetron not built — run ./build.sh first.");
 }
@@ -165,7 +167,7 @@ log(`## Results\n`);
 log(`| metric | nativetron | electron | electron / nativetron |`);
 log(`|---|---|---|---|`);
 log(`| **Disk (shipped runtime)** | ${ntDisk ? mb(ntDisk) : "n/a"} | ${elDisk ? mb(elDisk) : "n/a"} | ${ratio(ntDisk, elDisk)} |`);
-log(`| **Cold start → first paint** (median of ${STARTUP_RUNS}) | ${cell(ntStart && ntStart.wallMedian + " ms")} | ${cell(elStart && elStart.wallMedian + " ms")} | ${ratio(ntStart?.wallMedian, elStart?.wallMedian)} |`);
+log(`| **Cold start → first paint** (median of ${STARTUP_RUNS}) | ${cell(ntStart && ntStart.readyMedian + " ms")} | ${cell(elStart && elStart.readyMedian + " ms")} | ${ratio(ntStart?.readyMedian, elStart?.readyMedian)} |`);
 log(`| **Peak RSS** (process tree) | ${cell(ntRun && kb(ntRun.peakRSS))} | ${cell(elRun && kb(elRun.peakRSS))} | ${ratio(ntRun?.peakRSS, elRun?.peakRSS)} |`);
 log(`| **Steady RSS** | ${cell(ntRun && kb(ntRun.steadyRSS))} | ${cell(elRun && kb(elRun.steadyRSS))} | ${ratio(ntRun?.steadyRSS, elRun?.steadyRSS)} |`);
 log(`| **Processes** | ${cell(ntRun?.procs)} | ${cell(elRun?.procs)} | — |`);

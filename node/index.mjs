@@ -2,6 +2,7 @@ import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { NATIVE_EVENT_BRIDGE_JS, parseNativeEventMessage } from "../host/native-event.generated.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const native = createRequire(import.meta.url)("./build/Release/nativetron.node");
@@ -10,6 +11,29 @@ const OPS = Object.fromEntries(
   JSON.parse(readFileSync(join(here, "..", "abi", "ops.json"), "utf8")).ops.map((o) => [o.name, o.code]),
 );
 const HOST_JS = readFileSync(join(here, "..", "host", "dom-host.js"), "utf8");
+const WEBVIEW_MESSAGE_LIMIT = 65536;
+
+function webviewMessage(raw) {
+  try {
+    const argumentsList = JSON.parse(raw);
+    if (!Array.isArray(argumentsList) || argumentsList.length !== 1 ||
+        typeof argumentsList[0] !== "string" || argumentsList[0].length > WEBVIEW_MESSAGE_LIMIT) return null;
+    return argumentsList[0];
+  } catch {
+    return null;
+  }
+}
+
+function readyMessage(raw) {
+  try {
+    const message = JSON.parse(raw);
+    if (message === null || typeof message !== "object" || Array.isArray(message) ||
+        Object.keys(message).length !== 2 || !Object.hasOwn(message, "n") || !Object.hasOwn(message, "t")) return false;
+    return message.n === 0 && message.t === "__ready";
+  } catch {
+    return false;
+  }
+}
 
 export class Encoder {
   constructor() {
@@ -82,10 +106,7 @@ export class Window {
 
     native.init();
     native.addInit(HOST_JS);
-    native.addInit(
-      'window.__nt_event=function(slot,value){' +
-        '(window.__nt_send||window.__nt_ipc)(JSON.stringify({n:slot,t:"__slot",value:value}))};',
-    );
+    native.addInit(NATIVE_EVENT_BRIDGE_JS);
     native.setTitle(title);
     native.setSize(width, height);
     native.onMessage((raw) => this._message(raw));
@@ -97,25 +118,20 @@ export class Window {
   }
 
   _message(raw) {
-    let ev;
-    try {
-      const args = JSON.parse(raw);
-      ev = JSON.parse(args[0]);
-    } catch {
-      return;
-    }
-    if (ev.t === "__ready") {
+    const payload = webviewMessage(raw);
+    if (payload === null) return;
+    if (readyMessage(payload)) {
       this.ready = true;
-      for (const b of this.pending) native.applyBatch(b);
+      for (const batch of this.pending) native.applyBatch(batch);
       this.pending.length = 0;
       if (this.onReady) this.onReady();
       return;
     }
-    if (ev.t === "__slot") {
-      const h = this.slots[ev.n];
-      if (h) h(ev.value ?? "");
-      this.flush();
-    }
+    const event = parseNativeEventMessage(payload);
+    if (event === null) return;
+    const handler = this.slots[event.slot];
+    if (handler) handler(event.value);
+    this.flush();
   }
 
   listen(id, type, handler) {

@@ -25,9 +25,10 @@ const nt = {
   wasm: join(WEB, "renderer.wasm"),
   glue: join(WEB, "renderer.mjs"),
   host: join(REPO, "host", "dom-host.js"),
+  events: join(REPO, "host", "event.generated.mjs"),
 };
-const ntRaw = size(nt.wasm) + size(nt.glue) + size(nt.host);
-const ntGz = gz(nt.wasm) + gz(nt.glue) + gz(nt.host);
+const ntRaw = size(nt.wasm) + size(nt.glue) + size(nt.host) + size(nt.events);
+const ntGz = gz(nt.wasm) + gz(nt.glue) + gz(nt.host) + gz(nt.events);
 const rxRaw = size(join(REACT, "bundle.js"));
 const rxGz = gz(join(REACT, "bundle.js"));
 
@@ -42,7 +43,8 @@ console.log(`| app+runtime (gzip) | ${kb(ntGz)} | ${rxGz ? kb(rxGz) : "n/a"} |`)
 console.log(`| — wasm / react+react-dom+app | ${kb(size(nt.wasm))} | ${rxRaw ? kb(rxRaw) : "n/a"} |`);
 console.log(`| — JS glue | ${kb(size(nt.glue))} | — |`);
 console.log(`| — DOM host | ${kb(size(nt.host))} | — |`);
+console.log(`| — event binder | ${kb(size(nt.events))} | — |`);
 console.log(`\nratio (react / nativetron): raw ${ratio(ntRaw, rxRaw)}, gzip ${ratio(ntGz, rxGz)}`);
 console.log("\nnativetron ships no framework runtime in JS: the reconciler and all app");
 console.log("logic are AOT-compiled into the wasm. The wasm's fixed cost is the scriptc");
-console.log("runtime (GC, strings, JSON); React's fixed cost is react+react-dom.");
+console.log("runtime (GC and strings); React's fixed cost is react+react-dom.");

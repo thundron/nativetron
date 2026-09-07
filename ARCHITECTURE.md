@@ -25,7 +25,9 @@ The reconciler only speaks the DOM Host ABI, so both hosts run the same
 components. Component scopes own reactive effects, listeners, and refs; node
 removal disposes them before the host drops the subtree. `app/renderer.ts` and
 `web/renderer.ts` differ only in how they mount and which transport they
-install.
+install. `abi/events.json` is the authoritative event contract; generation
+owns host projection, default/primary/rich tier selection, guest decoding, native
+messages, callback signatures, Wasm profiles, and the matching ABI documentation.
 
 ## Desktop
 
@@ -39,7 +41,9 @@ also native. The renderer owns a window through a C++ wrapper around the
 
 `web/renderer.ts` compiles to a wasm reactor. Generated glue instantiates it,
 supplies host imports and a WASI shim, and calls the exports. Operations cross
-as bytes in linear memory; events call exported functions with scalars.
+as bytes in linear memory. Generated event binders select a slot-only export when
+all metadata is at its schema default, slot plus primary string when only `value`
+is present, and the schema-wide rich export otherwise.
 
 ## Compiler fork
 

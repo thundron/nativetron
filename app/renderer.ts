@@ -8,8 +8,6 @@ import { notificationsAvailable, notify, openExternal, readClipboard, writeClipb
 import { getApplicationMenuItemCount, getContextMenuItemCount, getTrayMenuItemCount, hasTray, removeTray, setApplicationMenu, setContextMenu, setTray, setTrayImage, setTrayMenu } from "../framework/menu.js";
 import { getGlobalShortcutCount, registerGlobalShortcut, unregisterAllGlobalShortcuts } from "../framework/shortcuts.js";
 import { onOpenFile, onOpenUrl } from "../framework/associations.js";
-import { SAMPLE_REVIEW, SAFE_REVIEW } from "../pyrus/sample.js";
-import type { ReleaseReview, ReleaseReviewRequest } from "../pyrus/release-review.js";
 
 const ipc = new IpcRenderer();
 let associatedFile = "";
@@ -21,7 +19,6 @@ const count = signal(0);
 const items = signal<string[]>(["alpha", "beta", "gamma"]);
 const nativeOut = signal("(nothing yet)");
 const home = signal("");
-const releaseOut = signal("(not reviewed)");
 let seq = 0;
 
 function button(label: string, handler: () => void): El {
@@ -69,33 +66,12 @@ function List(): El {
       const out: KeyedItem[] = [];
       const cur = items.get();
       for (let i = 0; i < cur.length; i++) {
-        out.push({ key: cur[i]!, el: el("li", [txt(cur[i]!)]) });
+        const value = cur[i]!;
+        out.push({ key: value, build: () => el("li", [txt(value)]) });
       }
       return out;
     }),
     el("p", [dyn(() => `${items.get().length} items`)]),
-  ]);
-}
-
-function requestReleaseReview(request: ReleaseReviewRequest): Promise<ReleaseReview> {
-  return ipc.invoke("pyrus:review-release", encodeUtf8(JSON.stringify(request)))
-    .then((payload: Uint8Array) => JSON.parse(decodeUtf8(payload)) as ReleaseReview);
-}
-
-function PyrusReleaseReview(): El {
-  return el("section", [
-    el("h2", [txt("Pyrus release review")]),
-    button("Review sample release", () => {
-      releaseOut.set("…");
-      requestReleaseReview(SAMPLE_REVIEW)
-        .then((review: ReleaseReview) => {
-          const codes: string[] = [];
-          for (let i = 0; i < review.findings.length; i++) codes.push(review.findings[i]!.code);
-          releaseOut.set((review.blocking ? "blocked: " : "clear: ") + codes.join(", "));
-        })
-        .catch((e: unknown) => { releaseOut.set("error: " + (e instanceof Error ? e.message : "failed")); });
-    }),
-    el("pre", [attr(el("span", [dyn(() => releaseOut.get())]), "style", "white-space:pre-wrap")]),
   ]);
 }
 
@@ -106,7 +82,7 @@ function Native(): El {
     button("UUID", () => { ask("crypto:uuid", ""); }),
     button("sha256", () => { ask("crypto:sha256", "nativetron"); }),
     button("List home", () => { ask("fs:list", home.get()); }),
-    button("Run uname -a", () => { ask("proc:run", "/usr/bin/uname\n-a"); }),
+    button("Run uname -a", () => { ask("proc:uname", "-a"); }),
     button("Test IPC refusal", () => {
       nativeOut.set("testing expected refusal…");
       ipc.invoke("does:not:exist", encodeUtf8(""))
@@ -131,14 +107,13 @@ mountTo(el("main", [
   el("p", [txt("Renderer drives the DOM. Main process does native work over IPC.")]),
   Counter(),
   List(),
-  PyrusReleaseReview(),
   Native(),
 ]));
 
 async function selftest(): Promise<void> {
   const uuid = decodeUtf8(await ipc.invoke("crypto:uuid", encodeUtf8("")));
   const sha = decodeUtf8(await ipc.invoke("crypto:sha256", encodeUtf8("nativetron")));
-  const uname = decodeUtf8(await ipc.invoke("proc:run", encodeUtf8("/usr/bin/uname\n-s")));
+  const uname = decodeUtf8(await ipc.invoke("proc:uname", encodeUtf8("-s")));
   let refused = "";
   try {
     await ipc.invoke("does:not:exist", encodeUtf8(""));
@@ -163,243 +138,17 @@ async function selftest(): Promise<void> {
 async function processSecuritySelftest(): Promise<void> {
   let denied = false;
   try {
-    await ipc.invoke("proc:run", encodeUtf8("/bin/echo\nx"));
+    await ipc.invoke("proc:uname", encodeUtf8("--invalid"));
   } catch (error) {
-    denied = error instanceof Error && error.message === "process executable is not allowed";
+    denied = error instanceof Error && error.message === "uname argument is not allowed";
   }
   let allowed = false;
   try {
-    const reply = await ipc.invoke("proc:run", encodeUtf8("/usr/bin/uname\n-s"));
+    const reply = await ipc.invoke("proc:uname", encodeUtf8("-s"));
     allowed = decodeUtf8(reply).trim() === "Darwin";
   } catch (_error) {
   }
   console.log(denied && allowed ? "NT_PROCESS_SECURITY_SELFTEST=OK" : "NT_PROCESS_SECURITY_SELFTEST=FAIL");
-  quit();
-}
-
-async function pyrusPearLinkSelftest(): Promise<void> {
-  const key = "y".repeat(52);
-  let valid = false;
-  let unsafe = false;
-  let oversized = false;
-  try {
-    const reply = await ipc.invoke(
-      "pyrus:parse-link",
-      encodeUtf8("pear://" + key + "/folder/caf%C3%A9#section%20one"),
-    );
-    const result = JSON.parse(decodeUtf8(reply)) as {
-      kind: string;
-      baseKind: string;
-      path: string | null;
-      hash: string | null;
-    };
-    valid = result.kind === "hash" && result.baseKind === "stable" &&
-      result.path === "/folder/café" && result.hash === "section one";
-  } catch (_error) {
-  }
-  try {
-    await ipc.invoke("pyrus:parse-link", encodeUtf8("pear://" + key + "/a%2Fb"));
-  } catch (error) {
-    unsafe = error instanceof Error && error.message === "Pear link path segment is unsafe";
-  }
-  try {
-    await ipc.invoke("pyrus:parse-link", new Uint8Array(16 * 1024 + 1));
-  } catch (error) {
-    oversized = error instanceof Error && error.message === "Pear link exceeds the IPC limit";
-  }
-  console.log(valid && unsafe && oversized ? "NT_PYRUS_PEAR_LINK_SELFTEST=OK" : "NT_PYRUS_PEAR_LINK_SELFTEST=FAIL");
-  quit();
-}
-
-async function pyrusUntrustedDataSelftest(): Promise<void> {
-  let valid = false;
-  let unsafe = false;
-  let byteLimit = false;
-  let ipcLimit = false;
-  try {
-    const reply = await ipc.invoke(
-      "pyrus:sanitize-data",
-      encodeUtf8('{"name":"café","items":[1,true,null,{"ok":"😀"}]}'),
-    );
-    valid = decodeUtf8(reply) === '{"name":"café","items":[1,true,null,{"ok":"😀"}]}';
-  } catch (_error) {
-  }
-  try {
-    await ipc.invoke("pyrus:sanitize-data", encodeUtf8('{"__proto__":{"polluted":true}}'));
-  } catch (error) {
-    unsafe = error instanceof Error && error.message === "Unsafe structured key";
-  }
-  try {
-    const chunks: string[] = [];
-    for (let i = 0; i < 17; i++) chunks.push("x".repeat(16 * 1024));
-    await ipc.invoke("pyrus:sanitize-data", encodeUtf8(JSON.stringify(chunks)));
-  } catch (error) {
-    byteLimit = error instanceof Error && error.message === "Structured data exceeds byte limit";
-  }
-  try {
-    await ipc.invoke("pyrus:sanitize-data", new Uint8Array(512 * 1024 + 1));
-  } catch (error) {
-    ipcLimit = error instanceof Error && error.message === "structured data exceeds the IPC limit";
-  }
-  console.log(valid && unsafe && byteLimit && ipcLimit ? "NT_PYRUS_UNTRUSTED_DATA_SELFTEST=OK" : "NT_PYRUS_UNTRUSTED_DATA_SELFTEST=FAIL");
-  quit();
-}
-
-async function pyrusArgvSelftest(): Promise<void> {
-  if (process.env.NT_PEAR_VERSION_MODE === "unsupported") {
-    try {
-      await ipc.invoke("pyrus:build-argv", encodeUtf8(JSON.stringify({ operation: "touch", input: {} })));
-      console.log("NT_PYRUS_ARGV_VERSION_SELFTEST=FAIL");
-    } catch (error) {
-      const ok = error instanceof Error &&
-        error.message === "Pear 3.2.0 or newer is required for structured operations";
-      console.log(ok ? "NT_PYRUS_ARGV_VERSION_SELFTEST=OK" : "NT_PYRUS_ARGV_VERSION_SELFTEST=FAIL");
-    }
-    quit();
-    return;
-  }
-  let valid = false;
-  let secretRejected = false;
-  let envelopeRejected = false;
-  let oversized = false;
-  try {
-    const payload = encodeUtf8(JSON.stringify({
-      operation: "stage",
-      input: { link: "pear://abc", directory: "/tmp/project", dryRun: true, only: ["src"] },
-    }));
-    const reply = await ipc.invoke("pyrus:build-argv", payload);
-    const argv = JSON.parse(decodeUtf8(reply)) as string[];
-    valid = argv.join("|") === "stage|pear://abc|/tmp/project|--json|--dry-run|--only|src";
-  } catch (_error) {
-  }
-  try {
-    await ipc.invoke("pyrus:build-argv", encodeUtf8(JSON.stringify({ operation: "touch", input: { secret: "x" } })));
-  } catch (error) {
-    secretRejected = error instanceof Error && error.message === "secret material is not supported by semantic operations";
-  }
-  try {
-    await ipc.invoke("pyrus:build-argv", encodeUtf8(JSON.stringify({ operation: "touch", input: {}, extra: true })));
-  } catch (error) {
-    envelopeRejected = error instanceof Error && error.message === "operation request.extra is not allowed";
-  }
-  try {
-    await ipc.invoke("pyrus:build-argv", new Uint8Array(128 * 1024 + 1));
-  } catch (error) {
-    oversized = error instanceof Error && error.message === "operation input exceeds the IPC limit";
-  }
-  console.log(valid && secretRejected && envelopeRejected && oversized ? "NT_PYRUS_ARGV_SELFTEST=OK" : "NT_PYRUS_ARGV_SELFTEST=FAIL");
-  quit();
-}
-
-async function pyrusCapabilitiesSelftest(): Promise<void> {
-  let valid = false;
-  let invalid = false;
-  let oversized = false;
-  try {
-    const reply = await ipc.invoke(
-      "pyrus:pear-capabilities",
-      encodeUtf8("Pear Runtime; SemVer=3.2.4-beta.1+build.9, Key=abc"),
-    );
-    const result = JSON.parse(decodeUtf8(reply)) as {
-      state: string;
-      supported: boolean;
-      contract: string | null;
-      version: { raw: string } | null;
-      capabilities: string[];
-    };
-    valid = result.state === "supported" && result.supported &&
-      result.contract === "pear-3.2-ndjson" && result.version !== null &&
-      result.version.raw === "3.2.4-beta.1" && result.capabilities.length === 14;
-  } catch (_error) {
-  }
-  try {
-    await ipc.invoke("pyrus:pear-capabilities", encodeUtf8("Version=3.2.4"));
-  } catch (error) {
-    invalid = error instanceof Error && error.message === "Pear returned invalid SemVer metadata";
-  }
-  try {
-    await ipc.invoke("pyrus:pear-capabilities", new Uint8Array(64 * 1024 + 1));
-  } catch (error) {
-    oversized = error instanceof Error && error.message === "Pear version metadata exceeds the output limit";
-  }
-  console.log(valid && invalid && oversized ? "NT_PYRUS_CAPABILITIES_SELFTEST=OK" : "NT_PYRUS_CAPABILITIES_SELFTEST=FAIL");
-  quit();
-}
-
-async function pyrusBuildHashSelftest(): Promise<void> {
-  const target = process.env.NT_PYRUS_BUILD_ROOT ?? "";
-  const expectedHash = process.env.NT_PYRUS_BUILD_HASH ?? "";
-  let denied = false;
-  try {
-    await ipc.invoke("pyrus:hash-build", encodeUtf8(target + "-denied"));
-  } catch (error) {
-    denied = error instanceof Error && error.message === "build hash target is not allowed";
-  }
-  try {
-    const reply = await ipc.invoke("pyrus:hash-build", encodeUtf8(target));
-    const result = JSON.parse(decodeUtf8(reply)) as {
-      contentHash: string;
-      entries: { path: string; bytes: number; directory: boolean }[];
-    };
-    const ok = denied && result.contentHash === expectedHash && result.entries.length === 4;
-    console.log(ok ? "NT_PYRUS_BUILD_HASH_SELFTEST=OK" : "NT_PYRUS_BUILD_HASH_SELFTEST=FAIL");
-  } catch (_error) {
-    console.log("NT_PYRUS_BUILD_HASH_SELFTEST=FAIL");
-  }
-  quit();
-}
-
-function pyrusOutputSelftest(): void {
-  const source = encodeUtf8(
-    "safe\r\n\u001b]8;;https://evil.invalid\u0007click\u001b]8;;\u0007\u202eevil",
-  );
-  ipc.invoke("pyrus:sanitize-output", source)
-    .then((reply: Uint8Array) => {
-      const ok = decodeUtf8(reply) === "safe\nclickevil";
-      console.log(ok ? "NT_PYRUS_OUTPUT_SELFTEST=OK" : "NT_PYRUS_OUTPUT_SELFTEST=FAIL");
-      quit();
-    })
-    .catch((_error: unknown) => {
-      console.log("NT_PYRUS_OUTPUT_SELFTEST=FAIL");
-      quit();
-    });
-}
-
-function pyrusNDJSONSelftest(): void {
-  const valid = encodeUtf8(
-    '{"cmd":"stage","tag":"file","data":"a"}\r\n' +
-    '{"cmd":"stage","tag":"future-tag","data":true}\n',
-  );
-  let validOk = false;
-  ipc.invoke("pyrus:parse-ndjson", valid)
-    .then((reply: Uint8Array) => {
-      validOk = decodeUtf8(reply) === "stage:file:known\nstage:future-tag:unknown";
-      return ipc.invoke("pyrus:parse-ndjson", new Uint8Array([0xff, 0x0a]));
-    })
-    .then((_reply: Uint8Array) => {
-      console.log("NT_PYRUS_NDJSON_SELFTEST=FAIL");
-      quit();
-    })
-    .catch((error: unknown) => {
-      const message = error instanceof Error ? error.message : "";
-      const ok = validOk && message === "NDJSON record is not valid UTF-8 at event 1";
-      console.log(ok ? "NT_PYRUS_NDJSON_SELFTEST=OK" : "NT_PYRUS_NDJSON_SELFTEST=FAIL");
-      quit();
-    });
-}
-
-async function pyrusSelftest(): Promise<void> {
-  const unsafe = await requestReleaseReview(SAMPLE_REVIEW);
-  const safe = await requestReleaseReview(SAFE_REVIEW);
-  const expected = ["local-state", "secret-file", "credential-pattern", "unexpected-binary",
-    "nested-generated-output", "large-addition", "deletion"];
-  let codesMatch = unsafe.findings.length === expected.length;
-  for (let i = 0; i < expected.length && codesMatch; i++) {
-    if (unsafe.findings[i]!.code !== expected[i]) codesMatch = false;
-  }
-  const ok = unsafe.blocking && unsafe.changelog.currentVersionPresent && codesMatch &&
-    !safe.blocking && safe.findings.length === 0;
-  console.log(ok ? "NT_PYRUS_SELFTEST=OK" : "NT_PYRUS_SELFTEST=FAIL");
   quit();
 }
 
@@ -556,14 +305,6 @@ ipc.onOpen(() => {
   if (process.env.NT_SELFTEST === "desktop") desktopSelftest();
   if (process.env.NT_SELFTEST === "menu") menuSelftest();
   if (process.env.NT_SELFTEST === "shortcut") shortcutSelftest();
-  if (process.env.NT_SELFTEST === "pyrus") pyrusSelftest();
-  if (process.env.NT_SELFTEST === "pyrus-ndjson") pyrusNDJSONSelftest();
-  if (process.env.NT_SELFTEST === "pyrus-output") pyrusOutputSelftest();
-  if (process.env.NT_SELFTEST === "pyrus-pear-link") pyrusPearLinkSelftest();
-  if (process.env.NT_SELFTEST === "pyrus-untrusted-data") pyrusUntrustedDataSelftest();
-  if (process.env.NT_SELFTEST === "pyrus-argv") pyrusArgvSelftest();
-  if (process.env.NT_SELFTEST === "pyrus-capabilities") pyrusCapabilitiesSelftest();
-  if (process.env.NT_SELFTEST === "pyrus-build-hash") pyrusBuildHashSelftest();
   if (process.env.NT_SELFTEST === "process-security") processSecuritySelftest();
 });
 ipc.onClose(() => { quit(); });

@@ -12,11 +12,51 @@
     "callback_register_symbol": "nt_set_callback"
   },
   "callbacks": [
-    { "name": "ntApply", "params": ["bytes"], "returns": "void" }
+    {
+      "name": "ntApply",
+      "params": [
+        "bytes"
+      ],
+      "returns": "void"
+    }
   ],
   "exports": [
-    { "export": "start", "symbol": "nt_start", "params": [], "returns": "f64" },
-    { "export": "onEvent", "symbol": "nt_on_event", "params": ["f64"], "returns": "f64" },
-    { "export": "onEventValue", "symbol": "nt_on_event_value", "params": ["f64", "string"], "returns": "f64" }
+    {
+      "export": "start",
+      "symbol": "nt_start",
+      "params": [],
+      "returns": "f64"
+    },
+    {
+      "export": "onEvent",
+      "symbol": "nt_on_event",
+      "params": [
+        "f64"
+      ],
+      "returns": "f64"
+    },
+    {
+      "export": "onEventValue",
+      "symbol": "nt_on_event_value",
+      "params": [
+        "f64",
+        "string"
+      ],
+      "returns": "f64"
+    },
+    {
+      "export": "onEventRich",
+      "symbol": "nt_on_event_rich",
+      "params": [
+        "f64",
+        "string",
+        "f64",
+        "string",
+        "string",
+        "f64",
+        "string"
+      ],
+      "returns": "f64"
+    }
   ]
 }

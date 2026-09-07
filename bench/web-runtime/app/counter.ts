@@ -1,4 +1,6 @@
-import { flush, setBinarySink, setLive, dispatchSlot } from "../../../framework/core.js";
+import {
+  flush, setBinarySink, setLive, dispatchSlot, dispatchSlotValue, dispatchSlotRich,
+} from "../../../framework/core.js";
 import { el, txt, dyn, attr, on, mountTo, type El } from "../../../framework/ui.js";
 import { signal } from "../../../framework/reactive.js";
 
@@ -24,5 +26,35 @@ export function start(): number {
   return 0;
 }
 
-export function onEvent(slot: number): number { dispatchSlot(slot, ""); flush(); return 0; }
-export function onEventValue(slot: number, value: string): number { dispatchSlot(slot, value); flush(); return 0; }
+/* generated:event-export */
+export function onEvent(
+  slot: number,
+): number {
+  dispatchSlot(slot);
+  flush();
+  return 0;
+}
+
+export function onEventValue(
+  slot: number,
+  value: string,
+): number {
+  dispatchSlotValue(slot, value);
+  flush();
+  return 0;
+}
+
+export function onEventRich(
+  slot: number,
+  value: string,
+  checked: number,
+  key: string,
+  code: string,
+  modifiers: number,
+  inputType: string,
+): number {
+  dispatchSlotRich(slot, value, checked, key, code, modifiers, inputType);
+  flush();
+  return 0;
+}
+/* /generated:event-export */

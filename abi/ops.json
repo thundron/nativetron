@@ -110,6 +110,21 @@
         "textId",
         "text:str"
       ]
+    },
+    {
+      "code": 14,
+      "name": "CREATE_SVG_ELEMENT",
+      "args": [
+        "id",
+        "tag:intern"
+      ]
+    },
+    {
+      "code": 15,
+      "name": "FOCUS",
+      "args": [
+        "id"
+      ]
     }
   ]
 }

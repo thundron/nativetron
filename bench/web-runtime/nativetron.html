@@ -5,8 +5,9 @@
 <script type="module">
 import { installBench } from "./harness.js";
 import { instantiateFromBytes } from "./app/.scriptc/counter.mjs";
+import { bindEventCallbacks } from "../../host/event.generated.mjs";
 let api, wasmBytes = 0, button, out;
-window.__nt_event = (slot, value) => { if (api) { if (value) api.nt_on_event_value(slot, value); else api.nt_on_event(slot); } };
+bindEventCallbacks(window, () => api, "nt");
 installBench({
   setup: async () => {
     const buf = await (await fetch("./app/.scriptc/counter.wasm")).arrayBuffer();

@@ -1,6 +1,7 @@
 import {
-  ROOT, newId, createElement, createText, setAttr, append, insertBefore, remove,
-  flush, on as listen, unlisten, bindText,
+  ROOT, newId, createElement, createSvgElement, createText, setAttr, setProp,
+  focusElement, append, insertBefore, remove, flush, on as listen, unlisten,
+  bindText, type NtEvent,
 } from "./core.js";
 import { effect, beginEffectScope, endEffectScope, type Cleanup } from "./reactive.js";
 
@@ -47,15 +48,26 @@ function removeEl(child: El): void {
   for (let i = 0; i < child.roots.length; i++) remove(child.roots[i]!);
 }
 
-export function el(tag: string, children: El[]): El {
-  const id = newId();
+function elementFrom(id: number, children: El[]): El {
   const cleanups: Cleanup[] = [];
-  createElement(id, tag);
   for (let i = 0; i < children.length; i++) {
     appendEl(id, children[i]!);
     takeCleanups(cleanups, children[i]!);
   }
   return { roots: [id], cleanups };
+}
+
+export function el(tag: string, children: El[]): El {
+  const id = newId();
+  createElement(id, tag);
+  return elementFrom(id, children);
+}
+
+/** Create an element in the SVG namespace through the bounded host opcode. */
+export function svgEl(tag: string, children: El[]): El {
+  const id = newId();
+  createSvgElement(id, tag);
+  return elementFrom(id, children);
 }
 
 export function frag(children: El[]): El {
@@ -86,11 +98,26 @@ export function attr(e: El, name: string, value: string): El {
   return e;
 }
 
-export function on(e: El, type: string, handler: () => void): El {
+/** Set one of the host's explicitly allowed DOM properties. */
+export function prop(e: El, name: string, value: string): El {
+  setProp(e.roots[0]!, name, value);
+  return e;
+}
+
+export function onEvent(e: El, type: string, handler: (event: NtEvent) => void): El {
   const id = e.roots[0]!;
-  listen(id, type, () => { handler(); });
+  listen(id, type, handler);
   addCleanup(e, () => { unlisten(id, type); });
   return e;
+}
+
+export function on(e: El, type: string, handler: () => void): El {
+  return onEvent(e, type, (_event: NtEvent) => { handler(); });
+}
+
+/** Queue focus without exposing a general property or script-evaluation escape hatch. */
+export function focus(ref: ElementRef): void {
+  if (ref.current !== null) focusElement(ref.current.id);
 }
 
 export function component(build: () => El): El {
@@ -116,28 +143,7 @@ export function unmount(root: El): void {
 
 export interface KeyedItem {
   key: string;
-  el: El;
-}
-
-function insertStr(a: string[], i: number, v: string): string[] {
-  const out: string[] = [];
-  for (let k = 0; k < i; k++) out.push(a[k]!);
-  out.push(v);
-  for (let k = i; k < a.length; k++) out.push(a[k]!);
-  return out;
-}
-
-function insertEl(a: El[], i: number, v: El): El[] {
-  const out: El[] = [];
-  for (let k = 0; k < i; k++) out.push(a[k]!);
-  out.push(v);
-  for (let k = i; k < a.length; k++) out.push(a[k]!);
-  return out;
-}
-
-function discardFresh(fresh: El, retained: El): void {
-  if (fresh.roots[0] === retained.roots[0]) return;
-  removeEl(fresh);
+  build(): El;
 }
 
 export function each(tag: string, build: () => KeyedItem[]): El {
@@ -153,7 +159,11 @@ export function each(tag: string, build: () => KeyedItem[]): El {
     for (let i = 0; i < next.length; i++) nextKeys.push(next[i]!.key);
 
     const wanted = new Map<string, number>();
-    for (let i = 0; i < nextKeys.length; i++) wanted.set(nextKeys[i]!, i);
+    for (let i = 0; i < nextKeys.length; i++) {
+      const key = nextKeys[i]!;
+      if (wanted.has(key)) throw new Error("duplicate keyed item: " + key);
+      wanted.set(key, i);
+    }
 
     for (let i = keys.length - 1; i >= 0; i--) {
       if (!wanted.has(keys[i]!)) {
@@ -168,25 +178,21 @@ export function each(tag: string, build: () => KeyedItem[]): El {
 
     for (let i = 0; i < nextKeys.length; i++) {
       const key = nextKeys[i]!;
-      const fresh = next[i]!.el;
       const cur = at.get(key);
-      if (cur === i) {
-        discardFresh(fresh, items[i]!);
-        continue;
-      }
+      if (cur === i) continue;
 
-      let item = fresh;
-      if (cur !== undefined) {
+      let item: El;
+      if (cur === undefined) item = next[i]!.build();
+      else {
         item = items[cur]!;
-        discardFresh(fresh, item);
         keys.splice(cur, 1);
         items.splice(cur, 1);
       }
       const id = item.roots[0]!;
       if (i < keys.length) insertBefore(host, id, items[i]!.roots[0]!);
       else append(host, id);
-      keys = insertStr(keys, i, key);
-      items = insertEl(items, i, item);
+      keys.splice(i, 0, key);
+      items.splice(i, 0, item);
       for (let j = i; j < keys.length; j++) at.set(keys[j]!, j);
     }
 
@@ -200,6 +206,29 @@ export function each(tag: string, build: () => KeyedItem[]): El {
     keys = [];
   };
   return { roots: [host], cleanups: [cleanupItems, stop] };
+}
+
+/** Replace one lifecycle-scoped subtree when its key changes. */
+export function switchEl(tag: string, key: () => string, build: (value: string) => El): El {
+  const host = newId();
+  createElement(host, tag);
+  let current: El = { roots: [], cleanups: [] };
+  let last = "\u0000";
+  let first = true;
+
+  const stop = effect(() => {
+    const value = key();
+    if (value === last) return;
+    removeEl(current);
+    current = build(value);
+    appendEl(host, current);
+    last = value;
+    if (!first) flush();
+    first = false;
+  });
+
+  const cleanupCurrent = () => { disposeEl(current); };
+  return { roots: [host], cleanups: [cleanupCurrent, stop] };
 }
 
 export function show(cond: () => boolean, whenTrue: () => El, whenFalse: () => El): El {
@@ -229,6 +258,17 @@ export function dynAttr(e: El, name: string, compute: () => string): El {
   let first = true;
   const stop = effect(() => {
     setAttr(e.roots[0]!, name, compute());
+    if (!first) flush();
+    first = false;
+  });
+  addCleanup(e, stop);
+  return e;
+}
+
+export function dynProp(e: El, name: string, compute: () => string): El {
+  let first = true;
+  const stop = effect(() => {
+    setProp(e.roots[0]!, name, compute());
     if (!first) flush();
     first = false;
   });

@@ -1,36 +1,50 @@
 {
-  "date": "2026-08-30T10:49:20.029Z",
+  "date": "2026-09-07T22:35:35.139Z",
   "electron": "44.0.0",
   "nativetron": {
-    "diskBytes": 1035088,
-    "wallMedian": 168,
-    "walls": [
-      191,
-      161,
-      187,
-      168,
-      160
+    "diskBytes": 721328,
+    "readyMedian": 285,
+    "ready": [
+      724,
+      279,
+      288,
+      278,
+      285
     ],
-    "readyMs": 154,
-    "peakRSS": 76848,
-    "steadyRSS": 76832,
-    "peakCPU": 8,
-    "procs": 1
+    "wallMedian": 289,
+    "walls": [
+      728,
+      283,
+      292,
+      282,
+      289
+    ],
+    "peakRSS": 100432,
+    "steadyRSS": 100432,
+    "peakCPU": 13.7,
+    "procs": 2
   },
   "electronResult": {
     "diskBytes": 300650496,
-    "wallMedian": 307,
-    "walls": [
-      377,
-      307,
-      298,
-      302,
-      309
+    "readyMedian": 230,
+    "ready": [
+      238,
+      230,
+      239,
+      230,
+      229
     ],
-    "readyMs": 141,
-    "peakRSS": 337360,
-    "steadyRSS": 333248,
-    "peakCPU": 20.599999999999998,
+    "wallMedian": 269,
+    "walls": [
+      266,
+      254,
+      288,
+      269,
+      319
+    ],
+    "peakRSS": 338192,
+    "steadyRSS": 334048,
+    "peakCPU": 23.5,
     "procs": 4
   }
 }

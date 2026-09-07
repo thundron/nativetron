@@ -69,6 +69,10 @@ try {
   const ntS = await nt.evaluate("window.__stats()");
   const rxS = await rx.evaluate("window.__stats()");
   await nt.close(); await rx.close();
+  const expectedState = `count: ${500 + TRIALS * CLICKS}`;
+  if (ntS.finalCount !== expectedState || rxS.finalCount !== expectedState) {
+    throw new Error(`correctness gate failed: expected ${expectedState}; nativetron=${ntS.finalCount}; react=${rxS.finalCount}`);
+  }
 
   const diffs = ntT.map((v, i) => v - rxT[i]);
   const ntWins = diffs.filter((d) => d < 0).length;
@@ -96,7 +100,7 @@ try {
   console.log(`| JS heap | ${ntS.jsHeapMB} MB | ${rxS.jsHeapMB} MB |`);
   console.log(`| wasm linear memory | ${ntS.wasmMemMB} MB | — |`);
   console.log(`| module size | ${ntS.wasmKB} KB | 189.7 KB |`);
-  console.log(`| final DOM state | ${ntS.finalCount} | ${rxS.finalCount} |`);
+  console.log(`| final DOM state (correctness-gated) | ${ntS.finalCount} | ${rxS.finalCount} |`);
 } finally {
   chrome.kill(); server.kill(); await sleep(600);
   try { rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch {}

@@ -13,3 +13,5 @@ export const OP_UNLISTEN = 10;
 export const OP_SET_PROP = 11;
 export const OP_INTERN = 12;
 export const OP_ELEMENT_WITH_TEXT = 13;
+export const OP_CREATE_SVG_ELEMENT = 14;
+export const OP_FOCUS = 15;

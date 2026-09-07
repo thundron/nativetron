@@ -22,13 +22,23 @@ cd web && ./build-web.sh            # browser: .scriptc/renderer.{wasm,mjs}
 python3 -m http.server -d web 8000  # open /index.html
 ```
 
-Failure-path checks:
+Contract and failure-path checks:
 
 ```sh
+node abi/generate.mjs --check
+node abi/event-contract.test.mjs
+node host/dom-host.test.mjs
 node ipc/codec.test.mjs
+node security/transport.test.mjs
 node stress/lifecycle.test.mjs
 node packaging/package.test.mjs
 ```
+
+`abi/events.json` is the sole event contract. `abi/generate.mjs` emits the host
+projection and allowlist, default/primary/rich callback tiers, native message codec,
+typed guest decoders and callback boundaries, Wasm export signatures, profiles,
+and ABI documentation. Plain clicks cross the browser boundary with only a numeric
+slot; primary-value and rich events use their generated wider exports.
 
 Build a release bundle:
 
@@ -70,7 +80,6 @@ listeners, and refs.
 | `host/` | DOM host runtime used by both lanes |
 | `native/` | C++ webview wrapper exposing a C ABI |
 | `desktop/` | generated desktop capability contract |
-| `pyrus/` | compiled Pyrus review, parsing, sanitization, process-policy, and build-hash workflows |
 | `stress/` | lifecycle, crash, idle-memory, and orphan-cleanup tests |
 | `packaging/` | app-bundle, signing, notarization, install, and release tools |
 | `app/`, `web/` | desktop and browser entry points |

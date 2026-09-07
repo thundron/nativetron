@@ -1,5 +1,8 @@
 import { effect, type Cleanup } from "./reactive.js";
 import {
+  decodeDefaultHostEvent, decodePrimaryHostEvent, decodeHostEvent, type DecodedHostEvent,
+} from "./event.generated.js";
+import {
   OP_CREATE_ELEMENT,
   OP_CREATE_TEXT,
   OP_SET_TEXT,
@@ -13,6 +16,8 @@ import {
   OP_SET_PROP,
   OP_INTERN,
   OP_ELEMENT_WITH_TEXT,
+  OP_CREATE_SVG_ELEMENT,
+  OP_FOCUS,
 } from "./ops.generated.js";
 
 export const ROOT = 0;
@@ -78,6 +83,12 @@ function iref(v: string): number {
 export function createElement(id: number, tag: string): void {
   const t = iref(tag); u8(OP_CREATE_ELEMENT); u32(id); u32(t);
 }
+export function createSvgElement(id: number, tag: string): void {
+  const t = iref(tag); u8(OP_CREATE_SVG_ELEMENT); u32(id); u32(t);
+}
+export function focusElement(id: number): void {
+  u8(OP_FOCUS); u32(id);
+}
 export function elementWithText(parent: number, id: number, tag: string, textId: number, text: string): void {
   const t = iref(tag);
   u8(OP_ELEMENT_WITH_TEXT); u32(parent); u32(id); u32(t); u32(textId); str(text);
@@ -120,48 +131,79 @@ export function bindText(nodeId: number, compute: () => string): Cleanup {
   });
 }
 
-export interface NtEvent {
-  n: number;
-  t: string;
-  value?: string;
-}
+export type NtEvent = DecodedHostEvent;
+
 type Handler = (ev: NtEvent) => void;
 function noopHandler(_ev: NtEvent): void {}
-const handlerKeys: string[] = [];
+const HANDLER_SLOT_LIMIT = 65536;
+const handlerNodeIds: number[] = [];
+const handlerEventTypes: string[] = [];
 const handlerFns: Handler[] = [];
 const handlerActive: boolean[] = [];
 
-export function on(id: number, type: string, h: Handler): void {
-  const slot = handlerFns.length;
-  handlerKeys.push(`${id}:${type}`);
-  handlerFns.push(h);
-  handlerActive.push(true);
-  const t = iref(type); u8(OP_LISTEN); u32(id); u32(t); u32(slot);
+function reserveHandlerSlot(): number {
+  for (let index = 0; index < handlerActive.length; index++) {
+    if (!handlerActive[index]) return index;
+  }
+  if (handlerFns.length >= HANDLER_SLOT_LIMIT) throw new Error("event handler slot limit reached");
+  handlerNodeIds.push(0);
+  handlerEventTypes.push("");
+  handlerFns.push(noopHandler);
+  handlerActive.push(false);
+  return handlerFns.length - 1;
+}
+
+export function on(id: number, type: string, handler: Handler): void {
+  const slot = reserveHandlerSlot();
+  handlerNodeIds[slot] = id;
+  handlerEventTypes[slot] = type;
+  handlerFns[slot] = handler;
+  handlerActive[slot] = true;
+  const internedType = iref(type);
+  u8(OP_LISTEN); u32(id); u32(internedType); u32(slot);
 }
 
 export function unlisten(id: number, type: string): void {
-  const key = `${id}:${type}`;
-  for (let i = 0; i < handlerKeys.length; i++) {
-    if (handlerKeys[i] === key) {
-      handlerActive[i] = false;
-      handlerKeys[i] = "";
-      handlerFns[i] = noopHandler;
+  for (let index = 0; index < handlerFns.length; index++) {
+    if (handlerNodeIds[index] === id && handlerEventTypes[index] === type) {
+      handlerActive[index] = false;
+      handlerNodeIds[index] = 0;
+      handlerEventTypes[index] = "";
+      handlerFns[index] = noopHandler;
     }
   }
-  const t = iref(type); u8(OP_UNLISTEN); u32(id); u32(t);
+  const internedType = iref(type);
+  u8(OP_UNLISTEN); u32(id); u32(internedType);
 }
 
-export function dispatch(ev: NtEvent): void {
-  const key = `${ev.n}:${ev.t}`;
-  for (let i = 0; i < handlerKeys.length; i++) {
-    if (handlerKeys[i] === key && handlerActive[i]) {
-      handlerFns[i]!(ev);
-      return;
-    }
-  }
+/* generated:event-dispatch */
+export function dispatchSlot(slot: number): void {
+  const handler = handlerFns[slot];
+  if (handler === undefined || !handlerActive[slot]) return;
+  const nodeId = handlerNodeIds[slot];
+  const eventType = handlerEventTypes[slot];
+  if (nodeId === undefined || eventType === undefined) return;
+  const event = decodeDefaultHostEvent(nodeId, eventType);
+  if (event !== null) handler(event);
 }
 
-export function dispatchSlot(slot: number, value: string): void {
-  const h = handlerFns[slot];
-  if (h !== undefined && handlerActive[slot]) h({ n: slot, t: "", value });
+export function dispatchSlotValue(slot: number, value: string): void {
+  const handler = handlerFns[slot];
+  if (handler === undefined || !handlerActive[slot]) return;
+  const nodeId = handlerNodeIds[slot];
+  const eventType = handlerEventTypes[slot];
+  if (nodeId === undefined || eventType === undefined) return;
+  const event = decodePrimaryHostEvent(nodeId, eventType, value);
+  if (event !== null) handler(event);
 }
+
+export function dispatchSlotRich(slot: number, value: string, checked: number, key: string, code: string, modifiers: number, inputType: string): void {
+  const handler = handlerFns[slot];
+  if (handler === undefined || !handlerActive[slot]) return;
+  const nodeId = handlerNodeIds[slot];
+  const eventType = handlerEventTypes[slot];
+  if (nodeId === undefined || eventType === undefined) return;
+  const event = decodeHostEvent(nodeId, eventType, value, checked, key, code, modifiers, inputType);
+  if (event !== null) handler(event);
+}
+/* /generated:event-dispatch */

@@ -251,7 +251,7 @@ function lowerJsx(context) {
       f.createPropertyAssignment("key", f.createBinaryExpression(
         f.createStringLiteral(""), f.createToken(ts.SyntaxKind.PlusToken),
         f.createParenthesizedExpression(keyExpr))),
-      f.createPropertyAssignment("el", elExpr),
+      f.createPropertyAssignment("build", thunk(elExpr)),
     ], false);
     const newCb = f.createArrowFunction(undefined, undefined, cb.parameters, undefined,
       f.createToken(ts.SyntaxKind.EqualsGreaterThanToken), f.createParenthesizedExpression(item));

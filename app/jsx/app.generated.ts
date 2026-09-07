@@ -126,7 +126,7 @@ function Items(): El {
             const next = items().slice();
             next.push("item-" + (next.length + 1));
             setItems(next);
-        } }, "Add"), h("button", { "onclick": () => { const next = items().slice(); next.shift(); setItems(next); } }, "Remove first"), applyProps(each("ul", () => items().map((x: string) => ({ key: "" + (x), el: h("li", { "title": () => "" + ("count:" + items().length) }, () => "" + (x)) }))), { "class": "items" }), h("p", null, () => "" + (items().length), " items")));
+        } }, "Add"), h("button", { "onclick": () => { const next = items().slice(); next.shift(); setItems(next); } }, "Remove first"), applyProps(each("ul", () => items().map((x: string) => ({ key: "" + (x), build: () => h("li", { "title": () => "" + ("count:" + items().length) }, () => "" + (x)) }))), { "class": "items" }), h("p", null, () => "" + (items().length), " items")));
 }
 mount("nativetron — JSX", 560, 560);
 const counterDefaults: CounterProps = { label: "By one", step: 1 };

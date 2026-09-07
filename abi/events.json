@@ -1,0 +1,80 @@
+{
+  "format": 2,
+  "nativeMessage": {
+    "version": 1,
+    "kind": "event"
+  },
+  "primaryField": "value",
+  "dispatch": [
+    {
+      "semantics": "default",
+      "callback": "__nt_event",
+      "export": "onEvent"
+    },
+    {
+      "semantics": "primary",
+      "callback": "__nt_event_value",
+      "export": "onEventValue"
+    },
+    {
+      "semantics": "rich",
+      "callback": "__nt_event_rich",
+      "export": "onEventRich"
+    }
+  ],
+  "fields": [
+    {
+      "name": "value",
+      "type": "string",
+      "source": "targetValue",
+      "maximum": 4096,
+      "default": ""
+    },
+    {
+      "name": "checked",
+      "type": "triBoolean",
+      "source": "targetChecked",
+      "default": -1
+    },
+    {
+      "name": "key",
+      "type": "string",
+      "source": "eventKey",
+      "maximum": 64,
+      "default": ""
+    },
+    {
+      "name": "code",
+      "type": "string",
+      "source": "eventCode",
+      "maximum": 64,
+      "default": ""
+    },
+    {
+      "name": "modifiers",
+      "type": "modifierBits",
+      "source": "eventModifiers",
+      "maximum": 15,
+      "default": 0
+    },
+    {
+      "name": "inputType",
+      "type": "string",
+      "source": "eventInputType",
+      "maximum": 32,
+      "default": ""
+    }
+  ],
+  "safeEvents": [
+    "click",
+    "input",
+    "change",
+    "keydown",
+    "keyup",
+    "focus",
+    "blur",
+    "submit",
+    "pointerdown",
+    "pointerup"
+  ]
+}
