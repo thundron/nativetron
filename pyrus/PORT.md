@@ -42,6 +42,19 @@ Differences:
 
 This port drove exact `string.codePointAt` optional results and string-pattern `string.replace` support in scriptc's C and LLVM backends. Function replacement callbacks remain an explicit `SC1120` refusal.
 
+## Semantic Pear arguments
+
+Source: `project-pyrus/src/main/pear/argv.js`.
+
+The compiled builders preserve the 21-operation allowlist, exact per-operation input keys, token type and control-character checks, integer checks, boolean flags, argument ordering, the 4,096-byte token limit, 64-argument limit, 32 KiB aggregate limit, and both direct and prefixed `--secret` rejection. `app/main.ts` exposes version-gated construction as `pyrus:build-argv` through an exact two-field request envelope capped at 128 KiB; the main process derives the capability record from its bounded `NT_PEAR_VERSION_OUTPUT`, not renderer input.
+
+Differences:
+
+- IPC JSON values cannot carry custom prototypes, so the plain-object check rejects null, arrays, and primitives without a prototype inspection step.
+- Returned arrays are not frozen. They remain private values serialized immediately by the main-process handler.
+
+This port drove `Object.hasOwn` for pure index-signature records and fixed one-item `Array.splice` insertion in scriptc's C and LLVM backends.
+
 ## Pear capability gate
 
 Sources: `project-pyrus/src/main/pear/capabilities.js` and `src/shared/runtime-contracts.js`.

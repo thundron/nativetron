@@ -170,6 +170,52 @@ async function processSecuritySelftest(): Promise<void> {
   quit();
 }
 
+async function pyrusArgvSelftest(): Promise<void> {
+  if (process.env.NT_PEAR_VERSION_MODE === "unsupported") {
+    try {
+      await ipc.invoke("pyrus:build-argv", encodeUtf8(JSON.stringify({ operation: "touch", input: {} })));
+      console.log("NT_PYRUS_ARGV_VERSION_SELFTEST=FAIL");
+    } catch (error) {
+      const ok = error instanceof Error &&
+        error.message === "Pear 3.2.0 or newer is required for structured operations";
+      console.log(ok ? "NT_PYRUS_ARGV_VERSION_SELFTEST=OK" : "NT_PYRUS_ARGV_VERSION_SELFTEST=FAIL");
+    }
+    quit();
+    return;
+  }
+  let valid = false;
+  let secretRejected = false;
+  let envelopeRejected = false;
+  let oversized = false;
+  try {
+    const payload = encodeUtf8(JSON.stringify({
+      operation: "stage",
+      input: { link: "pear://abc", directory: "/tmp/project", dryRun: true, only: ["src"] },
+    }));
+    const reply = await ipc.invoke("pyrus:build-argv", payload);
+    const argv = JSON.parse(decodeUtf8(reply)) as string[];
+    valid = argv.join("|") === "stage|pear://abc|/tmp/project|--json|--dry-run|--only|src";
+  } catch (_error) {
+  }
+  try {
+    await ipc.invoke("pyrus:build-argv", encodeUtf8(JSON.stringify({ operation: "touch", input: { secret: "x" } })));
+  } catch (error) {
+    secretRejected = error instanceof Error && error.message === "secret material is not supported by semantic operations";
+  }
+  try {
+    await ipc.invoke("pyrus:build-argv", encodeUtf8(JSON.stringify({ operation: "touch", input: {}, extra: true })));
+  } catch (error) {
+    envelopeRejected = error instanceof Error && error.message === "operation request.extra is not allowed";
+  }
+  try {
+    await ipc.invoke("pyrus:build-argv", new Uint8Array(128 * 1024 + 1));
+  } catch (error) {
+    oversized = error instanceof Error && error.message === "operation input exceeds the IPC limit";
+  }
+  console.log(valid && secretRejected && envelopeRejected && oversized ? "NT_PYRUS_ARGV_SELFTEST=OK" : "NT_PYRUS_ARGV_SELFTEST=FAIL");
+  quit();
+}
+
 async function pyrusCapabilitiesSelftest(): Promise<void> {
   let valid = false;
   let invalid = false;
@@ -438,6 +484,7 @@ ipc.onOpen(() => {
   if (process.env.NT_SELFTEST === "pyrus") pyrusSelftest();
   if (process.env.NT_SELFTEST === "pyrus-ndjson") pyrusNDJSONSelftest();
   if (process.env.NT_SELFTEST === "pyrus-output") pyrusOutputSelftest();
+  if (process.env.NT_SELFTEST === "pyrus-argv") pyrusArgvSelftest();
   if (process.env.NT_SELFTEST === "pyrus-capabilities") pyrusCapabilitiesSelftest();
   if (process.env.NT_SELFTEST === "pyrus-build-hash") pyrusBuildHashSelftest();
   if (process.env.NT_SELFTEST === "process-security") processSecuritySelftest();

@@ -11,6 +11,7 @@ import { sanitizeOutput } from "../pyrus/output-sanitizer.js";
 import { runBoundedProcess } from "../pyrus/process-runner.js";
 import { hashBuildDirectory } from "../pyrus/build-hash.js";
 import { capabilitiesFromVersionOutput } from "../pyrus/capabilities.js";
+import { buildVersionedArgv } from "../pyrus/argv.js";
 
 declare function ntOnOpenFile(cb: (path: string) => void): void;
 declare function ntOnOpenUrl(cb: (url: string) => void): void;
@@ -93,6 +94,26 @@ ipc.handle("pyrus:review-release", (payload: Uint8Array) => {
   return Promise.resolve(encodeUtf8(JSON.stringify(reviewRelease(request))));
 });
 
+ipc.handle("pyrus:build-argv", (payload: Uint8Array) => {
+  if (payload.length > 128 * 1024) throw new Error("operation input exceeds the IPC limit");
+  const request = JSON.parse(decodeUtf8(payload)) as Record<string, unknown>;
+  if (request === null || typeof request !== "object" || Array.isArray(request))
+    throw new TypeError("operation request must be a plain object");
+  const keys = Object.keys(request);
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i]!;
+    if (key !== "operation" && key !== "input")
+      throw new TypeError("operation request." + key + " is not allowed");
+  }
+  const operation = request["operation"];
+  if (typeof operation !== "string") throw new TypeError("operation must be a string");
+  const versionOutput = process.env.NT_PEAR_VERSION_OUTPUT ?? "";
+  if (Buffer.byteLength(versionOutput) > 64 * 1024)
+    throw new Error("Pear version metadata exceeds the output limit");
+  const capability = capabilitiesFromVersionOutput(versionOutput);
+  return Promise.resolve(encodeUtf8(JSON.stringify(buildVersionedArgv(capability, operation, request["input"]))));
+});
+
 ipc.handle("pyrus:pear-capabilities", (payload: Uint8Array) => {
   if (payload.length > 64 * 1024) throw new Error("Pear version metadata exceeds the output limit");
   return Promise.resolve(encodeUtf8(JSON.stringify(capabilitiesFromVersionOutput(decodeUtf8(payload)))));
@@ -138,6 +159,7 @@ ipc.onListening((port: number) => {
       NT_BLOCKING_RUN: process.env.NT_BLOCKING_RUN ?? "",
       NT_PYRUS_BUILD_ROOT: process.env.NT_PYRUS_BUILD_ROOT ?? "",
       NT_PYRUS_BUILD_HASH: process.env.NT_PYRUS_BUILD_HASH ?? "",
+      NT_PEAR_VERSION_MODE: process.env.NT_PEAR_VERSION_MODE ?? "",
     },
   });
   renderer.on("exit", (code: number | null) => {

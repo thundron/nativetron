@@ -1,4 +1,4 @@
-import { capabilitiesForVersion, capabilitiesFromVersionOutput, parsePearVersionOutput } from "./capabilities.js";
+import { capabilitiesForVersion, capabilitiesFromVersionOutput, parsePearVersionOutput, PearCapabilityError } from "./capabilities.js";
 
 function main(): void {
   const parsed = parsePearVersionOutput("Pear Runtime; SemVer=3.2.4-beta.1+build.9, Key=abc");
@@ -10,7 +10,8 @@ function main(): void {
   try {
     capabilitiesFromVersionOutput("Version=3.2.0");
   } catch (error) {
-    invalidRejected = error instanceof Error && error.message === "Pear returned invalid SemVer metadata";
+    invalidRejected = error instanceof PearCapabilityError && error.code === "PEAR_VERSION_INVALID" &&
+      error.message === "Pear returned invalid SemVer metadata";
   }
   const ok = parsed !== null && parsed.raw === "3.2.4-beta.1" && parsed.prerelease === "beta.1"
     && supported.state === "supported" && supported.capabilities.join(",") ===

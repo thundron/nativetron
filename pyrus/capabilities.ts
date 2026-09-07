@@ -6,6 +6,15 @@ export interface PearVersion {
   raw: string;
 }
 
+export class PearCapabilityError extends Error {
+  code: string;
+  constructor(code: string, message: string) {
+    super(message);
+    this.name = "PearCapabilityError";
+    this.code = code;
+  }
+}
+
 export interface PearCapabilities {
   state: "supported" | "fallback" | "unsupported";
   supported: boolean;
@@ -90,6 +99,15 @@ export function capabilitiesForVersion(value: string | PearVersion): PearCapabil
 
 export function capabilitiesFromVersionOutput(output: string): PearCapabilities {
   const version = parsePearVersionOutput(output);
-  if (version === null) throw new Error("Pear returned invalid SemVer metadata");
+  if (version === null)
+    throw new PearCapabilityError("PEAR_VERSION_INVALID", "Pear returned invalid SemVer metadata");
   return capabilitiesForVersion(version);
+}
+
+export function requireStructuredCapabilities(record: PearCapabilities): PearCapabilities {
+  if (!record.supported) {
+    const reason = record.reason ?? "Pear 3.2.0 or newer is required";
+    throw new PearCapabilityError("PEAR_VERSION_UNSUPPORTED", reason);
+  }
+  return record;
 }
