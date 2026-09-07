@@ -153,6 +153,23 @@ async function selftest(): Promise<void> {
   quit();
 }
 
+async function processSecuritySelftest(): Promise<void> {
+  let denied = false;
+  try {
+    await ipc.invoke("proc:run", encodeUtf8("/bin/echo\nx"));
+  } catch (error) {
+    denied = error instanceof Error && error.message === "process executable is not allowed";
+  }
+  let allowed = false;
+  try {
+    const reply = await ipc.invoke("proc:run", encodeUtf8("/usr/bin/uname\n-s"));
+    allowed = decodeUtf8(reply).trim() === "Darwin";
+  } catch (_error) {
+  }
+  console.log(denied && allowed ? "NT_PROCESS_SECURITY_SELFTEST=OK" : "NT_PROCESS_SECURITY_SELFTEST=FAIL");
+  quit();
+}
+
 function pyrusOutputSelftest(): void {
   const source = encodeUtf8(
     "safe\r\n\u001b]8;;https://evil.invalid\u0007click\u001b]8;;\u0007\u202eevil",
@@ -363,6 +380,7 @@ ipc.onOpen(() => {
   if (process.env.NT_SELFTEST === "pyrus") pyrusSelftest();
   if (process.env.NT_SELFTEST === "pyrus-ndjson") pyrusNDJSONSelftest();
   if (process.env.NT_SELFTEST === "pyrus-output") pyrusOutputSelftest();
+  if (process.env.NT_SELFTEST === "process-security") processSecuritySelftest();
 });
 ipc.onClose(() => { quit(); });
 ipc.connect(+(process.env.NT_IPC_PORT ?? "0"), "127.0.0.1");

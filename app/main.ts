@@ -8,6 +8,7 @@ import { encodeUtf8, decodeUtf8 } from "../ipc/codec.js";
 import { reviewRelease, type ReleaseReviewRequest } from "../pyrus/release-review.js";
 import { summarizeNDJSON } from "../pyrus/ndjson.js";
 import { sanitizeOutput } from "../pyrus/output-sanitizer.js";
+import { runBoundedProcess } from "../pyrus/process-runner.js";
 
 declare function ntOnOpenFile(cb: (path: string) => void): void;
 declare function ntOnOpenUrl(cb: (url: string) => void): void;
@@ -91,28 +92,17 @@ ipc.handle("pyrus:review-release", (payload: Uint8Array) => {
 });
 
 ipc.handle("proc:run", (payload: Uint8Array) => {
-  return new Promise<Uint8Array>((resolve, reject) => {
-    const parts = decodeUtf8(payload).split("\n");
-    const cmd = parts[0] ?? "";
-    const args: string[] = [];
-    for (let i = 1; i < parts.length; i++) args.push(parts[i]!);
-    const child = spawn(cmd, args, { stdio: ["inherit", "pipe", "pipe"] });
-    let out = "";
-    let err = "";
-    child.stdout!.on("data", (d: Buffer) => { out = out + decodeUtf8(bufToBytes(d)); });
-    child.stderr!.on("data", (d: Buffer) => { err = err + decodeUtf8(bufToBytes(d)); });
-    child.on("error", (e: Error) => { reject(e); });
-    child.on("exit", (code: number | null) => {
-      resolve(encodeUtf8((code ?? 0) === 0 ? out : "exit " + (code ?? 0) + "\n" + err));
-    });
+  const parts = decodeUtf8(payload).split("\n");
+  const cmd = parts[0] ?? "";
+  if (cmd !== "/usr/bin/uname") throw new Error("process executable is not allowed");
+  if (parts.length !== 2 || (parts[1] !== "-a" && parts[1] !== "-s"))
+    throw new Error("process arguments are not allowed");
+  return runBoundedProcess(cmd, [parts[1]!]).then((result) => {
+    if (result.code === 0) return encodeUtf8(result.stdout);
+    const status = result.code === null ? "signal" : "" + result.code;
+    return encodeUtf8("exit " + status + "\n" + result.stderr);
   });
 });
-
-function bufToBytes(d: Buffer): Uint8Array {
-  const u = new Uint8Array(d.length);
-  for (let i = 0; i < d.length; i++) u[i] = d[i]!;
-  return u;
-}
 
 ipc.on("renderer:log", (payload: Uint8Array) => {
   console.log("[renderer] " + decodeUtf8(payload));

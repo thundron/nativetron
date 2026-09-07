@@ -41,3 +41,14 @@ Differences:
 - The IPC validation handler splits one bounded request into two chunks; process supervisors can use `OutputSanitizer` directly for arbitrary stream chunking.
 
 This port drove exact `string.codePointAt` optional results and string-pattern `string.replace` support in scriptc's C and LLVM backends. Function replacement callbacks remain an explicit `SC1120` refusal.
+
+## Process environment
+
+Sources: `project-pyrus/src/main/environment.js`, `output-sanitizer.js`, and the bounded stream handling in `process-manager.js`.
+
+The compiled macOS path preserves Pyrus's environment allowlist, value bounds, NUL rejection, absolute-path requirement, canonicalization, directory check, and deduplication. The sample `proc:run` handler now accepts only `/usr/bin/uname` with `-a` or `-s`, ignores stdin, replaces the child environment, sanitizes both output streams, terminates after five seconds, and rejects output above 1 MiB.
+
+Differences:
+
+- The compiled desktop target is macOS-only, so PATH parsing uses the POSIX delimiter and `node:path` `posix` implementation. Pyrus's Windows branch remains in Pyrus.
+- The sample executable policy is intentionally narrower than Pyrus's verified Pear process manager.
