@@ -28,3 +28,16 @@ Differences:
 - Custom known-tag maps are not exposed; the compiled parser uses Pyrus's default command/tag contract.
 
 This port drove exact fatal UTF-8 decoding in scriptc's C and LLVM backends and named `node:util` `TextDecoder` imports. Non-fatal decoder options and fatal non-UTF-8 decoders remain explicit `SC2020` refusals.
+
+## Output sanitizer
+
+Source: `project-pyrus/src/main/output-sanitizer.js`.
+
+The compiled streaming sanitizer preserves Pyrus's UTF-8 chunk decoding, CRLF normalization, terminal escape-state handling, control-character filtering, and bidi-isolate filtering. `app/main.ts` exposes a bounded byte payload as `pyrus:sanitize-output` over binary IPC.
+
+Differences:
+
+- CommonJS and `Buffer` became typed ESM and `Uint8Array`.
+- The IPC validation handler splits one bounded request into two chunks; process supervisors can use `OutputSanitizer` directly for arbitrary stream chunking.
+
+This port drove exact `string.codePointAt` optional results and string-pattern `string.replace` support in scriptc's C and LLVM backends. Function replacement callbacks remain an explicit `SC1120` refusal.

@@ -7,6 +7,7 @@ import { IpcMain } from "../ipc/main.js";
 import { encodeUtf8, decodeUtf8 } from "../ipc/codec.js";
 import { reviewRelease, type ReleaseReviewRequest } from "../pyrus/release-review.js";
 import { summarizeNDJSON } from "../pyrus/ndjson.js";
+import { sanitizeOutput } from "../pyrus/output-sanitizer.js";
 
 declare function ntOnOpenFile(cb: (path: string) => void): void;
 declare function ntOnOpenUrl(cb: (url: string) => void): void;
@@ -78,6 +79,10 @@ ipc.handle("fs:stat", async (payload: Uint8Array) => {
 
 ipc.handle("pyrus:parse-ndjson", (payload: Uint8Array) => {
   return Promise.resolve(encodeUtf8(summarizeNDJSON(payload)));
+});
+
+ipc.handle("pyrus:sanitize-output", (payload: Uint8Array) => {
+  return Promise.resolve(encodeUtf8(sanitizeOutput(payload)));
 });
 
 ipc.handle("pyrus:review-release", (payload: Uint8Array) => {

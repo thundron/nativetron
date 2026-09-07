@@ -153,6 +153,22 @@ async function selftest(): Promise<void> {
   quit();
 }
 
+function pyrusOutputSelftest(): void {
+  const source = encodeUtf8(
+    "safe\r\n\u001b]8;;https://evil.invalid\u0007click\u001b]8;;\u0007\u202eevil",
+  );
+  ipc.invoke("pyrus:sanitize-output", source)
+    .then((reply: Uint8Array) => {
+      const ok = decodeUtf8(reply) === "safe\nclickevil";
+      console.log(ok ? "NT_PYRUS_OUTPUT_SELFTEST=OK" : "NT_PYRUS_OUTPUT_SELFTEST=FAIL");
+      quit();
+    })
+    .catch((_error: unknown) => {
+      console.log("NT_PYRUS_OUTPUT_SELFTEST=FAIL");
+      quit();
+    });
+}
+
 function pyrusNDJSONSelftest(): void {
   const valid = encodeUtf8(
     '{"cmd":"stage","tag":"file","data":"a"}\r\n' +
@@ -346,6 +362,7 @@ ipc.onOpen(() => {
   if (process.env.NT_SELFTEST === "shortcut") shortcutSelftest();
   if (process.env.NT_SELFTEST === "pyrus") pyrusSelftest();
   if (process.env.NT_SELFTEST === "pyrus-ndjson") pyrusNDJSONSelftest();
+  if (process.env.NT_SELFTEST === "pyrus-output") pyrusOutputSelftest();
 });
 ipc.onClose(() => { quit(); });
 ipc.connect(+(process.env.NT_IPC_PORT ?? "0"), "127.0.0.1");
