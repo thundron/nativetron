@@ -58,14 +58,14 @@ literal.
 
 | metric | nativetron | electron 44 |
 |---|---|---|
-| shipped artifact | 0.55 MiB | 287 MB |
+| shipped artifact | 1.01 MiB | 287 MB |
 | cold start to first paint | 168 ms | 307 ms |
 | peak resident memory | 75 MB | 330 MB |
 | steady resident memory | 75 MB | 325 MB |
 | processes | 1 | 4 |
 | startup CPU | 8.0% | 20.6% |
 
-The nativetron artifact is the current 0.20 MiB main plus 0.35 MiB renderer after unreachable runtime sections are stripped. The standalone compiled JSX app is 0.29 MiB.
+Measured 2026-09-07 at scriptc `032123ab`: the bundle contains a 0.548 MiB main and 0.461 MiB renderer, or 1.01 MiB including its launcher and metadata. The increase from the earlier 0.55 MiB app is from the added desktop and compiled Pyrus workflows, not the 0.0.36 runtime update: rebuilding the same standalone JSX app changed it from 325,736 to 326,168 bytes. The current standalone JSX app is 0.311 MiB; the browser renderer is 61,984 bytes of wasm plus 2,682 bytes of loader glue.
 
 Electron's helper processes are children and fully counted. The WKWebView
 content process is spawned by the system, so nativetron's resident memory is

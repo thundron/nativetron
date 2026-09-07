@@ -80,7 +80,7 @@ compile error, not a runtime failure.
 ## Node builtins
 
 176 of 239 members lower statically, projected from
-scriptc's manifest at compiler 0.0.35.
+scriptc's manifest at compiler 0.0.36.
 
 | module | lowers | missing |
 |---|---|---|
