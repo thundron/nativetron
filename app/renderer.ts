@@ -170,6 +170,40 @@ async function processSecuritySelftest(): Promise<void> {
   quit();
 }
 
+async function pyrusUntrustedDataSelftest(): Promise<void> {
+  let valid = false;
+  let unsafe = false;
+  let byteLimit = false;
+  let ipcLimit = false;
+  try {
+    const reply = await ipc.invoke(
+      "pyrus:sanitize-data",
+      encodeUtf8('{"name":"café","items":[1,true,null,{"ok":"😀"}]}'),
+    );
+    valid = decodeUtf8(reply) === '{"name":"café","items":[1,true,null,{"ok":"😀"}]}';
+  } catch (_error) {
+  }
+  try {
+    await ipc.invoke("pyrus:sanitize-data", encodeUtf8('{"__proto__":{"polluted":true}}'));
+  } catch (error) {
+    unsafe = error instanceof Error && error.message === "Unsafe structured key";
+  }
+  try {
+    const chunks: string[] = [];
+    for (let i = 0; i < 17; i++) chunks.push("x".repeat(16 * 1024));
+    await ipc.invoke("pyrus:sanitize-data", encodeUtf8(JSON.stringify(chunks)));
+  } catch (error) {
+    byteLimit = error instanceof Error && error.message === "Structured data exceeds byte limit";
+  }
+  try {
+    await ipc.invoke("pyrus:sanitize-data", new Uint8Array(512 * 1024 + 1));
+  } catch (error) {
+    ipcLimit = error instanceof Error && error.message === "structured data exceeds the IPC limit";
+  }
+  console.log(valid && unsafe && byteLimit && ipcLimit ? "NT_PYRUS_UNTRUSTED_DATA_SELFTEST=OK" : "NT_PYRUS_UNTRUSTED_DATA_SELFTEST=FAIL");
+  quit();
+}
+
 async function pyrusArgvSelftest(): Promise<void> {
   if (process.env.NT_PEAR_VERSION_MODE === "unsupported") {
     try {
@@ -484,6 +518,7 @@ ipc.onOpen(() => {
   if (process.env.NT_SELFTEST === "pyrus") pyrusSelftest();
   if (process.env.NT_SELFTEST === "pyrus-ndjson") pyrusNDJSONSelftest();
   if (process.env.NT_SELFTEST === "pyrus-output") pyrusOutputSelftest();
+  if (process.env.NT_SELFTEST === "pyrus-untrusted-data") pyrusUntrustedDataSelftest();
   if (process.env.NT_SELFTEST === "pyrus-argv") pyrusArgvSelftest();
   if (process.env.NT_SELFTEST === "pyrus-capabilities") pyrusCapabilitiesSelftest();
   if (process.env.NT_SELFTEST === "pyrus-build-hash") pyrusBuildHashSelftest();

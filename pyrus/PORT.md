@@ -42,6 +42,17 @@ Differences:
 
 This port drove exact `string.codePointAt` optional results and string-pattern `string.replace` support in scriptc's C and LLVM backends. Function replacement callbacks remain an explicit `SC1120` refusal.
 
+## Untrusted structured data
+
+Source: `project-pyrus/src/main/links/untrusted-data.js`.
+
+The compiled sanitizer preserves control-character rejection, finite-number checks, UTF-8 byte accounting, unsafe-key rejection, undefined-to-null conversion, null-prototype output dictionaries, and configurable depth, node, string, byte, array, and object-key limits. `app/main.ts` exposes the default policy as `pyrus:sanitize-data` with a 512 KiB pre-parse IPC cap.
+
+Differences:
+
+- The IPC boundary accepts JSON, which cannot encode custom prototypes, functions, symbols, cycles, undefined properties, or non-finite numbers. The direct compiled sanitizer still handles undefined and rejects non-finite numbers, but has no JavaScript prototype objects to inspect.
+- The separate recursive `freezeData` helper is not exposed; sanitized values remain private and are serialized immediately by the main-process handler.
+
 ## Semantic Pear arguments
 
 Source: `project-pyrus/src/main/pear/argv.js`.
