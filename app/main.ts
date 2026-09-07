@@ -9,6 +9,7 @@ import { reviewRelease, type ReleaseReviewRequest } from "../pyrus/release-revie
 import { summarizeNDJSON } from "../pyrus/ndjson.js";
 import { sanitizeOutput } from "../pyrus/output-sanitizer.js";
 import { runBoundedProcess } from "../pyrus/process-runner.js";
+import { hashBuildDirectory } from "../pyrus/build-hash.js";
 
 declare function ntOnOpenFile(cb: (path: string) => void): void;
 declare function ntOnOpenUrl(cb: (url: string) => void): void;
@@ -91,6 +92,15 @@ ipc.handle("pyrus:review-release", (payload: Uint8Array) => {
   return Promise.resolve(encodeUtf8(JSON.stringify(reviewRelease(request))));
 });
 
+ipc.handle("pyrus:hash-build", async (payload: Uint8Array) => {
+  const target = decodeUtf8(payload);
+  const allowed = process.env.NT_PYRUS_BUILD_ROOT ?? "";
+  if (allowed.length === 0 || target !== allowed) throw new Error("build hash target is not allowed");
+  const encoded = encodeUtf8(JSON.stringify(await hashBuildDirectory(target)));
+  if (encoded.length > 8 * 1024 * 1024 - 64) throw new Error("build hash result exceeds the IPC limit");
+  return encoded;
+});
+
 ipc.handle("proc:run", (payload: Uint8Array) => {
   const parts = decodeUtf8(payload).split("\n");
   const cmd = parts[0] ?? "";
@@ -120,6 +130,8 @@ ipc.onListening((port: number) => {
       NT_SELFTEST: process.env.NT_SELFTEST ?? "",
       NT_BENCH_QUIT: process.env.NT_BENCH_QUIT ?? "",
       NT_BLOCKING_RUN: process.env.NT_BLOCKING_RUN ?? "",
+      NT_PYRUS_BUILD_ROOT: process.env.NT_PYRUS_BUILD_ROOT ?? "",
+      NT_PYRUS_BUILD_HASH: process.env.NT_PYRUS_BUILD_HASH ?? "",
     },
   });
   renderer.on("exit", (code: number | null) => {

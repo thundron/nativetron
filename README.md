@@ -68,7 +68,7 @@ mountTo(el("main", [Counter()]));
 | `host/` | DOM host runtime used by both lanes |
 | `native/` | C++ webview wrapper exposing a C ABI |
 | `desktop/` | generated desktop capability contract |
-| `pyrus/` | compiled Pyrus release-review workflow and compatibility notes |
+| `pyrus/` | compiled Pyrus review, parsing, sanitization, process-policy, and build-hash workflows |
 | `stress/` | lifecycle, crash, idle-memory, and orphan-cleanup tests |
 | `packaging/` | app-bundle, signing, notarization, install, and release tools |
 | `app/`, `web/` | desktop and browser entry points |

@@ -42,6 +42,19 @@ Differences:
 
 This port drove exact `string.codePointAt` optional results and string-pattern `string.replace` support in scriptc's C and LLVM backends. Function replacement callbacks remain an explicit `SC1120` refusal.
 
+## Build output hash
+
+Source: `project-pyrus/src/main/workflows/build-runtime.js`.
+
+The compiled traversal preserves sorted breadth-first enumeration, symlink and unsupported-file rejection, the 10,000-artifact and 2 GiB limits, `O_NOFOLLOW`, path-stat versus handle-stat identity checks, post-read size and modification-time checks, bounded 64 KiB reads, and incremental SHA-256 hashing. `app/main.ts` exposes it as `pyrus:hash-build` only for the exact `NT_PYRUS_BUILD_ROOT`; responses remain below the IPC frame limit.
+
+Differences:
+
+- CommonJS became typed ESM.
+- Directory reads return names and use `lstat` for type classification instead of retaining `Dirent` values; the subsequent checks and hash input are unchanged.
+
+This port drove `Stats.dev`/`Stats.ino`, numeric `fs.promises.open` flags, `fs.constants.O_RDONLY`/`O_NOFOLLOW`, and owned incremental SHA-256/SHA-1 hash handles in scriptc's C and LLVM backends.
+
 ## Process environment
 
 Sources: `project-pyrus/src/main/environment.js`, `output-sanitizer.js`, and the bounded stream handling in `process-manager.js`.

@@ -170,6 +170,29 @@ async function processSecuritySelftest(): Promise<void> {
   quit();
 }
 
+async function pyrusBuildHashSelftest(): Promise<void> {
+  const target = process.env.NT_PYRUS_BUILD_ROOT ?? "";
+  const expectedHash = process.env.NT_PYRUS_BUILD_HASH ?? "";
+  let denied = false;
+  try {
+    await ipc.invoke("pyrus:hash-build", encodeUtf8(target + "-denied"));
+  } catch (error) {
+    denied = error instanceof Error && error.message === "build hash target is not allowed";
+  }
+  try {
+    const reply = await ipc.invoke("pyrus:hash-build", encodeUtf8(target));
+    const result = JSON.parse(decodeUtf8(reply)) as {
+      contentHash: string;
+      entries: { path: string; bytes: number; directory: boolean }[];
+    };
+    const ok = denied && result.contentHash === expectedHash && result.entries.length === 4;
+    console.log(ok ? "NT_PYRUS_BUILD_HASH_SELFTEST=OK" : "NT_PYRUS_BUILD_HASH_SELFTEST=FAIL");
+  } catch (_error) {
+    console.log("NT_PYRUS_BUILD_HASH_SELFTEST=FAIL");
+  }
+  quit();
+}
+
 function pyrusOutputSelftest(): void {
   const source = encodeUtf8(
     "safe\r\n\u001b]8;;https://evil.invalid\u0007click\u001b]8;;\u0007\u202eevil",
@@ -380,6 +403,7 @@ ipc.onOpen(() => {
   if (process.env.NT_SELFTEST === "pyrus") pyrusSelftest();
   if (process.env.NT_SELFTEST === "pyrus-ndjson") pyrusNDJSONSelftest();
   if (process.env.NT_SELFTEST === "pyrus-output") pyrusOutputSelftest();
+  if (process.env.NT_SELFTEST === "pyrus-build-hash") pyrusBuildHashSelftest();
   if (process.env.NT_SELFTEST === "process-security") processSecuritySelftest();
 });
 ipc.onClose(() => { quit(); });
