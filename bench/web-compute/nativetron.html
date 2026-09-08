@@ -8,15 +8,47 @@ window.__split = {};
 window.__setup = async (n) => {
   const buf = await (await fetch("./.scriptc/rows.wasm")).arrayBuffer();
   let host = 0;
+  const marks = {};
   api = await instantiateFromBytes(buf, {
     ntApply: (b) => { const t = performance.now(); window.__nt.applyBin(b); host += performance.now() - t; },
+    ntMark: (phase) => { marks[phase] = performance.now(); },
   });
   const t0 = performance.now();
   api.nt_build(n);
-  window.__split = { guest: +(performance.now() - t0 - host).toFixed(1), host: +host.toFixed(1) };
+  window.__split = {
+    guest: +(performance.now() - t0 - host).toFixed(1),
+    data: +(marks[2] - marks[1]).toFixed(1),
+    encode: +(marks[3] - marks[2]).toFixed(1),
+    host: +host.toFixed(1),
+  };
   window.__wasmKB = +(buf.byteLength / 1024).toFixed(1);
   window.__wasmMemMB = +(api.__memory().byteLength / 1048576).toFixed(2);
   return document.getElementById("nt-root").children.length;
+};
+window.__directHost = (n) => {
+  const root = document.createElement("div");
+  document.body.appendChild(root);
+  const started = performance.now();
+  const nodes = [];
+  const nodeId = Symbol("nodeId");
+  const fragment = document.createDocumentFragment();
+  for (let i = 0; i < n; i++) {
+    const element = document.createElement("div");
+    const text = document.createTextNode("row " + i + " " + ((i * 7919) % 100000));
+    element.appendChild(text);
+    const elementId = i * 2 + 1;
+    const textId = i * 2 + 2;
+    if (nodes[elementId] || nodes[textId]) throw new Error("duplicate direct host id");
+    nodes[elementId] = element;
+    nodes[textId] = text;
+    element[nodeId] = elementId;
+    text[nodeId] = textId;
+    fragment.appendChild(element);
+  }
+  root.appendChild(fragment);
+  const elapsed = performance.now() - started;
+  root.remove();
+  return +elapsed.toFixed(1);
 };
 window.__trial = () => {
   window.__uapply = 0; window.__measuring = 1;

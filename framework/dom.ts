@@ -13,7 +13,8 @@ declare function ntInit(): void;
 declare function ntAddInit(js: string): void;
 declare function ntSetTitle(title: string): void;
 declare function ntSetSize(w: number, h: number): void;
-declare function ntSetHtml(html: string): void;
+declare function ntSetDocumentCss(css: string): void;
+declare function ntLoadDocument(): void;
 declare function ntOnMessage(cb: (req: string) => void): void;
 declare function ntEval(js: string): void;
 declare function ntSendOps(b: Uint8Array): void;
@@ -27,6 +28,7 @@ const BENCH_START_MS = +(process.env.NT_BENCH_START_MS ?? "0");
 const WEBVIEW_MESSAGE_LIMIT = 65536;
 const readyCallbacks: (() => void)[] = [];
 let hostReady = false;
+let hostSettled = false;
 
 interface HostControlMessage {
   n: number;
@@ -56,9 +58,14 @@ function controlMessage(raw: string): HostControlMessage | null {
   const value = message["value"];
   const keys = Object.keys(message);
   if (typeof n !== "number" || n !== 0 || typeof type !== "string") return null;
-  if (type === "__ready" && keys.length === 2 &&
+  if ((type === "__ready" || type === "__settled") && keys.length === 2 &&
       Object.hasOwn(message, "n") && Object.hasOwn(message, "t")) {
     return { n, t: type, value: "" };
+  }
+  if (type === "__paint" && keys.length === 3 &&
+      Object.hasOwn(message, "n") && Object.hasOwn(message, "t") && Object.hasOwn(message, "value") &&
+      typeof value === "string" && value.length <= 64) {
+    return { n, t: type, value };
   }
   if (type === "__selftest" && keys.length === 3 &&
       Object.hasOwn(message, "n") && Object.hasOwn(message, "t") && Object.hasOwn(message, "value") &&
@@ -89,20 +96,19 @@ export function mount(title: string, w: number, h: number): void {
 
 /** Mount the fixed host document with trusted compile-time CSS, never application markup. */
 export function mountStyled(title: string, w: number, h: number, css: string): void {
-  if (css.toLowerCase().includes("</style")) throw new Error("style text cannot close the host style element");
   setBinarySink((b: Uint8Array) => {
     ntSendOps(b);
   });
   ntInit();
+  ntAddInit("window.__nt_native=true;");
+  if (process.env.NT_BENCH_QUIT === "1" || process.env.NT_BENCH_RUNTIME === "1") {
+    ntAddInit("window.__nt_bench=true;");
+  }
   ntAddInit(HOST_JS);
   ntAddInit(NATIVE_EVENT_BRIDGE_JS);
   ntSetTitle(title);
   ntSetSize(w, h);
-  ntSetHtml(
-    `<!doctype html><meta charset="utf-8">` +
-      `<meta name="viewport" content="width=device-width,initial-scale=1">` +
-      `<style>${css}</style><body><div id="nt-root"></div></body>`,
-  );
+  ntSetDocumentCss(css);
   ntOnMessage((req: string) => {
     const rawMessage = webviewMessage(req);
     if (rawMessage === null) return;
@@ -155,11 +161,36 @@ export function mountStyled(title: string, w: number, h: number, css: string): v
         );
         return;
       }
-      if (process.env.NT_BENCH_QUIT === "1") {
+      if (process.env.NT_BENCH_QUIT === "1" || process.env.NT_BENCH_RUNTIME === "1") {
         const start = BENCH_START_MS > 0 && BENCH_START_MS <= Date.now() ? BENCH_START_MS : START_MS;
-        console.log(`NT_READY_MS=${Date.now() - start}`);
-        ntTerminate();
+        console.log(`NT_BENCH_PHASE=host-ready:${Date.now() - start}`);
       }
+      return;
+    }
+    if (message.t === "__settled") {
+      hostSettled = true;
+      return;
+    }
+    if (message.t === "__paint") {
+      const start = BENCH_START_MS > 0 && BENCH_START_MS <= Date.now() ? BENCH_START_MS : START_MS;
+      const parts = message.value.split(",");
+      if (parts.length !== 4) return;
+      const appliedAt = +parts[0]!;
+      const firstFrameAt = +parts[1]!;
+      const paintAt = +parts[2]!;
+      const contentfulPaintAt = +parts[3]!;
+      const now = Date.now();
+      if (!Number.isInteger(appliedAt) || !Number.isInteger(firstFrameAt) || !Number.isInteger(paintAt) ||
+          !Number.isInteger(contentfulPaintAt) || appliedAt < start || firstFrameAt < appliedAt ||
+          paintAt < firstFrameAt || paintAt > now + 1000 ||
+          (contentfulPaintAt !== 0 && (contentfulPaintAt < appliedAt || contentfulPaintAt > now + 1000))) return;
+      console.log(`NT_BENCH_PHASE=ui-applied:${appliedAt - start}`);
+      console.log(`NT_BENCH_PHASE=frame-one:${firstFrameAt - start}`);
+      if (contentfulPaintAt > 0) console.log(`NT_BENCH_PHASE=contentful-paint:${contentfulPaintAt - start}`);
+      console.log(`NT_READY_MS=${paintAt - start}`);
+      hostSettled = true;
+      if (process.env.NT_BENCH_QUIT === "1") ntTerminate();
+      else console.log("NT_RUNTIME_READY=1");
       return;
     }
     if (message.t === "__selftest") {
@@ -189,17 +220,22 @@ export function quit(): void {
 }
 
 export function run(): void {
+  setLive();
+  flush();
+  ntLoadDocument();
   if (process.env.NT_BLOCKING_RUN === "1") {
     ntRun();
+    process.exit(0);
     return;
   }
   ntActivate();
+  const fastPumpDeadline = Date.now() + 500;
   const tick = (): void => {
     if (ntPump() === 1) {
       process.exit(0);
       return;
     }
-    setTimeout(tick, 8);
+    setTimeout(tick, hostSettled || Date.now() >= fastPumpDeadline ? 8 : 0);
   };
   tick();
 }

@@ -30,6 +30,7 @@ Generated from `abi/ops.json`. Run `node abi/generate.mjs` after changing it;
 | 13 | ELEMENT_WITH_TEXT | parent, id, tag, textId, text |
 | 14 | CREATE_SVG_ELEMENT | id, tag |
 | 15 | FOCUS | id |
+| 16 | ELEMENT_TEXT_BATCH | parent, tag, count, count × (id, textId, text) |
 
 Wire layout:
 
@@ -49,6 +50,7 @@ Wire layout:
     13 ELEMENT_WITH_TEXT parent(u32) id(u32) tag(u32 intern id) textId(u32) text(length-prefixed utf-8)
     14 CREATE_SVG_ELEMENT id(u32) tag(u32 intern id)
     15 FOCUS             id(u32)
+    16 ELEMENT_TEXT_BATCH parent(u32) tag(u32 intern id) count(u32) repeat<=65535[id(u32) textId(u32) text(length-prefixed utf-8)]
 ```
 <!-- /generated:ops -->
 

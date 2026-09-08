@@ -22,6 +22,7 @@ nt_msg_cb g_msg_cb = nullptr;
 void *g_msg_ctx = nullptr;
 bool g_quit = false;
 bool g_dirty = false;
+bool g_document_started = false;
 nt_action_cb g_menu_cb = nullptr;
 void *g_menu_ctx = nullptr;
 nt_action_cb g_tray_cb = nullptr;
@@ -351,6 +352,7 @@ void nt_init(void) {
     return;
   }
   g_w = new webview::webview(/*debug=*/false, /*window=*/nullptr);
+  g_document_started = false;
   g_w->bind("__nt_ipc", [](std::string req) -> std::string {
     if (g_msg_cb) {
       g_msg_cb(reinterpret_cast<const uint8_t *>(req.data()), req.size(),
@@ -1140,8 +1142,23 @@ int32_t nt_notify(const uint8_t *title, size_t title_n,
 
 void nt_set_html(const uint8_t *s, size_t n) {
   if (g_w) {
+    g_document_started = true;
     g_w->set_html(sv(s, n));
   }
+}
+
+void nt_set_document_css(const uint8_t *s, size_t n) {
+  if (!g_w) return;
+  std::string init = "window.__nt_css=";
+  init += webview::detail::json_escape(sv(s, n));
+  init += ";";
+  g_w->init(init);
+}
+
+void nt_load_document(void) {
+  if (!g_w || g_document_started) return;
+  g_document_started = true;
+  g_w->navigate("about:blank");
 }
 
 // Ops cross as base64 inside a constant call. The evaluated source is
@@ -1171,7 +1188,11 @@ void nt_send_ops(const uint8_t *b, size_t n) {
     js += '=';
   }
   js += "\")";
-  g_w->eval(js);
+  if (g_document_started) {
+    g_w->eval(js);
+  } else {
+    g_w->init("document.addEventListener(\"DOMContentLoaded\",function(){" + js + "})");
+  }
 }
 
 void nt_eval(const uint8_t *s, size_t n) {

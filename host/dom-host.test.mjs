@@ -132,6 +132,21 @@ enc.push(OPS.SET_TEXT); pushU32(23); pushStr("filled");
 nt.applyBin(new Uint8Array(enc));
 assert.equal(root2.children[root2.children.length - 1].textContent, "filled", "compound: empty text remains addressable");
 enc.length = 0;
+enc.push(OPS.ELEMENT_TEXT_BATCH); pushU32(0); pushU32(5); pushU32(2);
+pushU32(40); pushU32(41); pushStr("batch-a");
+pushU32(42); pushU32(43); pushStr("batch-b");
+nt.applyBin(new Uint8Array(enc));
+assert.equal(root2.children[root2.children.length - 2].textContent, "batch-a", "bounded batch creates its first element");
+assert.equal(root2.children[root2.children.length - 1].textContent, "batch-b", "bounded batch creates its final element");
+enc.length = 0;
+enc.push(OPS.SET_TEXT); pushU32(43); pushStr("batch-patched");
+nt.applyBin(new Uint8Array(enc));
+assert.equal(root2.children[root2.children.length - 1].textContent, "batch-patched", "batched text ids remain addressable");
+enc.length = 0;
+enc.push(OPS.REMOVE); pushU32(40);
+enc.push(OPS.REMOVE); pushU32(42);
+nt.applyBin(new Uint8Array(enc));
+enc.length = 0;
 enc.push(OPS.REMOVE); pushU32(22);
 nt.applyBin(new Uint8Array(enc));
 enc.length = 0;
@@ -202,6 +217,12 @@ assert.throws(
   /truncated u32 operand/,
   "missing operation fields fail closed before a decoder overread",
 );
+enc.length = 0;
+enc.push(OPS.ELEMENT_TEXT_BATCH); pushU32(0); pushU32(5); pushU32(65536);
+assert.throws(() => nt.applyBin(new Uint8Array(enc)), /batch count exceeds limit/, "batch counts are bounded by the schema");
+enc.length = 0;
+enc.push(OPS.ELEMENT_TEXT_BATCH); pushU32(0); pushU32(5); pushU32(1); pushU32(50);
+assert.throws(() => nt.applyBin(new Uint8Array(enc)), /truncated u32 operand/, "truncated batch items fail closed");
 const truncatedString = [OPS.INTERN, 13, 0, 0, 0];
 // Write a declared string length with no payload.
 truncatedString.push(8, 0, 0, 0);

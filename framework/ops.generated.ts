@@ -15,3 +15,4 @@ export const OP_INTERN = 12;
 export const OP_ELEMENT_WITH_TEXT = 13;
 export const OP_CREATE_SVG_ELEMENT = 14;
 export const OP_FOCUS = 15;
+export const OP_ELEMENT_TEXT_BATCH = 16;

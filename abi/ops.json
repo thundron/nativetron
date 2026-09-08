@@ -125,6 +125,21 @@
       "args": [
         "id"
       ]
+    },
+    {
+      "code": 16,
+      "name": "ELEMENT_TEXT_BATCH",
+      "args": [
+        "parent",
+        "tag:intern",
+        "count"
+      ],
+      "repeat": [
+        "id",
+        "textId",
+        "text:str"
+      ],
+      "maximum": 65535
     }
   ]
 }

@@ -18,6 +18,7 @@
   var OP_ELEMENT_WITH_TEXT = 13;
   var OP_CREATE_SVG_ELEMENT = 14;
   var OP_FOCUS = 15;
+  var OP_ELEMENT_TEXT_BATCH = 16;
 /* /generated:operation-constants */
   /* generated:event-constants */
   var EVENT_VALUE_LIMIT = 4096;
@@ -41,6 +42,7 @@
   var handlers = {};
   var handlerTypes = new Map();
   var interned = [];
+  var paintScheduled = false;
 
   function root() {
     var mount = document.getElementById("nt-root");
@@ -283,11 +285,45 @@
           var compoundTag = readInterned();
           var compoundTextId = readU32();
           var compoundElement = document.createElement(compoundTag);
-          var compoundText = document.createTextNode(readString());
-          compoundElement.appendChild(compoundText);
+          var compoundValue = readString();
+          var compoundText;
+          if (compoundValue.length === 0) {
+            compoundText = document.createTextNode("");
+            compoundElement.appendChild(compoundText);
+          } else {
+            compoundElement.textContent = compoundValue;
+            compoundText = compoundElement.firstChild;
+          }
           remember(compoundElementId, compoundElement);
           remember(compoundTextId, compoundText);
           appendTo(compoundParentId, compoundElement);
+          break;
+        }
+        case OP_ELEMENT_TEXT_BATCH: {
+          flushFragment();
+          var batchParent = requireNode(readU32());
+          var batchTag = readInterned();
+          var batchCount = readU32();
+          if (batchCount === 0 || batchCount > 65535) throw new Error("element text batch count exceeds limit");
+          var batchFragment = document.createDocumentFragment();
+          for (var batchIndex = 0; batchIndex < batchCount; batchIndex++) {
+            var batchElementId = readU32();
+            var batchTextId = readU32();
+            var batchElement = document.createElement(batchTag);
+            var batchValue = readString();
+            var batchText;
+            if (batchValue.length === 0) {
+              batchText = document.createTextNode("");
+              batchElement.appendChild(batchText);
+            } else {
+              batchElement.textContent = batchValue;
+              batchText = batchElement.firstChild;
+            }
+            remember(batchElementId, batchElement);
+            remember(batchTextId, batchText);
+            batchFragment.appendChild(batchElement);
+          }
+          batchParent.appendChild(batchFragment);
           break;
         }
         case OP_CREATE_SVG_ELEMENT: {
@@ -319,6 +355,27 @@
       var bytes = new Uint8Array(length);
       for (var index = 0; index < length; index++) bytes[index] = raw.charCodeAt(index);
       applyBin(bytes);
+      if (window.__nt_native === true && !paintScheduled) {
+        paintScheduled = true;
+        var appliedAt = Date.now();
+        requestAnimationFrame(function () {
+          var firstFrameAt = Date.now();
+          requestAnimationFrame(function () {
+            if (window.__nt_bench === true) {
+              var fcp = 0;
+              var paints = performance.getEntriesByType("paint");
+              for (var p = 0; p < paints.length; p++) {
+                if (paints[p].name === "first-contentful-paint") {
+                  fcp = Math.round(performance.timeOrigin + paints[p].startTime);
+                }
+              }
+              send({ n: 0, t: "__paint", value: appliedAt + "," + firstFrameAt + "," + Date.now() + "," + fcp });
+            } else {
+              send({ n: 0, t: "__settled" });
+            }
+          });
+        });
+      }
     } catch (error) {
       window.__nt_last_error = String(error).slice(0, 512);
       throw error;
@@ -326,7 +383,31 @@
   }
   window.__nt = { applyBin: applyBin, applyB64: applyB64 };
 
+  function prepareDocument() {
+    if (!document.querySelector('meta[charset]')) {
+      var charset = document.createElement("meta");
+      charset.setAttribute("charset", "utf-8");
+      document.head.appendChild(charset);
+    }
+    if (!document.querySelector('meta[name="viewport"]')) {
+      var viewport = document.createElement("meta");
+      viewport.setAttribute("name", "viewport");
+      viewport.setAttribute("content", "width=device-width,initial-scale=1");
+      document.head.appendChild(viewport);
+    }
+    if (typeof window.__nt_css === "string") {
+      var style = document.createElement("style");
+      style.textContent = window.__nt_css;
+      document.head.appendChild(style);
+    }
+    if (!document.getElementById("nt-root")) {
+      var mount = document.createElement("div");
+      mount.id = "nt-root";
+      document.body.appendChild(mount);
+    }
+  }
   function ready() {
+    prepareDocument();
     send({ n: 0, t: "__ready" });
   }
   if (document.readyState === "loading") {

@@ -7,4 +7,5 @@ framework/host-embed.generated.ts
 web/.scriptc/
 security/.scriptc/
 bench/desktop-lane/.scriptc/
+bench/desktop-app/build/
 canvas/.scriptc/

@@ -8,6 +8,7 @@ counter. React 19, bundled with esbuild in production mode.
 TRIALS=100 node bench/run-web-runtime.mjs    # interaction latency
 ROWS=10000 node bench/run-web-compute.mjs    # bulk update and mount
 node bench/web-bench.mjs                     # payload size
+./bench/build-desktop-app.sh
 node bench/run-bench.mjs                     # desktop, against Electron
 ```
 
@@ -21,16 +22,15 @@ repeats, and alternates order. Only compare within one run.
 
 | metric | nativetron | react |
 |---|---|---|
-| interaction, median | 2.05 µs | 3.20 µs |
-| interaction, p95 | 2.70 µs | 3.55 µs |
-| payload, raw | 91.2 KB | 189.7 KB |
-| payload, gzipped | 42.4 KB | 59.3 KB |
-| 10k row update, median | 4.70 ms | 3.70 ms |
-| 10k row mount, median of 5 | 74 ms | 12 ms |
-| JS heap after 10k rows | 6.81 MB | 10.52 MB |
+| interaction, median | 2.00 µs | 3.15 µs |
+| interaction, p95 | 2.60 µs | 3.35 µs |
+| payload, raw | 93.9 KB | 189.7 KB |
+| payload, gzipped | 43.1 KB | 59.3 KB |
+| 10k row update, median | 4.50 ms | 3.60 ms |
+| 10k row mount, median of 15 | 70 ms | 12 ms |
+| JS heap after 10k rows | 5.69 MB | 12.05 MB |
 
-Mount splits about 29 ms guest / 38 ms host. The same 10k elements from plain
-JS cost 5 ms via a fragment, 3 ms via `innerHTML`.
+Mount splits into about 9 ms of data construction, 17 ms of guest DOM-batch encoding, 37 ms of host application, and 7 ms of bridge and measurement overhead. Schema-bounded runs of homogeneous text elements reduce guest encoding time and wasm linear memory, but host DOM application remains the largest framework-owned mount cost.
 
 A 10k sort is 2.1 ms in wasm vs 0.4 ms in V8. Comparators that subtract a numeric key (`a.f - b.f`,
 `k[a] - k[b]`) now inline: 14% off the sort, 2% off this benchmark.
@@ -57,15 +57,15 @@ literal.
 
 | metric | nativetron | electron 44 |
 |---|---|---|
-| shipped binaries | 0.69 MiB | 287 MB |
-| cold start to first paint | 285 ms | 230 ms |
-| peak resident memory | 98.1 MiB | 330.3 MiB |
-| steady resident memory | 98.1 MiB | 326.2 MiB |
-| processes | 2 | 4 |
-| startup CPU | 13.7% | 23.5% |
+| benchmark binaries | 0.55 MiB | 287 MB |
+| warmed launch to first frame | 166 ms | 227 ms |
+| double-rAF confirmation | 229 ms | 236 ms |
+| process-tree steady RSS | 79.5 MiB | 335.1 MiB |
+| system WebKit service RSS | 77.4 MiB | — |
+| accounted steady RSS | 157.0 MiB | 335.1 MiB |
+| summed physical footprint | 87.3 MiB | 126.8 MiB |
+| application child tree | 2 processes | 4 processes |
 
-Measured 2026-09-07 at scriptc `032123ab`. The benchmark launches the complete nativetron main/renderer pair and timestamps from the parent before process creation; the earlier renderer-only startup measurement was invalid. The shipped binaries are a 239,816-byte main and 481,512-byte renderer. The standalone JSX lifecycle app is 398,968 bytes; the browser renderer is 75,215 bytes of wasm plus 3,100 bytes of loader glue.
+Measured 2026-09-08 at scriptc `032123ab` with three discarded warmups, 15 alternating AB/BA startup rounds, and five alternating runtime rounds. Both applications render the same heading, paragraph, button, and reactive counter. Parent timestamps cover process creation through UI application and animation frames. Nativetron reaches the first frame 1.4× sooner; its unusually long initial second-frame interval reduces the double-rAF advantage and remains under investigation.
 
-Electron's helper processes are children and fully counted. The WKWebView
-content process is spawned by the system, so nativetron's resident memory is
-undercounted.
+The benchmark pair is 194,184 bytes of main code and about 379 KB of renderer code. The production sample remains a 239,816-byte main and approximately 482 KB renderer. System WebKit content, network, and GPU services are not children; the runner attributes newly observed service processes separately. Summed RSS double-counts shared pages, so the report also measures physical footprint with macOS `footprint`.

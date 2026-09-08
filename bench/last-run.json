@@ -1,50 +1,283 @@
 {
-  "date": "2026-09-07T22:35:35.139Z",
+  "date": "2026-09-08T00:36:00.301Z",
+  "rounds": {
+    "warmup": 3,
+    "startup": 15,
+    "runtime": 5,
+    "order": "alternating AB/BA"
+  },
   "electron": "44.0.0",
   "nativetron": {
-    "diskBytes": 721328,
-    "readyMedian": 285,
-    "ready": [
-      724,
-      279,
-      288,
-      278,
-      285
-    ],
-    "wallMedian": 289,
-    "walls": [
-      728,
-      283,
-      292,
-      282,
-      289
-    ],
-    "peakRSS": 100432,
-    "steadyRSS": 100432,
-    "peakCPU": 13.7,
-    "procs": 2
+    "diskBytes": 573344,
+    "startup": {
+      "readyMedian": 229,
+      "ready": [
+        231,
+        230,
+        226,
+        217,
+        226,
+        229,
+        227,
+        222,
+        230,
+        231,
+        213,
+        229,
+        230,
+        234,
+        228
+      ],
+      "wallMedian": 234,
+      "phases": {
+        "main-entry": 3,
+        "ipc-listening": 3,
+        "renderer-entry": 7,
+        "app-ready": 47,
+        "window-created": 63,
+        "browser-created": 95,
+        "webview-created": 98,
+        "ui-buffered": 98,
+        "run-enter": 98,
+        "host-ready": 165,
+        "ui-applied": 162,
+        "frame-one": 166,
+        "contentful-paint": 166
+      }
+    },
+    "runtime": {
+      "peakRSS": 79536,
+      "steadyRSS": 79536,
+      "serviceRSS": 77376,
+      "accountedRSS": 156992,
+      "peakCPU": 28.1,
+      "steadyCPU": 0.4,
+      "processes": 2,
+      "footprint": 87328,
+      "rows": [
+        {
+          "pid": 90188,
+          "ppid": 84101,
+          "cpu": 0,
+          "rss": 1440,
+          "command": "/Users/thundron/Documents/development/axelerontech/nativetron/bench/desktop-app/build/main",
+          "footprint": 1088
+        },
+        {
+          "pid": 90189,
+          "ppid": 90188,
+          "cpu": 0.4,
+          "rss": 78096,
+          "command": "/Users/thundron/Documents/development/axelerontech/nativetron/bench/desktop-app/build/renderer",
+          "footprint": 21504
+        },
+        {
+          "pid": 90191,
+          "ppid": 1,
+          "cpu": 0,
+          "rss": 32512,
+          "command": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+          "footprint": 37888
+        },
+        {
+          "pid": 90192,
+          "ppid": 1,
+          "cpu": 0,
+          "rss": 29600,
+          "command": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+          "footprint": 21504
+        },
+        {
+          "pid": 90193,
+          "ppid": 1,
+          "cpu": 0,
+          "rss": 15056,
+          "command": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+          "footprint": 5344
+        }
+      ],
+      "trials": [
+        {
+          "peakRSS": 80064,
+          "steadyRSS": 80064,
+          "serviceRSS": 77376,
+          "accountedRSS": 157440,
+          "peakCPU": 30.5,
+          "steadyCPU": 0.5,
+          "processes": 2,
+          "footprint": 87297
+        },
+        {
+          "peakRSS": 79536,
+          "steadyRSS": 79536,
+          "serviceRSS": 77168,
+          "accountedRSS": 156704,
+          "peakCPU": 25.6,
+          "steadyCPU": 0.4,
+          "processes": 2,
+          "footprint": 87328
+        },
+        {
+          "peakRSS": 79136,
+          "steadyRSS": 79136,
+          "serviceRSS": 77488,
+          "accountedRSS": 156624,
+          "peakCPU": 28.1,
+          "steadyCPU": 0.4,
+          "processes": 2,
+          "footprint": 87376
+        },
+        {
+          "peakRSS": 79808,
+          "steadyRSS": 79808,
+          "serviceRSS": 77184,
+          "accountedRSS": 156992,
+          "peakCPU": 27.1,
+          "steadyCPU": 0.4,
+          "processes": 2,
+          "footprint": 87344
+        },
+        {
+          "peakRSS": 79392,
+          "steadyRSS": 79392,
+          "serviceRSS": 77760,
+          "accountedRSS": 157152,
+          "peakCPU": 30.5,
+          "steadyCPU": 0.5,
+          "processes": 2,
+          "footprint": 87264
+        }
+      ]
+    }
   },
   "electronResult": {
     "diskBytes": 300650496,
-    "readyMedian": 230,
-    "ready": [
-      238,
-      230,
-      239,
-      230,
-      229
-    ],
-    "wallMedian": 269,
-    "walls": [
-      266,
-      254,
-      288,
-      269,
-      319
-    ],
-    "peakRSS": 338192,
-    "steadyRSS": 334048,
-    "peakCPU": 23.5,
-    "procs": 4
+    "startup": {
+      "readyMedian": 236,
+      "ready": [
+        237,
+        225,
+        237,
+        234,
+        236,
+        228,
+        238,
+        234,
+        237,
+        223,
+        229,
+        238,
+        226,
+        241,
+        244
+      ],
+      "wallMedian": 311,
+      "phases": {
+        "main-entry": 82,
+        "app-ready": 104,
+        "window-created": 145,
+        "browser-created": 145,
+        "renderer-entry": 214,
+        "host-ready": 221,
+        "ui-applied": 221,
+        "frame-one": 227
+      }
+    },
+    "runtime": {
+      "peakRSS": 339184,
+      "steadyRSS": 335120,
+      "serviceRSS": 0,
+      "accountedRSS": 335120,
+      "peakCPU": 80,
+      "steadyCPU": 0,
+      "processes": 4,
+      "footprint": 126769,
+      "rows": [
+        {
+          "pid": 823,
+          "ppid": 84101,
+          "cpu": 0,
+          "rss": 136128,
+          "command": "/var/folders/q6/rmz2lkw969dbfsp22b7m3gv00000gn/T/nt-bench-electron/Electron.app/Contents/MacOS/Electron",
+          "footprint": 37888
+        },
+        {
+          "pid": 824,
+          "ppid": 823,
+          "cpu": 0,
+          "rss": 77216,
+          "command": "/private/var/folders/q6/rmz2lkw969dbfsp22b7m3gv00000gn/T/nt-bench-electron/Electron.app/Contents/Frameworks/Electron Helper.app/Contents/MacOS/Electron Helper",
+          "footprint": 61440
+        },
+        {
+          "pid": 825,
+          "ppid": 823,
+          "cpu": 0,
+          "rss": 37104,
+          "command": "/private/var/folders/q6/rmz2lkw969dbfsp22b7m3gv00000gn/T/nt-bench-electron/Electron.app/Contents/Frameworks/Electron Helper.app/Contents/MacOS/Electron Helper",
+          "footprint": 6961
+        },
+        {
+          "pid": 826,
+          "ppid": 823,
+          "cpu": 0,
+          "rss": 83520,
+          "command": "/private/var/folders/q6/rmz2lkw969dbfsp22b7m3gv00000gn/T/nt-bench-electron/Electron.app/Contents/Frameworks/Electron Helper (Renderer).app/Contents/MacOS/Electron Helper (Renderer)",
+          "footprint": 20480
+        }
+      ],
+      "trials": [
+        {
+          "peakRSS": 340368,
+          "steadyRSS": 336256,
+          "serviceRSS": 0,
+          "accountedRSS": 336256,
+          "peakCPU": 78.3,
+          "steadyCPU": 0,
+          "processes": 4,
+          "footprint": 121857
+        },
+        {
+          "peakRSS": 341088,
+          "steadyRSS": 337648,
+          "serviceRSS": 0,
+          "accountedRSS": 337648,
+          "peakCPU": 83.39999999999999,
+          "steadyCPU": 0.4,
+          "processes": 4,
+          "footprint": 127073
+        },
+        {
+          "peakRSS": 339184,
+          "steadyRSS": 335120,
+          "serviceRSS": 0,
+          "accountedRSS": 335120,
+          "peakCPU": 80,
+          "steadyCPU": 0,
+          "processes": 4,
+          "footprint": 126737
+        },
+        {
+          "peakRSS": 338608,
+          "steadyRSS": 334432,
+          "serviceRSS": 0,
+          "accountedRSS": 334432,
+          "peakCPU": 76.7,
+          "steadyCPU": 0,
+          "processes": 4,
+          "footprint": 131953
+        },
+        {
+          "peakRSS": 338112,
+          "steadyRSS": 333984,
+          "serviceRSS": 0,
+          "accountedRSS": 333984,
+          "peakCPU": 87.1,
+          "steadyCPU": 0,
+          "processes": 4,
+          "footprint": 126769
+        }
+      ]
+    }
   }
 }

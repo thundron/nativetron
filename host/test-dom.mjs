@@ -70,10 +70,24 @@ export function makeTestNode(kind, tag) {
 
 export function createTestDocument(initialRoot = makeTestNode("element", "div")) {
   let root = initialRoot;
+  const head = makeTestNode("element", "head");
+  const body = makeTestNode("element", "body");
+  body.appendChild(root);
   return {
     document: {
       readyState: "complete",
+      head,
+      body,
       getElementById: (id) => id === "nt-root" ? root : null,
+      querySelector: (selector) => {
+        if (selector === "meta[charset]") {
+          return head.children.find((node) => Object.hasOwn(node.attrs, "charset")) ?? null;
+        }
+        if (selector === 'meta[name="viewport"]') {
+          return head.children.find((node) => node.attrs.name === "viewport") ?? null;
+        }
+        return null;
+      },
       createElement: (tag) => makeTestNode("element", tag),
       createElementNS: (namespace, tag) => {
         const node = makeTestNode("element", tag);
@@ -89,6 +103,10 @@ export function createTestDocument(initialRoot = makeTestNode("element", "div"))
       addEventListener() {},
     },
     root: () => root,
-    setRoot(next) { root = next; },
+    setRoot(next) {
+      if (root.parentNode) root.parentNode.removeChild(root);
+      root = next;
+      body.appendChild(root);
+    },
   };
 }

@@ -43,7 +43,8 @@ function validateOperations(schema) {
   for (let index = 0; index < schema.ops.length; index++) {
     const operation = schema.ops[index];
     const path = `ops.ops[${index}]`;
-    exactKeys(operation, ["code", "name", "args"], path);
+    const repeated = Object.hasOwn(operation, "repeat");
+    exactKeys(operation, repeated ? ["code", "name", "args", "repeat", "maximum"] : ["code", "name", "args"], path);
     if (!Number.isInteger(operation.code) || operation.code < 1 || operation.code > 255 || codes.has(operation.code)) {
       throw new Error(path + ".code must be a unique nonzero u8");
     }
@@ -52,6 +53,16 @@ function validateOperations(schema) {
     }
     if (!Array.isArray(operation.args)) throw new Error(path + ".args must be an array");
     operation.args.forEach((argument, argumentIndex) => operationArgument(argument, `${path}.args[${argumentIndex}]`));
+    if (repeated) {
+      if (!Array.isArray(operation.repeat) || operation.repeat.length === 0) throw new Error(path + ".repeat must be a nonempty array");
+      operation.repeat.forEach((argument, argumentIndex) => operationArgument(argument, `${path}.repeat[${argumentIndex}]`));
+      if (!Number.isInteger(operation.maximum) || operation.maximum < 1 || operation.maximum > 65535) {
+        throw new Error(path + ".maximum must be an integer from 1 through 65535");
+      }
+      if (!operation.args.some((value) => operationArgument(value, path + ".args").name === "count")) {
+        throw new Error(path + ".args must contain count when repeat is present");
+      }
+    }
     codes.add(operation.code);
     names.add(operation.name);
   }
@@ -63,15 +74,24 @@ const operandDescription = { u32: "u32", intern: "u32 intern id", str: "length-p
 const operationTable = [
   "| opcode | name | arguments |",
   "|---|---|---|",
-  ...operations.ops.map((operation) =>
-    `| ${operation.code} | ${operation.name} | ${operation.args.map((value) => argument(value).name).join(", ") || "—"} |`),
+  ...operations.ops.map((operation) => {
+    const fixed = operation.args.map((value) => argument(value).name);
+    const repeated = operation.repeat ? [`count × (${operation.repeat.map((value) => argument(value).name).join(", ")})`] : [];
+    return `| ${operation.code} | ${operation.name} | ${[...fixed, ...repeated].join(", ") || "—"} |`;
+  }),
 ].join("\n");
 const operationLayout = operations.ops.map((operation) =>
   `    ${String(operation.code).padStart(2)} ${operation.name.padEnd(17)} ` +
-  `${operation.args.map((value) => {
-    const operand = argument(value);
-    return `${operand.name}(${operandDescription[operand.type]})`;
-  }).join(" ") || "—"}`).join("\n");
+  `${[
+    ...operation.args.map((value) => {
+      const operand = argument(value);
+      return `${operand.name}(${operandDescription[operand.type]})`;
+    }),
+    ...(operation.repeat ? [`repeat<=${operation.maximum}[${operation.repeat.map((value) => {
+      const operand = argument(value);
+      return `${operand.name}(${operandDescription[operand.type]})`;
+    }).join(" ")}]`] : []),
+  ].join(" ") || "—"}`).join("\n");
 
 function generatedRegion(previous, name, body) {
   const start = `/* generated:${name} */`;

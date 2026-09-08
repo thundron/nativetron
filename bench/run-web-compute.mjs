@@ -59,7 +59,7 @@ const f = (x) => x.toFixed(2);
 
 try {
   await waitCdp();
-  const ntMounts = [], rxMounts = [], guests = [], hosts = [];
+  const ntMounts = [], rxMounts = [], guests = [], dataBuilds = [], encodes = [], hosts = [], directHosts = [];
   for (let r = 0; r < MOUNT_REPS; r++) {
     const a = await openPage("nativetron.html");
     const b = await openPage("react.html");
@@ -68,7 +68,8 @@ try {
     if (r % 2 === 0) { ntMounts.push(await timed(a)); rxMounts.push(await timed(b)); }
     else { rxMounts.push(await timed(b)); ntMounts.push(await timed(a)); }
     const sp = JSON.parse(await a.evaluate("JSON.stringify(window.__split)", true));
-    guests.push(sp.guest); hosts.push(sp.host);
+    guests.push(sp.guest); dataBuilds.push(sp.data); encodes.push(sp.encode); hosts.push(sp.host);
+    directHosts.push(await a.evaluate(`window.__directHost(${ROWS})`, true));
     await a.close(); await b.close();
   }
   const ntMount = median(ntMounts), rxMount = median(rxMounts);
@@ -113,8 +114,11 @@ try {
   console.log(`|---|---|---|`);
   console.log(`| rows rendered | ${ntRows} | ${rxRows} |`);
   console.log(`| mount ${ROWS} rows (median of ${MOUNT_REPS}) | ${ntMount} ms | ${rxMount} ms |`);
-  console.log(`| — building the batch (guest) | ${median(guests)} ms | — |`);
+  console.log(`| — total guest work | ${median(guests)} ms | — |`);
+  console.log(`| —— data and arrays | ${median(dataBuilds)} ms | — |`);
+  console.log(`| —— DOM batch encoding | ${median(encodes)} ms | — |`);
   console.log(`| — applying it (host) | ${median(hosts)} ms | — |`);
+  console.log(`| — equivalent direct DOM host loop | ${median(directHosts)} ms | — |`);
   console.log(`| JS heap | ${ntS.jsHeapMB} MB | ${rxS.jsHeapMB} MB |`);
   console.log(`| wasm linear memory | ${ntS.wasmMemMB} MB | — |`);
   console.log(`| module size | ${ntS.wasmKB} KB | 189.8 KB |`);

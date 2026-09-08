@@ -475,11 +475,17 @@
       "returns": "i32"
     },
     {
-      "name": "ntSetHtml",
-      "symbol": "nt_set_html",
+      "name": "ntSetDocumentCss",
+      "symbol": "nt_set_document_css",
       "params": [
         "string"
       ],
+      "returns": "void"
+    },
+    {
+      "name": "ntLoadDocument",
+      "symbol": "nt_load_document",
+      "params": [],
       "returns": "void"
     },
     {

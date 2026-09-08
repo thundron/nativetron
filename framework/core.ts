@@ -18,6 +18,7 @@ import {
   OP_ELEMENT_WITH_TEXT,
   OP_CREATE_SVG_ELEMENT,
   OP_FOCUS,
+  OP_ELEMENT_TEXT_BATCH,
 } from "./ops.generated.js";
 
 export const ROOT = 0;
@@ -67,11 +68,32 @@ function str(s: string): void {
 
 const internKeys: string[] = [];
 let nextIntern = 1;
+let elementTextBatchParent = -1;
+let elementTextBatchTag = "";
+let elementTextBatchCountOffset = -1;
+let elementTextBatchCount = 0;
+
+function endElementTextBatch(): void {
+  elementTextBatchParent = -1;
+  elementTextBatchTag = "";
+  elementTextBatchCountOffset = -1;
+  elementTextBatchCount = 0;
+}
+
+function updateElementTextBatchCount(): void {
+  const v = elementTextBatchCount;
+  const at = elementTextBatchCountOffset;
+  buf[at] = v & 0xff;
+  buf[at + 1] = (v >>> 8) & 0xff;
+  buf[at + 2] = (v >>> 16) & 0xff;
+  buf[at + 3] = (v >>> 24) & 0xff;
+}
 
 function iref(v: string): number {
   for (let i = 0; i < internKeys.length; i++) {
     if (internKeys[i] === v) return i + 1;
   }
+  endElementTextBatch();
   internKeys.push(v);
   const id = nextIntern++;
   u8(OP_INTERN);
@@ -81,44 +103,67 @@ function iref(v: string): number {
 }
 
 export function createElement(id: number, tag: string): void {
+  endElementTextBatch();
   const t = iref(tag); u8(OP_CREATE_ELEMENT); u32(id); u32(t);
 }
 export function createSvgElement(id: number, tag: string): void {
+  endElementTextBatch();
   const t = iref(tag); u8(OP_CREATE_SVG_ELEMENT); u32(id); u32(t);
 }
 export function focusElement(id: number): void {
+  endElementTextBatch();
   u8(OP_FOCUS); u32(id);
 }
 export function elementWithText(parent: number, id: number, tag: string, textId: number, text: string): void {
-  const t = iref(tag);
-  u8(OP_ELEMENT_WITH_TEXT); u32(parent); u32(id); u32(t); u32(textId); str(text);
+  if (elementTextBatchCountOffset < 0 || elementTextBatchParent !== parent || elementTextBatchTag !== tag ||
+      elementTextBatchCount >= 65535) {
+    endElementTextBatch();
+    const t = iref(tag);
+    u8(OP_ELEMENT_TEXT_BATCH); u32(parent); u32(t);
+    elementTextBatchCountOffset = off;
+    u32(0);
+    elementTextBatchParent = parent;
+    elementTextBatchTag = tag;
+  }
+  u32(id); u32(textId); str(text);
+  elementTextBatchCount++;
+  updateElementTextBatchCount();
 }
 export function createText(id: number, text: string): void {
+  endElementTextBatch();
   u8(OP_CREATE_TEXT); u32(id); str(text);
 }
 export function setText(id: number, text: string): void {
+  endElementTextBatch();
   u8(OP_SET_TEXT); u32(id); str(text);
 }
 export function setAttr(id: number, name: string, value: string): void {
+  endElementTextBatch();
   const n = iref(name); u8(OP_SET_ATTR); u32(id); u32(n); str(value);
 }
 export function removeAttr(id: number, name: string): void {
+  endElementTextBatch();
   const n = iref(name); u8(OP_REMOVE_ATTR); u32(id); u32(n);
 }
 export function append(parent: number, child: number): void {
+  endElementTextBatch();
   u8(OP_APPEND); u32(parent); u32(child);
 }
 export function insertBefore(parent: number, child: number, ref: number): void {
+  endElementTextBatch();
   u8(OP_INSERT_BEFORE); u32(parent); u32(child); u32(ref);
 }
 export function remove(id: number): void {
+  endElementTextBatch();
   u8(OP_REMOVE); u32(id);
 }
 export function setProp(id: number, name: string, value: string): void {
+  endElementTextBatch();
   const n = iref(name); u8(OP_SET_PROP); u32(id); u32(n); str(value);
 }
 
 export function flush(): void {
+  endElementTextBatch();
   if (off === 0) return;
   binSink(buf.subarray(0, off));
   off = 0;

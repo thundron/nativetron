@@ -12,7 +12,8 @@
     "callback_register_symbol": "nt_set_callback"
   },
   "callbacks": [
-    { "name": "ntApply", "params": ["bytes"], "returns": "void" }
+    { "name": "ntApply", "params": ["bytes"], "returns": "void" },
+    { "name": "ntMark", "params": ["f64"], "returns": "void" }
   ],
   "exports": [
     { "export": "build", "symbol": "nt_build", "params": ["f64"], "returns": "f64" },

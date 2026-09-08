@@ -3,6 +3,7 @@ import {
 } from "../../framework/core.js";
 
 declare function ntApply(b: Uint8Array): void;
+declare function ntMark(phase: number): void;
 
 const labels: string[] = [];
 const vals: number[] = [];
@@ -11,17 +12,23 @@ const idx: number[] = [];
 
 export function build(n: number): number {
   setBinarySink((b: Uint8Array) => { ntApply(b); });
+  ntMark(1);
   for (let i = 0; i < n; i++) {
     labels.push("row " + i);
     vals.push((i * 7919) % 100000);
     idx.push(i);
+  }
+  ntMark(2);
+  for (let i = 0; i < n; i++) {
     const d = newId();
     const t = newId();
-    elementWithText(ROOT, d, "div", t, labels[i]! + " " + vals[i]!);
+    elementWithText(ROOT, d, "div", t, `${labels[i]!} ${vals[i]!}`);
     textIds.push(t);
   }
+  ntMark(3);
   setLive();
   flush();
+  ntMark(4);
   return n;
 }
 
@@ -31,7 +38,7 @@ export function update(): number {
   idx.sort((a, b) => vals[a]! - vals[b]!);
   for (let k = 0; k < n; k++) {
     const i = idx[k]!;
-    setText(textIds[k]!, labels[i]! + " " + vals[i]!);
+    setText(textIds[k]!, `${labels[i]!} ${vals[i]!}`);
   }
   flush();
   return n;

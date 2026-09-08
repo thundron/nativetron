@@ -50,6 +50,9 @@
 #include "../user_script.hh"
 
 #include <atomic>
+#include <chrono>
+#include <cstdio>
+#include <cstdlib>
 #include <functional>
 #include <list>
 #include <memory>
@@ -82,6 +85,16 @@ private:
 // Since those commmon symbols are used a lot, this reduces the overall
 // noise in the code.
 namespace cocoa_webkit {
+
+inline void benchmark_phase(const char *name) {
+  const char *raw = std::getenv("NT_BENCH_START_MS");
+  if (!raw || !*raw) return;
+  const auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
+      std::chrono::system_clock::now().time_since_epoch()).count();
+  std::fprintf(stdout, "NT_BENCH_PHASE=%s:%lld\n", name,
+               static_cast<long long>(now - std::atoll(raw)));
+  std::fflush(stdout);
+}
 
 using namespace cocoa;
 using namespace webkit;
@@ -410,6 +423,7 @@ private:
     return !!bundled;
   }
   void on_application_did_finish_launching(id /*delegate*/, id app) {
+    benchmark_phase("app-ready");
     // See comments related to application lifecycle in create_app_delegate().
     if (owns_window()) {
       // Stop the main run loop so that we can return
@@ -436,6 +450,7 @@ private:
     }
 
     window_init_proceed();
+    benchmark_phase("window-created");
   }
   void on_window_will_close(id /*delegate*/, id /*window*/) {
     // Widget destroyed along with window.
@@ -517,6 +532,7 @@ private:
     if (owns_window()) {
       NSWindow_makeKeyAndOrderFront(m_window);
     }
+    benchmark_phase("browser-created");
   }
   void set_up_widget() {
     objc::autoreleasepool arp;
