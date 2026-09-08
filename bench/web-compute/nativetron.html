@@ -10,7 +10,13 @@ window.__setup = async (n) => {
   let host = 0;
   const marks = {};
   api = await instantiateFromBytes(buf, {
-    ntApply: (b) => { const t = performance.now(); window.__nt.applyBin(b); host += performance.now() - t; },
+    ntApply: (b) => {
+      const t = performance.now();
+      window.__nt.applyBin(b);
+      const elapsed = performance.now() - t;
+      host += elapsed;
+      if (window.__measuring === 1) window.__uapply += elapsed;
+    },
     ntMark: (phase) => { marks[phase] = performance.now(); },
   });
   const t0 = performance.now();
@@ -63,6 +69,7 @@ window.__stats = () => ({
   sample: document.getElementById("nt-root").children[0].textContent,
   jsHeapMB: performance.memory ? +(performance.memory.usedJSHeapSize / 1048576).toFixed(2) : 0,
   wasmKB: window.__wasmKB, wasmMemMB: window.__wasmMemMB,
+  updateGuest: window.__lastGuest, updateHost: window.__lastApply,
 });
 window.__benchReady = true;
 </script></body></html>

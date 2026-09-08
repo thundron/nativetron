@@ -121,6 +121,7 @@ try {
   console.log(`| — equivalent direct DOM host loop | ${median(directHosts)} ms | — |`);
   console.log(`| JS heap | ${ntS.jsHeapMB} MB | ${rxS.jsHeapMB} MB |`);
   console.log(`| wasm linear memory | ${ntS.wasmMemMB} MB | — |`);
+  console.log(`| final update split | ${ntS.updateGuest} ms guest + ${ntS.updateHost} ms host | — |`);
   console.log(`| module size | ${ntS.wasmKB} KB | 189.8 KB |`);
   console.log(`| first row after run | ${JSON.stringify(ntS.sample)} | ${JSON.stringify(rxS.sample)} |`);
 } finally {

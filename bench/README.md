@@ -26,11 +26,11 @@ repeats, and alternates order. Only compare within one run.
 | interaction, p95 | 2.60 µs | 3.35 µs |
 | payload, raw | 93.9 KB | 189.7 KB |
 | payload, gzipped | 43.1 KB | 59.3 KB |
-| 10k row update, median | 4.50 ms | 3.60 ms |
-| 10k row mount, median of 15 | 70 ms | 12 ms |
-| JS heap after 10k rows | 5.69 MB | 12.05 MB |
+| 10k row update, representative median | 4.60 ms | 3.70 ms |
+| 10k row mount, representative median of 15 | 63 ms | 12 ms |
+| JS heap after 10k rows | 5.69 MB | 8.90 MB |
 
-Mount splits into about 9 ms of data construction, 17 ms of guest DOM-batch encoding, 37 ms of host application, and 7 ms of bridge and measurement overhead. Schema-bounded runs of homogeneous text elements reduce guest encoding time and wasm linear memory, but host DOM application remains the largest framework-owned mount cost.
+Repeated 15-mount runs placed nativetron between 60 and 70 ms. A representative run splits into about 8 ms of data construction, 17 ms of guest DOM-batch encoding, 34 ms of host application, and 4 ms of bridge and measurement overhead. Schema-bounded runs of homogeneous text elements reduce guest encoding time and wasm linear memory, but host DOM application remains the largest framework-owned mount cost. A 10k update splits about 3.1 ms guest / 1.8 ms host.
 
 A 10k sort is 2.1 ms in wasm vs 0.4 ms in V8. Comparators that subtract a numeric key (`a.f - b.f`,
 `k[a] - k[b]`) now inline: 14% off the sort, 2% off this benchmark.
