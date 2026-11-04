@@ -16,7 +16,7 @@ let commands: Uint8Array = new Uint8Array(65536);
 let commandOffset = 0;
 let uploads: Uint8Array = new Uint8Array(1048576);
 let uploadOffset = 0;
-const readbacks = new Uint8Array(MAX_READBACK_BYTES);
+let readbacks: Uint8Array = new Uint8Array(0);
 let readbackOffset = 0;
 let sink: (batch: Uint8Array, upload: Uint8Array, readback: Uint8Array) => void = (
   _batch: Uint8Array,
@@ -69,6 +69,7 @@ export function uploadBytes(bytes: Uint8Array): UploadSlice {
 
 export function reserveReadback(length: number): ReadbackSlice {
   if (length < 0 || length !== Math.floor(length)) throw new Error("invalid GPU readback length");
+  if (readbacks.length === 0) readbacks = new Uint8Array(MAX_READBACK_BYTES);
   const offset = align4(readbackOffset);
   const required = offset + length;
   if (required > readbacks.length) throw new Error("GPU readback staging limit exceeded");

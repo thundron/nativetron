@@ -242,6 +242,306 @@ export const GPU_RECORDS = {
     "format"
   ]
 };
+export const GPU_FIXED_LAYOUTS = {
+  "requestDevice": {
+    "code": 1,
+    "bytes": 21,
+    "fields": {
+      "requestId": 1,
+      "powerPreference": 5,
+      "featureBits": 9,
+      "maxBufferSize": 13
+    }
+  },
+  "computeSetPipeline": {
+    "code": 17,
+    "bytes": 9,
+    "fields": {
+      "pass": 1,
+      "pipeline": 5
+    }
+  },
+  "computeDispatch": {
+    "code": 19,
+    "bytes": 17,
+    "fields": {
+      "pass": 1,
+      "x": 5,
+      "y": 9,
+      "z": 13
+    }
+  },
+  "computeDispatchIndirect": {
+    "code": 20,
+    "bytes": 17,
+    "fields": {
+      "pass": 1,
+      "buffer": 5,
+      "offset": 9
+    }
+  },
+  "endComputePass": {
+    "code": 21,
+    "bytes": 5,
+    "fields": {
+      "pass": 1
+    }
+  },
+  "renderSetViewport": {
+    "code": 23,
+    "bytes": 29,
+    "fields": {
+      "pass": 1,
+      "x": 5,
+      "y": 9,
+      "width": 13,
+      "height": 17,
+      "minDepth": 21,
+      "maxDepth": 25
+    }
+  },
+  "renderSetScissor": {
+    "code": 24,
+    "bytes": 21,
+    "fields": {
+      "pass": 1,
+      "x": 5,
+      "y": 9,
+      "width": 13,
+      "height": 17
+    }
+  },
+  "renderSetPipeline": {
+    "code": 25,
+    "bytes": 9,
+    "fields": {
+      "pass": 1,
+      "pipeline": 5
+    }
+  },
+  "renderSetVertexBuffer": {
+    "code": 27,
+    "bytes": 29,
+    "fields": {
+      "pass": 1,
+      "slot": 5,
+      "buffer": 9,
+      "offset": 13,
+      "size": 21
+    }
+  },
+  "renderSetIndexBuffer": {
+    "code": 28,
+    "bytes": 29,
+    "fields": {
+      "pass": 1,
+      "buffer": 5,
+      "format": 9,
+      "offset": 13,
+      "size": 21
+    }
+  },
+  "renderDraw": {
+    "code": 29,
+    "bytes": 21,
+    "fields": {
+      "pass": 1,
+      "vertexCount": 5,
+      "instanceCount": 9,
+      "firstVertex": 13,
+      "firstInstance": 17
+    }
+  },
+  "renderDrawIndexed": {
+    "code": 30,
+    "bytes": 25,
+    "fields": {
+      "pass": 1,
+      "indexCount": 5,
+      "instanceCount": 9,
+      "firstIndex": 13,
+      "baseVertex": 17,
+      "firstInstance": 21
+    }
+  },
+  "renderDrawIndirect": {
+    "code": 31,
+    "bytes": 17,
+    "fields": {
+      "pass": 1,
+      "buffer": 5,
+      "offset": 9
+    }
+  },
+  "renderDrawIndexedIndirect": {
+    "code": 32,
+    "bytes": 17,
+    "fields": {
+      "pass": 1,
+      "buffer": 5,
+      "offset": 9
+    }
+  },
+  "endRenderPass": {
+    "code": 33,
+    "bytes": 5,
+    "fields": {
+      "pass": 1
+    }
+  },
+  "copyBufferToBuffer": {
+    "code": 34,
+    "bytes": 37,
+    "fields": {
+      "encoder": 1,
+      "source": 5,
+      "sourceOffset": 9,
+      "destination": 17,
+      "destinationOffset": 21,
+      "size": 29
+    }
+  },
+  "copyBufferToTexture": {
+    "code": 35,
+    "bytes": 61,
+    "fields": {
+      "encoder": 1,
+      "source": 5,
+      "sourceOffset": 9,
+      "bytesPerRow": 17,
+      "rowsPerImage": 21,
+      "destination": 25,
+      "mipLevel": 29,
+      "originX": 33,
+      "originY": 37,
+      "originZ": 41,
+      "aspect": 45,
+      "width": 49,
+      "height": 53,
+      "depth": 57
+    }
+  },
+  "copyTextureToTexture": {
+    "code": 36,
+    "bytes": 57,
+    "fields": {
+      "encoder": 1,
+      "source": 5,
+      "sourceMip": 9,
+      "sourceX": 13,
+      "sourceY": 17,
+      "sourceZ": 21,
+      "destination": 25,
+      "destinationMip": 29,
+      "destinationX": 33,
+      "destinationY": 37,
+      "destinationZ": 41,
+      "width": 45,
+      "height": 49,
+      "depth": 53
+    }
+  },
+  "resolveQuerySet": {
+    "code": 37,
+    "bytes": 29,
+    "fields": {
+      "encoder": 1,
+      "querySet": 5,
+      "first": 9,
+      "count": 13,
+      "destination": 17,
+      "offset": 21
+    }
+  },
+  "writeBuffer": {
+    "code": 40,
+    "bytes": 21,
+    "fields": {
+      "buffer": 1,
+      "bufferOffset": 5,
+      "data": 13
+    }
+  },
+  "writeTexture": {
+    "code": 41,
+    "bytes": 53,
+    "fields": {
+      "texture": 1,
+      "mipLevel": 5,
+      "originX": 9,
+      "originY": 13,
+      "originZ": 17,
+      "aspect": 21,
+      "data": 25,
+      "bytesPerRow": 33,
+      "rowsPerImage": 37,
+      "width": 41,
+      "height": 45,
+      "depth": 49
+    }
+  },
+  "getCurrentTexture": {
+    "code": 43,
+    "bytes": 5,
+    "fields": {
+      "handle": 1
+    }
+  },
+  "destroy": {
+    "code": 44,
+    "bytes": 5,
+    "fields": {
+      "resource": 1
+    }
+  },
+  "mapAsync": {
+    "code": 45,
+    "bytes": 37,
+    "fields": {
+      "requestId": 1,
+      "buffer": 5,
+      "mode": 9,
+      "offset": 13,
+      "size": 21,
+      "destination": 29
+    }
+  },
+  "onSubmittedWorkDone": {
+    "code": 46,
+    "bytes": 5,
+    "fields": {
+      "requestId": 1
+    }
+  },
+  "requestFrame": {
+    "code": 47,
+    "bytes": 1,
+    "fields": {}
+  },
+  "release": {
+    "code": 48,
+    "bytes": 5,
+    "fields": {
+      "resource": 1
+    }
+  },
+  "unmap": {
+    "code": 49,
+    "bytes": 5,
+    "fields": {
+      "buffer": 1
+    }
+  },
+  "writeMappedBuffer": {
+    "code": 50,
+    "bytes": 21,
+    "fields": {
+      "buffer": 1,
+      "bufferOffset": 5,
+      "data": 13
+    }
+  }
+};
 
 export function readGpuRecord(kind, values, offset = 0) {
   const fields = GPU_RECORDS[kind];

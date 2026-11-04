@@ -12,13 +12,18 @@ const COMPUTE = `
 @compute @workgroup_size(64)
 fn fill(@builtin(global_invocation_id) id: vec3u) {
   if (id.x < 1024u) { data[id.x] = id.x * 3u + 7u; }
-  if (id.x == 0u) { data[1024] = 3u; data[1025] = 1u; data[1026] = 0u; data[1027] = 0u; }
+  if (id.x == 0u) {
+    data[1024] = 3u; data[1025] = 1u; data[1026] = 0u; data[1027] = 0u;
+    data[1028] = bitcast<u32>(-0.7); data[1029] = bitcast<u32>(-0.6);
+    data[1030] = bitcast<u32>(0.7); data[1031] = bitcast<u32>(-0.6);
+    data[1032] = bitcast<u32>(0.0); data[1033] = bitcast<u32>(0.7);
+  }
 }`;
 const RENDER = `
 @group(0) @binding(0) var<storage, read> data: array<u32>;
 @vertex fn vertex(@builtin(vertex_index) id: u32) -> @builtin(position) vec4f {
-  var positions = array<vec2f, 3>(vec2f(-0.7, -0.6), vec2f(0.7, -0.6), vec2f(0.0, 0.7));
-  return vec4f(positions[id], 0.0, 1.0);
+  let position = vec2f(bitcast<f32>(data[1028u + id * 2u]), bitcast<f32>(data[1029u + id * 2u]));
+  return vec4f(position, 0.0, 1.0);
 }
 @fragment fn fragment() -> @location(0) vec4f {
   return vec4f(f32(data[0]) / 10.0, 0.8, 0.3, 1.0);
@@ -39,6 +44,7 @@ let colour = 0.08;
 let ready = false;
 let firstFrame = true;
 let reportColour = false;
+let growOnNextFrame = false;
 let result: ReadbackSlice = { offset: 0, length: 0 };
 let timings: ReadbackSlice = { offset: 0, length: 0 };
 
@@ -67,7 +73,7 @@ function setup(timestamp: boolean, format: string): void {
   const computeShader = gpu.createShaderModule(10, COMPUTE, "fill");
   const renderShader = gpu.createShaderModule(11, RENDER, "triangle");
   const computeBindings = gpu.createBindGroupLayout([0, gpu.SHADER_STAGE_COMPUTE, gpu.BINDING_BUFFER, gpu.BUFFER_BINDING_STORAGE, 0, 8192, 0, 0, 0, 0], "compute bindings");
-  const renderBindings = gpu.createBindGroupLayout([0, gpu.SHADER_STAGE_FRAGMENT, gpu.BINDING_BUFFER, gpu.BUFFER_BINDING_READ_ONLY_STORAGE, 0, 8192, 0, 0, 0, 0], "render bindings");
+  const renderBindings = gpu.createBindGroupLayout([0, gpu.SHADER_STAGE_VERTEX | gpu.SHADER_STAGE_FRAGMENT, gpu.BINDING_BUFFER, gpu.BUFFER_BINDING_READ_ONLY_STORAGE, 0, 8192, 0, 0, 0, 0], "render bindings");
   computeGroup = gpu.createBindGroup(computeBindings, [0, gpu.BINDING_BUFFER, storage, 0, 8192], "compute group");
   renderGroup = gpu.createBindGroup(renderBindings, [0, gpu.BINDING_BUFFER, storage, 0, 8192], "render group");
   const computeLayout = gpu.createPipelineLayout([computeBindings], "compute layout");
@@ -139,6 +145,11 @@ export function frame(_timeMs: number): number {
       gpu.copyBufferToBuffer(encoder, queryBuffer, 0, queryReadback, 0, 16);
     }
   }
+  if (growOnNextFrame) {
+    const upload = reserveUpload(67108864);
+    gpu.writeBuffer(uploadBuffer, 0, { offset: upload.offset, length: 16777216 });
+    growOnNextFrame = false;
+  }
   const command = gpu.finishCommandEncoder(encoder, "demo commands");
   gpu.queueSubmit([command]);
   if (firstFrame) {
@@ -175,5 +186,11 @@ export function prepareUpload(): number {
   for (let i = 0; i < 16777216; i++) bytes[i] = i & 255;
   gpu.writeBuffer(uploadBuffer, 0, { offset: upload.offset, length: 16777216 });
   flush();
+  return 0;
+}
+
+export function growFrame(): number {
+  growOnNextFrame = true;
+  gpu.requestFrame(); flush();
   return 0;
 }

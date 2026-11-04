@@ -1,0 +1,17 @@
+{
+  "date": "2026-11-04T19:09:01.844Z",
+  "platform": "darwin",
+  "arch": "arm64",
+  "cpu": "Apple M4 Max",
+  "browser": "Chrome/154.0.8037.98",
+  "trials": 101,
+  "warmups": 20,
+  "pairedInterleaved": true,
+  "opsPerBatch": 500,
+  "decode500Ms": 0.029999971389770508,
+  "direct500Ms": 0.010000109672546387,
+  "opsPerMs": 16666.682561253765,
+  "upload16MiBMs": 0.315000057220459,
+  "directUpload16MiBMs": 0.31499993801116943,
+  "memoryGrew": true
+}

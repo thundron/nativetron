@@ -71,6 +71,12 @@
       "symbol": "ntgpu_prepare_upload",
       "params": [],
       "returns": "f64"
+    },
+    {
+      "export": "growFrame",
+      "symbol": "ntgpu_grow_frame",
+      "params": [],
+      "returns": "f64"
     }
   ]
 }

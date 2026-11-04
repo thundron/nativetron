@@ -1,4 +1,4 @@
-import { decodeGpuBatch } from "./gpu-host.generated.js";
+import { decodeGpuBatch, GPU_FIXED_LAYOUTS } from "./gpu-host.generated.js";
 
 const median = (values) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
 
@@ -6,15 +6,16 @@ export async function measureGpu(demo) {
   const device = demo.host.device;
   const host = demo.host;
   const count = 500, trials = 101, warmups = 20;
-  const bytes = new Uint8Array(count * 21);
+  const layout = GPU_FIXED_LAYOUTS.renderSetScissor;
+  const bytes = new Uint8Array(count * layout.bytes);
   const view = new DataView(bytes.buffer);
   const handle = 1948578;
   for (let i = 0; i < count; i++) {
-    const offset = i * 21;
-    bytes[offset] = 24;
-    view.setUint32(offset + 1, handle, true);
-    view.setUint32(offset + 5, 0, true); view.setUint32(offset + 9, 0, true);
-    view.setUint32(offset + 13, 32, true); view.setUint32(offset + 17, 32, true);
+    const offset = i * layout.bytes;
+    bytes[offset] = layout.code;
+    view.setUint32(offset + layout.fields.pass, handle, true);
+    view.setUint32(offset + layout.fields.x, 0, true); view.setUint32(offset + layout.fields.y, 0, true);
+    view.setUint32(offset + layout.fields.width, 32, true); view.setUint32(offset + layout.fields.height, 32, true);
   }
   const texture = device.createTexture({ size: [32, 32], format: "rgba8unorm", usage: GPUTextureUsage.RENDER_ATTACHMENT });
   const textureView = texture.createView();

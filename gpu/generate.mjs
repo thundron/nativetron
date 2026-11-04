@@ -91,6 +91,19 @@ const cases = spec.ops.map((op) => {
   return `        case ${op.code}: host.${camel(op.name)}(${reads.join(", ")}); break;`;
 }).join("\n");
 
+const fixedLayouts = {};
+for (const op of spec.ops) {
+  let offset = 1;
+  const fields = {};
+  if (op.result) { fields.handle = offset; offset += 4; }
+  for (const arg of op.args) {
+    const size = ({ u32: 4, i32: 4, f32: 4, f64: 8, bool: 1, handle: 4, upload: 8, readback: 8 })[arg.type];
+    if (!size) { offset = 0; break; }
+    fields[arg.name] = offset; offset += size;
+  }
+  if (offset) fixedLayouts[camel(op.name)] = { code: op.code, bytes: offset, fields };
+}
+
 const host = `// generated from gpu/ops.json by gpu/generate.mjs — do not edit\n` +
   Object.entries(spec.constants).map(([name, value]) => `export const ${name} = ${value};`).join("\n") + "\n" +
   spec.events.map((event) => `export const GPU_EVENT_${upper(event.name)} = ${event.code};`).join("\n") + `\n\n` +
@@ -102,6 +115,7 @@ export const GPU_HANDLE_GENERATION_BITS = ${spec.handle.generationBits};
 export const GPU_MAX_PENDING_REQUESTS = ${spec.maxPendingRequests};
 export const GPU_ENUMS = ${JSON.stringify(spec.enums, null, 2)};
 export const GPU_RECORDS = ${JSON.stringify(spec.records, null, 2)};
+export const GPU_FIXED_LAYOUTS = ${JSON.stringify(fixedLayouts, null, 2)};
 
 export function readGpuRecord(kind, values, offset = 0) {
   const fields = GPU_RECORDS[kind];
