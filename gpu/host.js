@@ -691,15 +691,19 @@ export function createGpuHost(options) {
       request(requestId, GPU_EVENT_MAP_READY, buffer, async (current, record) => {
         await resource.mapAsync(mode, start, length);
         if (!current()) return;
+        let data;
         try {
-          const memory = getMemory();
-          range(memory, target, length);
-          new Uint8Array(memory, target, length).set(new Uint8Array(resource.getMappedRange(start, length)));
+          range(getMemory(), target, length);
+          const mapped = new Uint8Array(resource.getMappedRange(start, length));
+          if (mapped.byteLength !== length) throw new Error("GPU mapped range has an unexpected length");
+          // Callback byte views are read-only. Stage owned host bytes; the embedding passes these
+          // to a guest export which copies into its own arena before delivering MAP_READY.
+          data = mapped.slice();
         } finally {
           resource.unmap();
           state.map = UNMAPPED;
         }
-        settle(requestId, record, GPU_EVENT_MAP_READY, GPU_STATUS_OK, { offset: destination.offset, length });
+        settle(requestId, record, GPU_EVENT_MAP_READY, GPU_STATUS_OK, { offset: destination.offset, length, data });
       }, {
         readback: [target, target + length],
         cleanup: (status) => {

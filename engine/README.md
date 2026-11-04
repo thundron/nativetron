@@ -72,3 +72,11 @@ See [engine IPC](../ipc/ENGINE.md) for the exact generated description and codec
 | WKWebView, iOS/Android/Windows webviews | lifecycle paths not verified on these hosts |
 
 The worker probe is capability-based, not an OS-version guess. No adapter produces a capability event and visible unavailable report.
+
+### Full-frame engine entry and readback ownership
+
+New engines export `receive(bytes)` as well as the legacy `message(topic, payload)` entry. `receive` gets an immutable copy of the complete generated envelope: kind, source/target lanes, request ID, topic and payload. The compiled GPU example replies to correlated commands on the originating lane with the same ID and topic; RESULT means accepted/queued, not GPU completion. Legacy `message` is retained for uncorrelated traffic; nonzero IDs require `receive` and are explicitly refused otherwise. The page uses `createEngine`, bounded startup queues and nonthrowing `trySend` in UI callbacks; UI deliveries are deferred to avoid callback-time reentry. Host lifecycle failures and capabilities reach the native observer as reports, not only the page log. Debug event/report histories are bounded.
+
+GPU callback buffers are read-only. Successful readbacks stage owned host bytes, then call the guest `readback(offset, bytes)` export before MAP_READY; that export uses `gpu.writeReadback` to write its own arena. The reactor strips readback data before publishing event metadata to the page/native UI. Uploads remain direct linear-memory WebGPU writes. See `gpu/README.md` for readback copy costs and lifetime.
+
+The demo native colour accelerator is Cmd/Ctrl+R, leaving Cmd/Ctrl+K for the command palette. Applications registering their own native shortcuts must reserve them with their command registry.

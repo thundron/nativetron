@@ -1,6 +1,7 @@
+import { GPU_PROTOCOL_HEADER_BYTES, writeGpuProtocolHeader } from "../../gpu/gpu-host.generated.js";
 // Test-only stand-in for scriptc's generated reactor glue (`instantiateFromBytes(bytes, host)`).
 // Behaviour is chosen by the module URL's `mode` query, so each mode is a separate module instance.
-import { encodeEngineMessage, ENGINE_RESULT, LANE_ENGINE, LANE_NATIVE, LANE_UI } from "../../ipc/engine.generated.mjs";
+import { decodeEngineMessage, encodeEngineMessage, ENGINE_RESULT, LANE_ENGINE, LANE_NATIVE, LANE_UI } from "../../ipc/engine.generated.mjs";
 
 const mode = new URL(import.meta.url).searchParams.get("mode") ?? "ok";
 const log = (globalThis.__engineFixture ??= { instances: 0, calls: [], hooks: {} });
@@ -20,13 +21,21 @@ export async function instantiateFromBytes(bytes, host) {
   const leave = (name) => { log.calls.push({ id, name: name + ":exit" }); depth--; };
   // Raw GPU batches in reactor memory, as compiled code would emit them: opcode 1 requestDevice, opcode 47 requestFrame.
   const present = (bytes) => {
-    new Uint8Array(memory.buffer, 0, bytes.length).set(bytes);
-    host.gpuPresent(new Uint8Array(memory.buffer, 0, bytes.length), new Uint8Array(memory.buffer, 1024, 0), new Uint8Array(memory.buffer, 2048, 0));
+    const batch = new Uint8Array(memory.buffer, 0, GPU_PROTOCOL_HEADER_BYTES + bytes.length);
+    writeGpuProtocolHeader(batch); batch.set(bytes, GPU_PROTOCOL_HEADER_BYTES);
+    host.gpuPresent(batch, new Uint8Array(memory.buffer, 1024, 0), new Uint8Array(memory.buffer, 2048, 0));
   };
   const requestDevice = () => { const bytes = new Uint8Array(21); const view = new DataView(bytes.buffer); bytes[0] = 1; view.setUint32(1, 1, true); view.setUint32(5, 0, true); view.setUint32(9, 0, true); view.setFloat64(13, 0, true); present(bytes); };
   const frame = (target, topic, payload) => encodeEngineMessage(ENGINE_RESULT, LANE_ENGINE, target, topic, topic, payload);
   return {
     __memory: () => memory.buffer,
+    ...(mode === "full-envelope" ? { fx_receive(bytes) {
+      const message = decodeEngineMessage(bytes);
+      enter("receive", [Array.from(bytes)]);
+      try { host.engineSend(encodeEngineMessage(ENGINE_RESULT, LANE_ENGINE, message.source, message.requestId, message.topic, message.payload)); }
+      finally { leave("receive"); }
+      return 0;
+    } } : {}),
     fx_start() {
       enter("start", []);
       try {

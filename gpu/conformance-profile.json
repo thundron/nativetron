@@ -73,6 +73,15 @@
         "f64"
       ],
       "returns": "f64"
+    },
+    {
+      "export": "readback",
+      "symbol": "ntconf_readback",
+      "params": [
+        "f64",
+        "bytes"
+      ],
+      "returns": "f64"
     }
   ]
 }

@@ -27,6 +27,13 @@
         "string"
       ],
       "returns": "void"
+    },
+    {
+      "name": "engineSend",
+      "params": [
+        "bytes"
+      ],
+      "returns": "void"
     }
   ],
   "exports": [
@@ -76,6 +83,23 @@
       "export": "growFrame",
       "symbol": "ntgpu_grow_frame",
       "params": [],
+      "returns": "f64"
+    },
+    {
+      "export": "receive",
+      "symbol": "ntgpu_receive",
+      "params": [
+        "bytes"
+      ],
+      "returns": "f64"
+    },
+    {
+      "export": "readback",
+      "symbol": "ntgpu_readback",
+      "params": [
+        "f64",
+        "bytes"
+      ],
       "returns": "f64"
     }
   ]

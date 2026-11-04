@@ -169,6 +169,12 @@ export async function instantiateReactor(prepared, options) {
     finally { active = false; }
   };
   const deliver = (event) => {
+    if (event.data) {
+      if (typeof api[`${prefix}readback`] !== "function") { fail(new EngineError("readback-export-required", "reactor must export readback(offset, bytes) for GPU readback")); return; }
+      call("readback", event.offset, event.data);
+      const { data, ...metadata } = event; event = metadata;
+      if (failure || disposed) return;
+    }
     let value = 0, text = event.message ?? event.reason ?? "";
     if (event.type === 1 && event.available) { value = event.features.includes("timestamp-query") ? 1 : 0; text = JSON.stringify(event); }
     else if (event.type === 7) text = JSON.stringify(event.messages);
@@ -184,7 +190,11 @@ export async function instantiateReactor(prepared, options) {
     while (inbox.length && !failure && !disposed) {
       const item = inbox.shift();
       if (item.event) { inboxEvents--; deliver(item.event); }
-      else { inboxMessages--; consumed++; call("message", item.topic, item.payload); }
+      else {
+        inboxMessages--; consumed++;
+        if (typeof api[`${prefix}receive`] === "function") call("receive", item.frame);
+        else call("message", item.topic, item.payload);
+      }
     }
     if (consumed) safe(options.onConsumed, consumed);
   };
@@ -224,8 +234,9 @@ export async function instantiateReactor(prepared, options) {
       if (!message || message.target !== LANE_ENGINE) throw new Error("invalid engine destination");
       if (disposed) throw new EngineError("disposed", "engine reactor disposed");
       if (failure) throw new EngineError("failed", `engine reactor failed: ${failure.message}`, { cause: failure });
+      if (typeof api[`${prefix}receive`] !== "function" && message.requestId !== 0) throw new EngineError("envelope-export-required", "reactor must export receive(bytes) to preserve correlation identifiers");
       if (inboxMessages >= inboundLimit) throw new EngineError("queue-full", "engine inbound queue full");
-      inbox.push({ topic: message.topic, payload: message.payload.slice() }); inboxMessages++; schedule();
+      inbox.push({ topic: message.topic, payload: message.payload.slice(), frame: bytes.slice() }); inboxMessages++; schedule();
     },
     resize(width, height, dpr) {
       if (disposed || failure) return;

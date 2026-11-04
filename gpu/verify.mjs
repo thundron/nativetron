@@ -269,7 +269,7 @@ test("upload uses the current grown memory, not copied command bytes", async () 
   f.host.dispose();
 });
 
-test("async map reacquires memory after growth and unmaps before completion", async () => {
+test("async map never mutates borrowed bytes, stages owned data after growth and unmaps before completion", async () => {
   const f = await connected();
   assert.equal(f.apply([
     ["createBuffer", h(1), 16, C.BUFFER_USAGE_MAP_READ | C.BUFFER_USAGE_COPY_DST, false, "readback"],
@@ -279,7 +279,9 @@ test("async map reacquires memory after growth and unmaps before completion", as
   f.memory.grow(1);
   f.mock.maps[0].resolve();
   await settle();
-  assert.deepEqual([...new Uint8Array(f.memory.buffer, 32768, 4)], [1, 2, 3, 4]);
+  assert.deepEqual([...new Uint8Array(f.memory.buffer, 32768, 4)], [0, 0, 0, 0]);
+  assert.deepEqual([...f.terminal(2)[0].data], [1, 2, 3, 4]);
+  assert.notEqual(f.terminal(2)[0].data.buffer, f.memory.buffer);
   assert.equal(f.mock.maps[0].buffer.unmaps, 1);
   assert.deepEqual(f.terminal(2).map((event) => [event.type, event.status, event.handle]), [[E.MAP_READY, S.OK, h(1)]]);
   f.host.dispose();

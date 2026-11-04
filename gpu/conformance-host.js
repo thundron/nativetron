@@ -13,6 +13,7 @@ export async function loadConformance({ canvas, bytes, moduleUrl = new URL("./.s
       events.push(event);
       observe(event);
       queueMicrotask(() => {
+        if (event.data) api.ntconf_readback(event.offset, event.data);
         const value = event.type === 1 ? event.featureBits ?? 0 : 0;
         api.ntconf_event(event.type, event.requestId, event.handle, event.status, value, JSON.stringify(event));
       });

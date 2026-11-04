@@ -112,6 +112,13 @@ export function readbackView(slice: ReadbackSlice): Uint8Array {
   return readbacks.subarray(slice.offset, slice.offset + slice.length);
 }
 
+// Called from a guest export, never by mutating the read-only gpuPresent callback views.
+export function writeReadback(offset: number, bytes: Uint8Array): number {
+  if (!Number.isInteger(offset) || offset < 0 || offset + bytes.length > readbacks.length) throw new Error("invalid GPU readback destination");
+  readbacks.set(bytes, offset);
+  return 0;
+}
+
 export function resetReadbacks(): void {
   readbackOffset = 0;
 }

@@ -407,3 +407,5 @@ export function frame(_timeMs: number): number {
 export function message(_kind: number, _payload: Uint8Array): number {
   return 0;
 }
+
+export function readback(offset: number, bytes: Uint8Array): number { return gpu.writeReadback(offset, bytes); }

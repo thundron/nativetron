@@ -1,3 +1,4 @@
+import { decodeEngineMessage, encodeEngineMessage, ENGINE_COMMAND, ENGINE_RESULT, ENGINE_ERROR, LANE_ENGINE } from "../ipc/engine.generated.js";
 import * as gpu from "./index.js";
 import {
   setSink, flush, reserveUpload, uploadView, reserveReadback, readbackView,
@@ -6,6 +7,7 @@ import {
 
 declare function gpuPresent(batch: Uint8Array, uploads: Uint8Array, readbacks: Uint8Array): void;
 declare function gpuReport(message: string): void;
+declare function engineSend(frame: Uint8Array): void;
 
 const COMPUTE = `
 @group(0) @binding(0) var<storage, read_write> data: array<u32>;
@@ -35,7 +37,7 @@ let compute = 0;
 let render = 0;
 let computeGroup = 0;
 let renderGroup = 0;
-let readback = 0;
+let readbackBuffer = 0;
 let queries = 0;
 let queryBuffer = 0;
 let queryReadback = 0;
@@ -62,7 +64,7 @@ interface DemoCapabilities { format: string; }
 function setup(timestamp: boolean, format: string): void {
   gpu.configureCanvas(format, gpu.TEXTURE_USAGE_RENDER_ATTACHMENT, 0, 0);
   storage = gpu.createBuffer(8192, gpu.BUFFER_USAGE_STORAGE | gpu.BUFFER_USAGE_INDIRECT | gpu.BUFFER_USAGE_COPY_SRC | gpu.BUFFER_USAGE_COPY_DST, false, "compute output + indirect arguments");
-  readback = gpu.createBuffer(4096, gpu.BUFFER_USAGE_MAP_READ | gpu.BUFFER_USAGE_COPY_DST, false, "readback");
+  readbackBuffer = gpu.createBuffer(4096, gpu.BUFFER_USAGE_MAP_READ | gpu.BUFFER_USAGE_COPY_DST, false, "readback");
   result = reserveReadback(4096);
   uploadBuffer = gpu.createBuffer(16777216, gpu.BUFFER_USAGE_COPY_DST | gpu.BUFFER_USAGE_COPY_SRC, false, "16 MiB upload");
   const upload = reserveUpload(16777216);
@@ -139,7 +141,7 @@ export function frame(_timeMs: number): number {
   gpu.renderDrawIndirect(renderPass, storage, 4096);
   gpu.endRenderPass(renderPass);
   if (firstFrame) {
-    gpu.copyBufferToBuffer(encoder, storage, 0, readback, 0, 4096);
+    gpu.copyBufferToBuffer(encoder, storage, 0, readbackBuffer, 0, 4096);
     if (queries !== 0) {
       gpu.resolveQuerySet(encoder, queries, 0, 2, queryBuffer, 0);
       gpu.copyBufferToBuffer(encoder, queryBuffer, 0, queryReadback, 0, 16);
@@ -153,7 +155,7 @@ export function frame(_timeMs: number): number {
   const command = gpu.finishCommandEncoder(encoder, "demo commands");
   gpu.queueSubmit([command]);
   if (firstFrame) {
-    gpu.mapAsync(30, readback, gpu.MAP_MODE_READ, 0, 4096, result);
+    gpu.mapAsync(30, readbackBuffer, gpu.MAP_MODE_READ, 0, 4096, result);
     if (queries !== 0) gpu.mapAsync(31, queryReadback, gpu.MAP_MODE_READ, 0, 16, timings);
     gpu.onSubmittedWorkDone(32);
   }
@@ -194,3 +196,13 @@ export function growFrame(): number {
   gpu.requestFrame(); flush();
   return 0;
 }
+
+export function receive(bytes: Uint8Array): number {
+  const frame = decodeEngineMessage(bytes);
+  if (frame === null || frame.target !== LANE_ENGINE || frame.kind !== ENGINE_COMMAND) return 1;
+  const status = frame.topic === 1 ? message(frame.topic, frame.payload) : 1;
+  if (frame.requestId !== 0) engineSend(encodeEngineMessage(status === 0 ? ENGINE_RESULT : ENGINE_ERROR, LANE_ENGINE, frame.source, frame.requestId, frame.topic, new Uint8Array(0)));
+  return status;
+}
+
+export function readback(offset: number, bytes: Uint8Array): number { return gpu.writeReadback(offset, bytes); }

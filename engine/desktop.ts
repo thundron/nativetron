@@ -11,7 +11,7 @@ const assets = process.env.NT_ENGINE_ASSETS ?? join(process.cwd(), "build", "eng
 if (ntAssetsConfigure(assets, "engine/page.html", 1) !== 1) throw new Error("engine asset directory missing");
 mountStyled("nativetron — in-page GPU reactor", 900, 700, "");
 if (!setApplicationMenu([{ label: "Engine", items: [
-  { label: "Change clear colour", key: "k", action: () => {
+  { label: "Change clear colour", key: "r", action: () => {
     sendEngineMessage(encodeEngineMessage(ENGINE_COMMAND, LANE_NATIVE, LANE_ENGINE, 1, 1, new Uint8Array(0)));
   } },
   { label: "Quit", key: "q", action: () => quit() },

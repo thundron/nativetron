@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createEngine, startEngine, watchViewport, ENGINE_STARTUP_QUEUE_LIMIT, ENGINE_CONTROL_QUEUE_LIMIT } from "./host.js";
 import { createOutbound, createRateWindow, instantiateReactor, prepareReactor, wasmExportNames, ENGINE_OUTBOUND_LIMIT } from "./reactor.js";
-import { decodeEngineMessage, ENGINE_MAX_RATE, LANE_NATIVE, LANE_UI } from "../ipc/engine.generated.mjs";
+import { decodeEngineMessage, encodeEngineMessage, ENGINE_COMMAND, ENGINE_RESULT, LANE_ENGINE, ENGINE_MAX_RATE, LANE_NATIVE, LANE_UI } from "../ipc/engine.generated.mjs";
 import { baseOptions, bridgedWorkerClass, fakeCanvas, fakeDocument, fakeGpu, fixtureLog, fixtureWasm, glue, manualClock, native, pageScope, scriptedWorkerClass, settle, ui, wasmUrl } from "./fixtures/harness.mjs";
 
 const callsOf = (id) => fixtureLog().calls.filter((call) => call.id === id);
@@ -661,4 +661,25 @@ test("GPU host frame callbacks cannot reenter an active export; device loss rest
   await lane.dispose();
   assert.equal(gpu.devices[1].destroyed, true, "disposed lane kept its device");
   assert.deepEqual(scope.leaks(), { windowListeners: 0, media: 0, observers: 0, frames: 0 });
+});
+
+
+test("full-frame reactor entry preserves kind, lanes, request id, topic and immutable payload", async () => {
+  const { options, toUi, toNative } = baseOptions({ moduleUrl: glue("full-envelope") });
+  const lane = await startEngine(options);
+  const frames = [
+    encodeEngineMessage(ENGINE_COMMAND, LANE_UI, LANE_ENGINE, 0x12345678, 19, new Uint8Array([0,255,17])),
+    encodeEngineMessage(ENGINE_COMMAND, LANE_NATIVE, LANE_ENGINE, 0xabcdef01, 20, new Uint8Array([7,0,9])),
+  ];
+  lane.send(frames[0], LANE_UI); lane.send(frames[1], LANE_NATIVE);
+  frames[0].fill(0); frames[1].fill(0);
+  await settle();
+  const a = decodeEngineMessage(toUi.at(-1)), b = decodeEngineMessage(toNative.filter(frame => decodeEngineMessage(frame).kind === ENGINE_RESULT).at(-1));
+  assert.deepEqual([a.kind,a.source,a.target,a.requestId,a.topic,...a.payload], [ENGINE_RESULT,LANE_ENGINE,LANE_UI,0x12345678,19,0,255,17]);
+  assert.deepEqual([b.kind,b.source,b.target,b.requestId,b.topic,...b.payload], [ENGINE_RESULT,LANE_ENGINE,LANE_NATIVE,0xabcdef01,20,7,0,9]);
+  await lane.dispose();
+  const legacy = baseOptions().options;
+  const reactor = await instantiateReactor(await prepareReactor(legacy), legacy);
+  assert.throws(() => reactor.receive(encodeEngineMessage(ENGINE_COMMAND, LANE_UI, LANE_ENGINE, 1, 1, new Uint8Array(0))), { code: "envelope-export-required" });
+  reactor.dispose();
 });
