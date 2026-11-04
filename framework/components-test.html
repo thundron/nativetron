@@ -3,12 +3,12 @@
 <script type="module">
 import { instantiateFromBytes } from "./.scriptc/components.fixture.mjs";
 import { bindEventCallbacks } from "../host/event.generated.mjs";
-import { formatLocaleNumber } from "../i18n/host.js";
+import { createLocaleFormatHost } from "../i18n/host.js";
 import { installCommandKeys } from "../commands/host.js";
 let api;
 bindEventCallbacks(window, () => api, "nt");
 api = await instantiateFromBytes(await (await fetch("./.scriptc/components.fixture.wasm")).arrayBuffer(), {
-  present: bytes => window.__nt.applyBin(bytes), localeNumber: formatLocaleNumber,
+  present: bytes => window.__nt.applyBin(bytes), ...createLocaleFormatHost().imports,
 });
 installCommandKeys(document.getElementById("nt-root"), ["Meta+j"]);
 api.nt_start();

@@ -20,13 +20,20 @@
       "returns": "void"
     },
     {
-      "name": "localeNumber",
+      "name": "localeFormatBegin",
       "params": [
         "f64",
         "string",
         "string",
         "f64",
-        "bytes"
+        "f64"
+      ],
+      "returns": "f64"
+    },
+    {
+      "name": "localeFormatByte",
+      "params": [
+        "f64"
       ],
       "returns": "f64"
     }
@@ -78,6 +85,7 @@
         "string",
         "f64",
         "string",
+        "f64",
         "f64"
       ],
       "returns": "f64"

@@ -203,8 +203,37 @@
         "string",
         "f64",
         "string",
+        "f64",
         "f64"
       ],
+      "returns": "f64"
+    },
+    {
+      "export": "startAuto",
+      "symbol": "nt_startAuto",
+      "params": [],
+      "returns": "f64"
+    },
+    {
+      "export": "setAutoHeight",
+      "symbol": "nt_setAutoHeight",
+      "params": [
+        "f64"
+      ],
+      "returns": "f64"
+    },
+    {
+      "export": "scrollAuto",
+      "symbol": "nt_scrollAuto",
+      "params": [
+        "f64"
+      ],
+      "returns": "f64"
+    },
+    {
+      "export": "disposeAuto",
+      "symbol": "nt_disposeAuto",
+      "params": [],
       "returns": "f64"
     }
   ]

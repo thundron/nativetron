@@ -242,13 +242,13 @@ export function dispatchSlotValue(slot: number, value: string): void {
   if (event !== null) handler(event);
 }
 
-export function dispatchSlotRich(slot: number, value: string, checked: number, key: string, code: string, modifiers: number, inputType: string, scrollTop: number): void {
+export function dispatchSlotRich(slot: number, value: string, checked: number, key: string, code: string, modifiers: number, inputType: string, scrollTop: number, clientHeight: number): void {
   const handler = handlerFns[slot];
   if (handler === undefined || !handlerActive[slot]) return;
   const nodeId = handlerNodeIds[slot];
   const eventType = handlerEventTypes[slot];
   if (nodeId === undefined || eventType === undefined) return;
-  const event = decodeHostEvent(nodeId, eventType, value, checked, key, code, modifiers, inputType, scrollTop);
+  const event = decodeHostEvent(nodeId, eventType, value, checked, key, code, modifiers, inputType, scrollTop, clientHeight);
   if (event !== null) handler(event);
 }
 /* /generated:event-dispatch */

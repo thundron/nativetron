@@ -9,6 +9,7 @@
 | field | meaning |
 |---|---|
 | `viewport: Signal<number>` | reactive viewport height in CSS pixels; replaces `height` and restyles the scroller |
+| `autoSize: boolean` | observes its CSS height with owned ResizeObserver; a supplied `viewport` receives measurements |
 | `activeIndex: Signal<number>` | logical row kept mounted while it is outside the window, for focus and editing; `-1` for none |
 | `label: string` | `aria-label` on the scroller, which also becomes keyboard-focusable (`tabindex=0`) |
 
@@ -20,7 +21,7 @@
 
 ## Behaviour
 
-Scroll offset. `scrollTop` mirrors the DOM scroller and is written by the generated `scroll` event (`abi/events.json`, bounded finite `scrollTop`). Mounting a scroller writes `0`, because a new DOM scroller starts at the top. When the collection shrinks or the viewport grows, the DOM clamps its offset; the list writes the same clamped value back, so later growth does not render rows for an unreachable position. Application writes are not reflected in the DOM scroll position; see the open requirements below.
+Scroll offset. `scrollTop` is bidirectional through the generated bounded numeric property and scroll event. A saved value is restored after the whole batch is inserted, so layout exists before assignment. Collection/viewport changes clamp it to the reachable range. `scrollToIndex(scrollTop, index, count, rowHeight, height, alignment = "nearest")` supports start/center/end/nearest and validates all geometry before changing the signal.
 
 Jumps. Any offset maps directly to its range with no incremental walk; a jump replaces the window in one keyed diff. The Chrome test jumps across a 1,000,000-row, 16,000,000-pixel list and checks against the layout engine that the row at the scroller's top edge is `floor(scrollTop / rowHeight)`.
 
@@ -42,10 +43,10 @@ SCRIPTC=/path/to/scriptc/packages/cli/dist/main.js node framework/virtual.test.m
 
 The test compiles `virtual.selftest.ts` natively and checks range, pinned-window, collapsed/fractional/huge offsets, exact pixel accounting and every refused input. It then builds `virtual.fixture.ts` as a wasm reactor (`virtual-profile.json`, `virtual-test.html`) and drives it in headless Chrome with DOM scrolling, CDP key and text input, focus and clicks: initial bounded windows for four lists; reactive viewport growth, shrink and collapse with offset clamping; 1,000,000-row jumps checked against layout; shrink/empty/grow and refused invalid counts; index-identity remounting; key-identity retention of DOM nodes and row-local click state across rotation and reversal; duplicate refusal with an intact window, and the panic for a scroll-exposed duplicate; in-place and direct-read edits; a pinned focused editor kept across 120,000-pixel scrolls with continued typing; a pinned row after the window and its release on shrink; native End/Home/PageDown scrolling; 1,200 compiled mount/scroll/reorder/dispose cycles with live row/list counts and wasm linear memory unchanged over the final 1,000; and 10 page-driven remounts that leave `#nt-root` empty. `node framework/components.test.mjs` continues to cover the original 10,000-row calls. These are correctness and boundedness checks, not timings.
 
-## Open requirements outside this stream
+## Sizing and remaining limits
 
-- Programmatic scroll: the host's `SET_PROP` has no `scrollTop`, and FOCUS prevents scrolling. Scroll restoration, scroll-to-index and a keyboard row cursor that scrolls its row into view need a bounded scroll operation or property (finite, 0–2³⁰) owned by the ABI integrator; then `scrollTop` can become bidirectional. Until then the list resets the signal to the DOM's 0 on mount instead of showing an unreachable window.
-- Automatic viewport size: no resize or element-size event exists, so `viewport` is application-supplied.
-- A keydown default-action control would be needed before custom arrow-key handling could coexist with native scroller keys.
-- Fixture generation: `abi/generate.mjs` does not yet own the event-export region of `virtual.fixture.ts` or the event exports in `virtual-profile.json`; the test asserts both equal the generated copies in `components.fixture.ts`/`components-profile.json`. The integrator should add the two files to the generator's targets.
-- Browser engines cap element layout size well below the 2³⁰ guest bound, at engine-specific limits the guest cannot detect; only a 16,000,000-pixel list in Chrome is verified, so keep `count × rowHeight` at or under that unless the target engine is tested. WKWebView and other engines are not runtime-verified by this stream.
+`autoSize: true` uses `height:100%` and an owned ResizeObserver, not polling. Give its parent a definite CSS height. The initial `height` is used before the first observation. A supplied `viewport` signal becomes measurement output in auto mode. Removal disconnects the observer; queued stale callbacks cannot dispatch. Explicit viewport signals remain supported when layout is application-controlled.
+
+Native event version 3 adds bounded `clientHeight` for generated resize events. Properties, limits, and all fixture export/profile surfaces are generated from the shared ABI source. Real Chrome tests verify automatic parent resizing, initial scroll restoration, scroll-to-index and observer disposal in addition to the stress tests above.
+
+Custom arrow selection needs a declarative default-action policy to replace native scroller key handling; native End/Home/PageDown work already. Browser engines cap layout size below the protocol's numeric bound; the 16,000,000-pixel Chrome case is verified, not every engine's maximum. Fixed row height remains explicit.

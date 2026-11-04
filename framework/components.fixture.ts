@@ -3,17 +3,21 @@ import { el, txt, dyn, attr, on, mountTo, unmount, type El } from "./ui.js";
 import { signal } from "./reactive.js";
 import { virtualList, virtualTable, visibleRange } from "./virtual.js";
 import { createCommandRegistry, commandPalette } from "../commands/index.js";
-import { message, numberArgument, textArgument, formatNumber, formatUnit, setLocaleFormatter } from "../i18n/index.js";
+import { message, numberArgument, textArgument, formatNumber, formatUnit, setLocaleFormatter, pullLocaleFormatter } from "../i18n/index.js";
 
 declare function present(bytes: Uint8Array): void;
-declare function localeNumber(value: number, locale: string, unit: string, digits: number, output: Uint8Array): number;
+declare function localeFormatBegin(value: number, locale: string, unit: string, digits: number, capacity: number): number;
+declare function localeFormatByte(index: number): number;
 const count = signal(10000), enabled = signal(true), executions = signal(0), scrollTop = signal(0);
 const registry = createCommandRegistry();
 let root: El = { roots: [], cleanups: [] };
 
 export function start(): number {
   setBinarySink((bytes: Uint8Array) => present(bytes));
-  setLocaleFormatter((value: number, locale: string, unit: string, digits: number, output: Uint8Array) => localeNumber(value, locale, unit, digits, output));
+  setLocaleFormatter(pullLocaleFormatter(
+    (value: number, locale: string, unit: string, digits: number, capacity: number) => localeFormatBegin(value, locale, unit, digits, capacity),
+    (index: number) => localeFormatByte(index),
+  ));
   registry.register({ id: "hello", labelKey: "commands.title", shortcut: "Meta+j", enabled, run: () => executions.set(executions.get() + 1) });
   const list = attr(virtualList({ count: () => count.get(), key: (index: number) => "row-" + index,
     render: (index: number) => attr(el("span", [txt("row " + index)]), "data-row", "" + index),
@@ -69,8 +73,9 @@ export function onEventRich(
   modifiers: number,
   inputType: string,
   scrollTop: number,
+  clientHeight: number,
 ): number {
-  dispatchSlotRich(slot, value, checked, key, code, modifiers, inputType, scrollTop);
+  dispatchSlotRich(slot, value, checked, key, code, modifiers, inputType, scrollTop, clientHeight);
   flush();
   return 0;
 }

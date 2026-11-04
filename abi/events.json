@@ -1,7 +1,7 @@
 {
   "format": 2,
   "nativeMessage": {
-    "version": 2,
+    "version": 3,
     "kind": "event"
   },
   "primaryField": "value",
@@ -70,6 +70,13 @@
       "source": "targetScrollTop",
       "maximum": 1073741824,
       "default": 0
+    },
+    {
+      "name": "clientHeight",
+      "type": "boundedNumber",
+      "source": "targetClientHeight",
+      "maximum": 1073741824,
+      "default": 0
     }
   ],
   "safeEvents": [
@@ -83,6 +90,7 @@
     "submit",
     "pointerdown",
     "pointerup",
-    "scroll"
+    "scroll",
+    "resize"
   ]
 }

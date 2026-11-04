@@ -27,13 +27,43 @@
   var EVENT_MODIFIERS_LIMIT = 15;
   var EVENT_INPUT_TYPE_LIMIT = 32;
   var EVENT_SCROLL_TOP_LIMIT = 1073741824;
-  var SAFE_EVENTS = { click: 1, input: 1, change: 1, keydown: 1, keyup: 1, focus: 1, blur: 1, submit: 1, pointerdown: 1, pointerup: 1, scroll: 1 };
+  var EVENT_CLIENT_HEIGHT_LIMIT = 1073741824;
+  var SAFE_EVENTS = { click: 1, input: 1, change: 1, keydown: 1, keyup: 1, focus: 1, blur: 1, submit: 1, pointerdown: 1, pointerup: 1, scroll: 1, resize: 1 };
 /* /generated:event-constants */
+  /* generated:property-contract */
   var SAFE_PROPERTIES = {
-    value: "string", checked: "boolean", disabled: "boolean",
-    selected: "boolean", indeterminate: "boolean", readOnly: "boolean",
-    selectedIndex: "index"
-  };
+  "value": {
+    "kind": "string",
+    "maximum": 4096
+  },
+  "checked": {
+    "kind": "boolean"
+  },
+  "disabled": {
+    "kind": "boolean"
+  },
+  "selected": {
+    "kind": "boolean"
+  },
+  "indeterminate": {
+    "kind": "boolean"
+  },
+  "readOnly": {
+    "kind": "boolean"
+  },
+  "selectedIndex": {
+    "kind": "index",
+    "minimum": -999999,
+    "maximum": 999999
+  },
+  "scrollTop": {
+    "kind": "number",
+    "minimum": 0,
+    "maximum": 1073741824,
+    "deferred": true
+  }
+};
+/* /generated:property-contract */
   var SAFE_SVG_TAGS = {
     svg: 1, g: 1, path: 1, circle: 1, rect: 1, line: 1,
     polyline: 1, polygon: 1, ellipse: 1, title: 1
@@ -42,6 +72,7 @@
   var overflowNodes = new Map();
   var nodeIdKey = Symbol("nativetronNodeId");
   var handlers = {};
+  var resizeObservers = {};
   var handlerTypes = new Map();
   var interned = [];
   var paintScheduled = false;
@@ -75,6 +106,7 @@
     if (h) {
       var n = node(id);
       if (n) n.removeEventListener(type, h);
+      if (resizeObservers[key]) { resizeObservers[key].disconnect(); delete resizeObservers[key]; }
       delete handlers[key];
       var types = handlerTypes.get(id) || [];
       var at = types.indexOf(type);
@@ -115,34 +147,49 @@
     var modifiers = ev ? (ev.altKey ? 1 : 0) | (ev.ctrlKey ? 2 : 0) | (ev.metaKey ? 4 : 0) | (ev.shiftKey ? 8 : 0) : 0;
     var inputType = ev && typeof ev.inputType === "string" ? boundedText(ev.inputType, EVENT_INPUT_TYPE_LIMIT) : "";
     var scrollTop = ev && ev.type === "scroll" && target && Number.isFinite(target.scrollTop) ? Math.max(0, Math.min(1073741824, target.scrollTop)) : 0;
-    if (value === "" && checked === -1 && key === "" && code === "" && modifiers === 0 && inputType === "" && scrollTop === 0) { window.__nt_event(slot); return; }
-    if (checked === -1 && key === "" && code === "" && modifiers === 0 && inputType === "" && scrollTop === 0) { window.__nt_event_value(slot, value); return; }
-    window.__nt_event_rich(slot, value, checked, key, code, modifiers, inputType, scrollTop);
+    var clientHeight = ev && ev.type === "resize" && target && Number.isFinite(target.clientHeight) ? Math.max(0, Math.min(1073741824, target.clientHeight)) : 0;
+    if (value === "" && checked === -1 && key === "" && code === "" && modifiers === 0 && inputType === "" && scrollTop === 0 && clientHeight === 0) { window.__nt_event(slot); return; }
+    if (checked === -1 && key === "" && code === "" && modifiers === 0 && inputType === "" && scrollTop === 0 && clientHeight === 0) { window.__nt_event_value(slot, value); return; }
+    window.__nt_event_rich(slot, value, checked, key, code, modifiers, inputType, scrollTop, clientHeight);
 /* /generated:event-projection */
   }
 
   function attachSlot(id, type, slot) {
-    if (!SAFE_EVENTS[type]) throw new Error("unsupported event type: " + type);
+    if (SAFE_EVENTS[type] !== 1) throw new Error("unsupported event type: " + type);
     var key = id + ":" + type;
     if (handlers[key]) return;
-    var h = function (ev) { dispatchEvent(slot, ev); };
+    var n = node(id);
+    if (!n) throw new Error("unknown listener node");
+    if (type === "resize" && typeof ResizeObserver !== "function") throw new Error("ResizeObserver unavailable");
+    var h = function (ev) { if (node(id) === n && handlers[key] === h) dispatchEvent(slot, ev); };
     handlers[key] = h;
     var types = handlerTypes.get(id) || [];
     types.push(type);
     handlerTypes.set(id, types);
-    node(id).addEventListener(type, h);
+    if (type === "resize") {
+      var observer = new ResizeObserver(function () { h({ type: "resize", target: n }); });
+      resizeObservers[key] = observer;
+      observer.observe(n);
+    } else n.addEventListener(type, h);
   }
 
-  function setSafeProperty(target, name, value) {
-    var kind = SAFE_PROPERTIES[name];
-    if (!kind) throw new Error("unsupported property: " + name);
-    if (kind === "boolean") { target[name] = value === "true"; return; }
-    if (kind === "index") {
-      if (!/^-?\d{1,6}$/.test(value)) throw new Error("invalid selectedIndex");
-      target[name] = Number(value);
+  function setSafeProperty(target, name, value, deferred) {
+    if (!Object.prototype.hasOwnProperty.call(SAFE_PROPERTIES, name)) throw new Error("unsupported property: " + name);
+    var contract = SAFE_PROPERTIES[name];
+    if (contract.kind === "boolean") {
+      if (value !== "true" && value !== "false") throw new Error("invalid boolean property");
+      target[name] = value === "true"; return;
+    }
+    if (contract.kind === "index" || contract.kind === "number") {
+      if (!/^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:e[+-]?\d+)?$/i.test(value)) throw new Error("invalid numeric property");
+      var numeric = Number(value);
+      if (!Number.isFinite(numeric) || numeric < contract.minimum || numeric > contract.maximum || (contract.kind === "index" && !Number.isInteger(numeric))) throw new Error("numeric property out of bounds");
+      if (contract.deferred) deferred.push({ target: target, name: name, value: numeric });
+      else target[name] = numeric;
       return;
     }
-    target[name] = value.length > EVENT_VALUE_LIMIT ? value.slice(0, EVENT_VALUE_LIMIT) : value;
+    if (value.length > contract.maximum) throw new Error("property string limit exceeded");
+    target[name] = value;
   }
 
   function applyBin(bytes) {
@@ -152,6 +199,7 @@
     if (bytes.byteLength > BATCH_BYTE_LIMIT) throw new Error("DOM operation batch exceeds limit");
     var view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     var offset = 0;
+    var deferredProperties = [];
     var readU32 = function () {
       if (offset + 4 > bytes.byteLength) throw new Error("truncated u32 operand");
       var value = view.getUint32(offset, true);
@@ -272,7 +320,7 @@
         }
         case OP_SET_PROP: {
           var propertyTargetId = readU32();
-          setSafeProperty(requireNode(propertyTargetId), readInterned(), readString());
+          setSafeProperty(requireNode(propertyTargetId), readInterned(), readString(), deferredProperties);
           break;
         }
         case OP_INTERN: {
@@ -332,7 +380,7 @@
         case OP_CREATE_SVG_ELEMENT: {
           var svgId = readU32();
           var svgTag = readInterned();
-          if (!SAFE_SVG_TAGS[svgTag]) throw new Error("unsupported SVG tag: " + svgTag);
+          if (SAFE_SVG_TAGS[svgTag] !== 1) throw new Error("unsupported SVG tag: " + svgTag);
           var svgNode = document.createElementNS("http://www.w3.org/2000/svg", svgTag);
           remember(svgId, svgNode);
           break;
@@ -348,6 +396,10 @@
       }
     }
     flushFragment();
+    for (var propertyIndex = 0; propertyIndex < deferredProperties.length; propertyIndex++) {
+      var assignment = deferredProperties[propertyIndex];
+      if (assignment.target.isConnected !== false && assignment.target[assignment.name] !== assignment.value) assignment.target[assignment.name] = assignment.value;
+    }
   }
 
   function applyB64(b64) {

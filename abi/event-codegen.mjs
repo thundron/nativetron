@@ -63,6 +63,7 @@ const FIELD_TYPES = {
 };
 
 const HOST_SOURCES = {
+  targetClientHeight: (field) => `ev && ev.type === "resize" && target && Number.isFinite(target.clientHeight) ? Math.max(0, Math.min(${field.maximum}, target.clientHeight)) : 0`,
   targetScrollTop: (field) => `ev && ev.type === "scroll" && target && Number.isFinite(target.scrollTop) ? Math.max(0, Math.min(${field.maximum}, target.scrollTop)) : 0`,
   targetValue: (field) => `target && "value" in target ? boundedText(target.value, EVENT_${upperSnake(field.name)}_LIMIT) : ""`,
   targetChecked: () => "target && typeof target.checked === \"boolean\" ? (target.checked ? 1 : 0) : -1",

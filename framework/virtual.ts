@@ -1,6 +1,6 @@
 import { EVENT_SCROLL_TOP_LIMIT } from "./event.generated.js";
 import { newId, createElement, setAttr, append, remove, flush } from "./core.js";
-import { el, txt, attr, dynAttr, onEvent, each, component, disposeEl, type El, type KeyedItem } from "./ui.js";
+import { el, txt, attr, dynAttr, dynProp, onEvent, each, component, disposeEl, type El, type KeyedItem } from "./ui.js";
 import { signal, effect, onScopeCleanup, type Signal } from "./reactive.js";
 
 export interface VisibleRange { first: number; end: number; top: number; bottom: number; }
@@ -29,6 +29,7 @@ export interface VirtualListOptions {
   scrollTop: Signal<number>;
   /** Reactive viewport height in CSS pixels; replaces `height` when present. */
   viewport?: Signal<number>;
+  autoSize?: boolean;
   /** Logical row kept mounted while it is outside the window (focus/editing); -1 for none. */
   activeIndex?: Signal<number>;
   /** Accessible name; also makes the scroll container keyboard-focusable. */
@@ -50,6 +51,7 @@ export interface KeyedVirtualListOptions {
   overscan: number;
   scrollTop: Signal<number>;
   viewport?: Signal<number>;
+  autoSize?: boolean;
   activeIndex?: Signal<number>;
   label?: string;
 }
@@ -62,6 +64,7 @@ export interface VirtualColumn {
 export interface VirtualTableOptions {
   scrollTop?: Signal<number>;
   viewport?: Signal<number>;
+  autoSize?: boolean;
   activeIndex?: Signal<number>;
   overscan?: number;
   label?: string;
@@ -120,6 +123,7 @@ interface VirtualConfig {
   overscan: number;
   scrollTop: Signal<number>;
   viewport: Signal<number> | null;
+  autoSize: boolean;
   activeIndex: Signal<number> | null;
   label: string;
 }
@@ -161,7 +165,8 @@ function scrollerStyle(height: number): string {
 function mountVirtual(cfg: VirtualConfig): El {
   return component(() => {
     const rowHeight = cfg.rowHeight;
-    const viewportHeight = (): number => cfg.viewport !== null ? cfg.viewport.get() : cfg.height;
+    const measured = cfg.autoSize ? (cfg.viewport ?? signal(cfg.height)) : cfg.viewport;
+    const viewportHeight = (): number => measured !== null ? measured.get() : cfg.height;
     const activeRow = (): number => cfg.activeIndex !== null ? cfg.activeIndex.get() : -1;
     const records = new Map<string, RowRecord>();
     let hostId = -1;
@@ -170,16 +175,10 @@ function mountVirtual(cfg: VirtualConfig): El {
     let gapStyle = "";
     let plan: VirtualWindow = { first: 0, end: 0, top: 0, bottom: 0, active: -1, activeBefore: false, gap: 0 };
 
-    // scrollTop mirrors the DOM offset. A new scroller starts at 0, and the DOM clamps its offset when content
-    // shrinks or the viewport grows; both are written back so the signal never describes an unreachable position.
-    let mounting = true;
     effect(() => {
       const max = Math.max(0, cfg.count() * rowHeight - viewportHeight());
       const offset = cfg.scrollTop.get();
-      if (mounting) {
-        mounting = false;
-        if (offset !== 0) cfg.scrollTop.set(0);
-      } else if (Number.isFinite(max) && offset > max) cfg.scrollTop.set(max);
+      if (Number.isFinite(max) && offset > max) cfg.scrollTop.set(max);
     });
 
     const applyPadding = (): void => {
@@ -260,7 +259,11 @@ function mountVirtual(cfg: VirtualConfig): El {
     applyPadding();
 
     const container = el("div", [rows]);
-    if (cfg.viewport !== null) dynAttr(container, "style", () => scrollerStyle(viewportHeight()));
+    dynProp(container, "scrollTop", () => "" + cfg.scrollTop.get());
+    if (cfg.autoSize) {
+      attr(container, "style", "overflow:auto;height:100%;min-height:0;overflow-anchor:none");
+      onEvent(container, "resize", event => { if (measured !== null) measured.set(event.clientHeight ?? 0); });
+    } else if (cfg.viewport !== null) dynAttr(container, "style", () => scrollerStyle(viewportHeight()));
     else attr(container, "style", scrollerStyle(cfg.height));
     if (cfg.label.length > 0) {
       attr(container, "aria-label", cfg.label);
@@ -287,7 +290,7 @@ export function virtualList(options: VirtualListOptions): El {
   return mountVirtual({
     count: options.count, key: options.key, keyed: false, render: options.render, renderRow: noRenderRow,
     rowHeight: options.rowHeight, height: options.height, overscan: options.overscan, scrollTop: options.scrollTop,
-    viewport: options.viewport ?? null, activeIndex: options.activeIndex ?? null, label: options.label ?? "",
+    viewport: options.viewport ?? null, autoSize: options.autoSize ?? false, activeIndex: options.activeIndex ?? null, label: options.label ?? "",
   });
 }
 
@@ -296,7 +299,7 @@ export function keyedVirtualList(options: KeyedVirtualListOptions): El {
   return mountVirtual({
     count: options.count, key: options.key, keyed: true, render: noRender, renderRow: options.renderRow,
     rowHeight: options.rowHeight, height: options.height, overscan: options.overscan, scrollTop: options.scrollTop,
-    viewport: options.viewport ?? null, activeIndex: options.activeIndex ?? null, label: options.label ?? "",
+    viewport: options.viewport ?? null, autoSize: options.autoSize ?? false, activeIndex: options.activeIndex ?? null, label: options.label ?? "",
   });
 }
 
@@ -310,7 +313,7 @@ export function virtualTable(count: () => number, key: (row: number) => string, 
     const header = attr(attr(attr(el("div", headers), "role", "row"), "style", grid), "aria-rowindex", "1");
     const list = mountVirtual({
       count, key, keyed: false, rowHeight, height, overscan: extra.overscan ?? 3, scrollTop: extra.scrollTop ?? signal(0),
-      viewport: extra.viewport ?? null, activeIndex: extra.activeIndex ?? null, label: extra.label ?? "", renderRow: noRenderRow,
+      viewport: extra.viewport ?? null, autoSize: extra.autoSize ?? false, activeIndex: extra.activeIndex ?? null, label: extra.label ?? "", renderRow: noRenderRow,
       render: (row: number) => {
         const cells: El[] = [];
         for (let i = 0; i < columns.length; i++) cells.push(attr(el("div", [columns[i]!.cell(row)]), "role", "cell"));
@@ -320,4 +323,21 @@ export function virtualTable(count: () => number, key: (row: number) => string, 
     const table = attr(attr(el("div", [header, list]), "role", "table"), "aria-colcount", "" + columns.length);
     return dynAttr(table, "aria-rowcount", () => "" + (count() + 1));
   });
+}
+
+export function scrollToIndex(scrollTop: Signal<number>, index: number, count: number, rowHeight: number, height: number, alignment: string = "nearest"): number {
+  visibleRange(count, rowHeight, height, scrollTop.get(), 0);
+  if (!Number.isSafeInteger(index) || index < 0 || index >= count || height <= 0) throw new Error("invalid virtual scroll target");
+  const start = index * rowHeight, end = start + rowHeight, current = scrollTop.get();
+  let target = current;
+  if (alignment === "start") target = start;
+  else if (alignment === "center") target = start - (height - rowHeight) / 2;
+  else if (alignment === "end") target = end - height;
+  else if (alignment === "nearest") {
+    if (start < current) target = start;
+    else if (end > current + height) target = end - height;
+  } else throw new Error("unsupported virtual scroll alignment");
+  target = Math.max(0, Math.min(target, Math.max(0, count * rowHeight - height)));
+  if (target !== current) scrollTop.set(target);
+  return target;
 }

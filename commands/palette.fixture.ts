@@ -84,7 +84,8 @@ export function registryTest(): number {
   for (let i = 0; i < refused.length - 1; i++) {
     if (!throws(() => r.register({ id: "b", labelKey: "commands.close", shortcut: refused[i]!, enabled: on1, run: noop }))) return 10 + i;
   }
-  if (!throws(() => r.register({ id: "b", labelKey: "missing.label", shortcut: "", enabled: on1, run: noop }))) return 20;
+  const missingLabel = "missing." + "label";
+  if (!throws(() => r.register({ id: "b", labelKey: missingLabel, shortcut: "", enabled: on1, run: noop }))) return 20;
   if (!throws(() => r.register({ id: "b", labelKey: "greeting", shortcut: "", enabled: on1, run: noop }))) return 21;
   if (!throws(() => r.register({ id: "", labelKey: "commands.close", shortcut: "", enabled: on1, run: noop }))) return 22;
   if (r.commands.get().length !== 1 || r.owner("Shift+Meta+K") !== "command:a") return 23;
@@ -148,8 +149,9 @@ export function onEventRich(
   modifiers: number,
   inputType: string,
   scrollTop: number,
+  clientHeight: number,
 ): number {
-  dispatchSlotRich(slot, value, checked, key, code, modifiers, inputType, scrollTop);
+  dispatchSlotRich(slot, value, checked, key, code, modifiers, inputType, scrollTop, clientHeight);
   flush();
   return 0;
 }

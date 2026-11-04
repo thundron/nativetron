@@ -99,8 +99,9 @@ export function onEventRich(
   modifiers: number,
   inputType: string,
   scrollTop: number,
+  clientHeight: number,
 ): number {
-  dispatchSlotRich(slot, value, checked, key, code, modifiers, inputType, scrollTop);
+  dispatchSlotRich(slot, value, checked, key, code, modifiers, inputType, scrollTop, clientHeight);
   flush();
   return 0;
 }

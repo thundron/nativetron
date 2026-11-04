@@ -31,7 +31,17 @@ function operationArgument(value, path) {
 }
 
 function validateOperations(schema) {
-  exactKeys(schema, ["root", "ops"], "ops");
+  exactKeys(schema, ["root", "ops", "properties"], "ops");
+  if (!schema.properties || typeof schema.properties !== "object" || Array.isArray(schema.properties)) throw new Error("ops.properties must be an object");
+  for (const [name, property] of Object.entries(schema.properties)) {
+    if (!/^[a-z][A-Za-z0-9]*$/.test(name)) throw new Error("invalid property name");
+    const keys = property.kind === "boolean" ? ["kind"] : property.kind === "string" ? ["kind", "maximum"] : property.kind === "index" ? ["kind", "minimum", "maximum"] : property.kind === "number" ? ["kind", "minimum", "maximum", "deferred"] : [];
+    if (!keys.length) throw new Error("unknown property kind");
+    exactKeys(property, keys, "property " + name);
+    if (property.kind !== "boolean" && (!Number.isFinite(property.maximum) || property.maximum < 0)) throw new Error("invalid property maximum");
+    if ((property.kind === "number" || property.kind === "index") && (!Number.isFinite(property.minimum) || property.minimum > property.maximum)) throw new Error("invalid property minimum");
+    if (property.kind === "number" && typeof property.deferred !== "boolean") throw new Error("invalid property deferred flag");
+  }
   if (!Number.isInteger(schema.root) || schema.root < 0 || schema.root > 4294967295) {
     throw new Error("ops.root must be a u32");
   }
@@ -123,7 +133,8 @@ const targets = [
   {
     path: join(here, "DOM_HOST_ABI.md"),
     render(previous) {
-      const operationsBody = `${operationTable}\n\nWire layout:\n\n\`\`\`\n${operationLayout}\n\`\`\``;
+      const properties = ["| property | kind | bounds | application |", "|---|---|---|---|", ...Object.entries(operations.properties).map(([name, rule]) => `| ${name} | ${rule.kind} | ${rule.kind === "boolean" ? "true/false" : rule.minimum === undefined ? `length ≤ ${rule.maximum}` : `${rule.minimum}–${rule.maximum}`} | ${rule.deferred ? "after batch insertion/layout" : "immediate"} |`)].join("\n");
+      const operationsBody = `${operationTable}\n\nWire layout:\n\n\`\`\`\n${operationLayout}\n\`\`\`\n\nMutable properties (strict bounds; unsupported values fail):\n\n${properties}`;
       const eventBody = [
         `Schema format ${events.format}; native event message version ${events.nativeMessage.version}, kind \`${events.nativeMessage.kind}\`.`,
         "",
@@ -163,6 +174,7 @@ const targets = [
   {
     path: join(here, "..", "host", "dom-host.js"),
     render(previous) {
+      previous = generatedRegion(previous, "property-contract", "  var SAFE_PROPERTIES = " + JSON.stringify(operations.properties, null, 2) + ";");
       return generatedRegion(
         generatedRegion(
           generatedRegion(previous, "operation-constants", operationConstants()),
@@ -174,6 +186,10 @@ const targets = [
       );
     },
   },
+  { path: join(here, "..", "commands", "palette.fixture.ts"), render: previous => generatedRegion(previous, "event-export", renderEventExport(events)) },
+  { path: join(here, "..", "commands", "palette-profile.json"), render: previous => updateEventProfile(events, previous) },
+  { path: join(here, "..", "framework", "virtual.fixture.ts"), render: previous => generatedRegion(previous, "event-export", renderEventExport(events)) },
+  { path: join(here, "..", "framework", "virtual-profile.json"), render: previous => updateEventProfile(events, previous) },
   {
     path: join(here, "..", "framework", "components.fixture.ts"),
     render: (previous) => generatedRegion(previous, "event-export", renderEventExport(events)),

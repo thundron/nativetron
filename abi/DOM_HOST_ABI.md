@@ -52,6 +52,19 @@ Wire layout:
     15 FOCUS             id(u32)
     16 ELEMENT_TEXT_BATCH parent(u32) tag(u32 intern id) count(u32) repeat<=65535[id(u32) textId(u32) text(length-prefixed utf-8)]
 ```
+
+Mutable properties (strict bounds; unsupported values fail):
+
+| property | kind | bounds | application |
+|---|---|---|---|
+| value | string | length ≤ 4096 | immediate |
+| checked | boolean | true/false | immediate |
+| disabled | boolean | true/false | immediate |
+| selected | boolean | true/false | immediate |
+| indeterminate | boolean | true/false | immediate |
+| readOnly | boolean | true/false | immediate |
+| selectedIndex | index | -999999–999999 | immediate |
+| scrollTop | number | 0–1073741824 | after batch insertion/layout |
 <!-- /generated:ops -->
 
 Operations are sent in batches and applied in order. Unknown opcodes abort the batch; the
@@ -65,7 +78,7 @@ UTF-8 bytes. Text content is inline; names are interned.
 LISTEN carries a callback slot.
 
 <!-- generated:events -->
-Schema format 2; native event message version 2, kind `event`.
+Schema format 2; native event message version 3, kind `event`.
 
 Browser dispatch is selected by generated default-value semantics:
 
@@ -73,7 +86,7 @@ Browser dispatch is selected by generated default-value semantics:
 |---|---|---|---|
 | default | `__nt_event` | `onEvent` | — |
 | primary | `__nt_event_value` | `onEventValue` | value |
-| rich | `__nt_event_rich` | `onEventRich` | value, checked, key, code, modifiers, inputType, scrollTop |
+| rich | `__nt_event_rich` | `onEventRich` | value, checked, key, code, modifiers, inputType, scrollTop, clientHeight |
 
 The rich tier has this generated field contract:
 
@@ -87,6 +100,7 @@ The rich tier has this generated field contract:
 | 5 | modifiers | modifierBits | integer bitset 0–15; default `0` |
 | 6 | inputType | string | at most 32 UTF-16 code units; default `` |
 | 7 | scrollTop | boundedNumber | finite number 0–1073741824; default `0` |
+| 8 | clientHeight | boundedNumber | finite number 0–1073741824; default `0` |
 
 The callback shapes, tier selection, host projection, guest decoders/exports, native bridge, browser binders, bounds, and event allowlist are generated from `abi/events.json`.
 <!-- /generated:events -->

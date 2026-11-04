@@ -270,9 +270,9 @@ try {
     assert.equal(await js("document.getElementById('nt-root').childNodes.length"), 0);
     assert.deepEqual(await stats(), [0, 0]);
     await fx("start()");
-    assert.deepEqual(await stats(), [4, 56]);
+    assert.deepEqual(await stats(), [4, i === 0 ? 56 : 59]);
     assert.equal(await fx("scrollValueA()"), 0);
-    assert.equal(await topRow("list-d", "data-huge"), 0);
+    assert.equal(await topRow("list-d", "data-huge"), i === 0 ? 0 : 500000 + i - 1);
     await scroll("list-d", 8000000 + i * 16);
     await waitFor(`document.querySelector('#list-d [data-huge]').getAttribute('data-huge') === '${499997 + i}'`, `remounted scroll ${i}`);
     assert.equal(await topRow("list-d", "data-huge"), 500000 + i);
@@ -282,6 +282,20 @@ try {
   assert.deepEqual(await stats(), [0, 0]);
   assert.deepEqual(await js("window.panics"), []);
   console.log(`virtual DOM: reactive viewport, 1M-row jumps, shrink/empty/grow clamps, index vs key identity, duplicate refusal, in-place/direct edits, pinned focus/editing, native keyboard scrolling and 1,210 mount/dispose cycles (linear memory ${memoryAfter} bytes, unchanged over the last 1,000) passed`);
+
+  await js("window.liveObservers = 0; window.NativeResizeObserver = ResizeObserver; window.ResizeObserver = class extends NativeResizeObserver { constructor(cb) { super(cb); liveObservers++; this.stopped=false; } disconnect() { if(!this.stopped) {liveObservers--; this.stopped=true;} super.disconnect(); } }");
+  await fx("startAuto()");
+  await waitFor("document.getElementById('auto-list').clientHeight === 360 && document.querySelectorAll('[data-auto]').length === 21", "automatic viewport observation");
+  assert.equal(await scrollTopOf("auto-list"), 480, "initial scroll position restored after insertion/layout");
+  assert.equal(await js("liveObservers"), 1);
+  await fx("setAutoHeight(120)");
+  await waitFor("document.querySelectorAll('[data-auto]').length === 11", "automatic parent resize");
+  await fx("scrollAuto(1000)");
+  await waitFor("document.getElementById('auto-list').scrollTop === 24000", "programmatic scrollToIndex");
+  assert.equal(await topRow("auto-list", "data-auto"), 1000);
+  await fx("disposeAuto()");
+  assert.equal(await js("liveObservers"), 0, "ResizeObserver disposed");
+  assert.deepEqual(await stats(), [0,0]);
 
   // Duplicates exposed by user scrolling are a fatal contract violation surfaced through the panic sink.
   await fx("start()");

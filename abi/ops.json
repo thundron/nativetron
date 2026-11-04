@@ -141,5 +141,37 @@
       ],
       "maximum": 65535
     }
-  ]
+  ],
+  "properties": {
+    "value": {
+      "kind": "string",
+      "maximum": 4096
+    },
+    "checked": {
+      "kind": "boolean"
+    },
+    "disabled": {
+      "kind": "boolean"
+    },
+    "selected": {
+      "kind": "boolean"
+    },
+    "indeterminate": {
+      "kind": "boolean"
+    },
+    "readOnly": {
+      "kind": "boolean"
+    },
+    "selectedIndex": {
+      "kind": "index",
+      "minimum": -999999,
+      "maximum": 999999
+    },
+    "scrollTop": {
+      "kind": "number",
+      "minimum": 0,
+      "maximum": 1073741824,
+      "deferred": true
+    }
+  }
 }

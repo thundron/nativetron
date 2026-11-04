@@ -70,6 +70,7 @@
         "string",
         "f64",
         "string",
+        "f64",
         "f64"
       ],
       "returns": "f64"

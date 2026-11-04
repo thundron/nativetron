@@ -1,7 +1,7 @@
 import { setBinarySink, setLive, flush, dispatchSlot, dispatchSlotValue, dispatchSlotRich } from "./core.js";
 import { el, txt, dyn, attr, on, onEvent as listenEvent, dynProp, mountTo, unmount, type El } from "./ui.js";
 import { signal } from "./reactive.js";
-import { virtualList, keyedVirtualList, virtualTable, virtualStats, type VirtualRow } from "./virtual.js";
+import { virtualList, keyedVirtualList, virtualTable, virtualStats, scrollToIndex, type VirtualRow } from "./virtual.js";
 
 declare function present(bytes: Uint8Array): void;
 
@@ -135,6 +135,20 @@ export function cycle(n: number): number {
   return 0;
 }
 
+let autoRoot: El = { roots: [], cleanups: [] };
+const autoScroll = signal(480), autoViewport = signal(240);
+export function startAuto(): number {
+  const list = attr(virtualList({ count: () => 10000, key: index => "a" + index,
+    render: index => attr(el("span", [txt("auto " + index)]), "data-auto", "" + index),
+    rowHeight: 24, height: 240, overscan: 3, scrollTop: autoScroll, viewport: autoViewport, autoSize: true,
+  }), "id", "auto-list");
+  autoRoot = attr(attr(el("div", [list]), "id", "auto-wrapper"), "style", "height:360px");
+  mountTo(autoRoot); flush(); return 0;
+}
+export function setAutoHeight(height: number): number { attr(autoRoot, "style", "height:" + height + "px"); flush(); return 0; }
+export function scrollAuto(index: number): number { return scrollToIndex(autoScroll, index, 10000, 24, autoViewport.get(), "start"); }
+export function disposeAuto(): number { unmount(autoRoot); flush(); return 0; }
+
 /* generated:event-export */
 export function onEvent(
   slot: number,
@@ -162,8 +176,9 @@ export function onEventRich(
   modifiers: number,
   inputType: string,
   scrollTop: number,
+  clientHeight: number,
 ): number {
-  dispatchSlotRich(slot, value, checked, key, code, modifiers, inputType, scrollTop);
+  dispatchSlotRich(slot, value, checked, key, code, modifiers, inputType, scrollTop, clientHeight);
   flush();
   return 0;
 }

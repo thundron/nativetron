@@ -38,6 +38,7 @@ const FIELD_KINDS = {
 };
 
 const SOURCE_KINDS = {
+  targetClientHeight: "boundedNumber",
   targetScrollTop: "boundedNumber",
   targetValue: "string",
   targetChecked: "triBoolean",
