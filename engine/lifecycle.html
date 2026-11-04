@@ -1,0 +1,102 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>engine lifecycle fixture</title></head>
+<body><script type="module">
+// Test-only page driven by engine/lifecycle.browser-test.mjs. Each scenario owns fresh canvases and disposes them.
+import { startEngine } from "./host.js";
+import { encodeEngineMessage, ENGINE_COMMAND, LANE_UI, LANE_ENGINE } from "../ipc/engine.generated.mjs";
+const demo = { moduleUrl: new URL("../gpu/.scriptc/demo.mjs", location.href).href, wasmUrl: new URL("../gpu/.scriptc/demo.wasm", location.href).href, prefix: "ntgpu_" };
+const trap = new URL("./fixtures/trap-glue.mjs", location.href).href;
+const colour = () => encodeEngineMessage(ENGINE_COMMAND, LANE_UI, LANE_ENGINE, 0, 1, new Uint8Array(0));
+const delay = (ms) => new Promise((done) => setTimeout(done, ms));
+let seq = 0;
+async function waitFor(predicate, ms = 8000, label = "condition") {
+  for (const end = performance.now() + ms; performance.now() < end; await delay(20)) if (predicate()) return;
+  throw new Error(`timed out waiting for ${label}`);
+}
+function make(extra = {}) {
+  const canvas = document.createElement("canvas");
+  canvas.id = `surface-${++seq}`; canvas.width = 64; canvas.height = 64; canvas.style.cssText = "width:64px;height:64px";
+  document.body.append(canvas);
+  const reports = [], events = [], states = [];
+  const options = { canvas, ...demo, report: (line) => reports.push(line), postNative() {}, postUi() {}, onEvent: (event) => events.push(event), onLifecycle: (event) => states.push(event.state), ...extra };
+  const count = (line) => reports.filter((report) => report === line).length;
+  const bad = () => events.filter((event) => event.status && event.type !== 7 && event.type !== 5).map((event) => JSON.stringify(event));
+  return { canvas, reports, events, states, options, count, bad };
+}
+const failure = (error) => ({ name: error.name, code: error.code, message: error.message, canvasTransferred: error.canvasTransferred });
+const scenarios = {
+  async restart(forceMain) {
+    const t = make({ forceMain });
+    const lane = await startEngine(t.options);
+    await waitFor(() => t.count("GPU_READBACK_OK 4096") === 1, 8000, "first readback");
+    const restarts = [];
+    for (let i = 0; i < 3; i++) {
+      const result = await lane.restart({ reason: `cycle ${i}` });
+      restarts.push({ ok: result.ok, mode: result.mode, generation: result.generation, code: result.code, message: result.message });
+      await waitFor(() => t.count("GPU_READBACK_OK 4096") === i + 2, 8000, `readback after restart ${i}`);
+    }
+    lane.send(colour());
+    await waitFor(() => t.count("GPU_COLOUR_CHANGED") === 1, 8000, "colour change");
+    const closed = await lane.dispose();
+    t.canvas.remove();
+    return { mode: lane.mode, generation: lane.generation, restarts, readbacks: t.count("GPU_READBACK_OK 4096"), bad: t.bad(), closed, states: t.states, gpu: lane.gpu?.available };
+  },
+  async deviceLost() {
+    const t = make({ forceMain: true });
+    const lane = await startEngine(t.options);
+    await waitFor(() => t.count("GPU_READBACK_OK 4096") === 1, 8000, "first readback");
+    const old = lane.reactor.host;
+    old.device.destroy();
+    await waitFor(() => lane.state === "lost", 8000, "lost state");
+    const accepted = lane.trySend(colour()).ok;
+    const result = await lane.restart({ reason: "device lost" });
+    await waitFor(() => t.count("GPU_READBACK_OK 4096") === 2, 8000, "readback after device-loss restart");
+    const fresh = lane.reactor.host !== old && lane.reactor.host.handles !== old.handles && old.device === null;
+    await lane.dispose(); t.canvas.remove();
+    return { ok: result.ok, accepted, fresh, lost: t.events.filter((event) => event.type === 5).length, bad: t.bad(), states: t.states };
+  },
+  async afterTransferTrap() {
+    const t = make({ moduleUrl: trap });
+    let error = null;
+    try { await startEngine(t.options); } catch (caught) { error = failure(caught); }
+    let consumed = false;
+    try { t.canvas.transferControlToOffscreen(); } catch { consumed = true; }
+    await delay(50);
+    t.canvas.remove();
+    return { error, consumed, reports: t.reports };
+  },
+  async afterTransferRecover() {
+    const t = make({ moduleUrl: trap, canvasRecovery: "replace" });
+    const lane = await startEngine(t.options);
+    await waitFor(() => t.count("GPU_READBACK_OK 4096") === 1, 8000, "readback on replacement canvas");
+    const result = { mode: lane.mode, reason: lane.reason, replaced: lane.canvas !== t.canvas, originalAttached: t.canvas.isConnected, freshAttached: lane.canvas.isConnected, sameId: lane.canvas.id === t.canvas.id, reports: t.reports, bad: t.bad() };
+    await lane.dispose(); lane.canvas.remove();
+    return result;
+  },
+  async abortProbe() {
+    const t = make();
+    const controller = new AbortController();
+    const starting = startEngine({ ...t.options, signal: controller.signal });
+    await null;
+    controller.abort();
+    let error = null;
+    try { await starting; } catch (caught) { error = failure(caught); }
+    const lane = await startEngine(t.options);
+    await waitFor(() => t.count("GPU_READBACK_OK 4096") === 1, 8000, "readback after aborted start");
+    const mode = lane.mode;
+    await lane.dispose(); t.canvas.remove();
+    return { error, mode };
+  },
+  async cycles() {
+    const results = [];
+    for (let i = 0; i < 5; i++) {
+      const t = make({ forceMain: i % 2 === 1 });
+      const lane = await startEngine(t.options);
+      await waitFor(() => t.count("GPU_READBACK_OK 4096") === 1, 8000, `readback cycle ${i}`);
+      results.push({ mode: lane.mode, closed: await lane.dispose(), bad: t.bad() });
+      t.canvas.remove();
+    }
+    return results;
+  },
+};
+window.lifecycle = { run: async (name, ...args) => { try { return { ok: true, value: await scenarios[name](...args) }; } catch (error) { return { ok: false, error: error.stack || String(error) }; } } };
+</script></body></html>
