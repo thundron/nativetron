@@ -42,9 +42,10 @@ try {
   const shader = await evaluate("demo.events.find(event => event.type === 7 && event.requestId === 900)");
   assert.equal(shader?.status, 1);
   assert.ok(shader.messages.some((message) => message.type === "error" && message.lineNum === 2));
-  const measurements = await evaluate("import('./measure.js').then(module => module.measureGpu(demo))");
-  console.log("GPU_MEASUREMENTS " + JSON.stringify(measurements));
-  if (process.env.NT_RECORD_GPU === "1") {
+  // NT_GPU_SKIP_MEASURE=1 runs the correctness gates only; timings belong to serialized benchmark runs.
+  const measurements = process.env.NT_GPU_SKIP_MEASURE === "1" ? null : await evaluate("import('./measure.js').then(module => module.measureGpu(demo))");
+  if (measurements) console.log("GPU_MEASUREMENTS " + JSON.stringify(measurements));
+  if (measurements && process.env.NT_RECORD_GPU === "1") {
     const version = await browser.send("Browser.getVersion");
     writeFileSync(new URL("./last-run.json", import.meta.url), JSON.stringify({ date: new Date().toISOString(), platform: platform(), arch: arch(), cpu: cpus()[0].model, browser: version.product, ...measurements }, null, 2) + "\n");
   }

@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>nativetron GPU conformance</title></head>
+<body><canvas id="gpu" width="4" height="4"></canvas><pre id="status"></pre>
+<script type="module">
+import { loadConformance } from "./conformance-host.js";
+const status = (line) => { document.getElementById("status").textContent += line + "\n"; };
+if (new URLSearchParams(location.search).has("worker")) {
+  // Messages are posted in order, so events and reports keep the worker's delivery order.
+  const lane = { mode: "worker", events: [], reports: [] };
+  const worker = new Worker(new URL("./conformance-worker.js", import.meta.url), { type: "module" });
+  worker.onmessage = ({ data }) => {
+    if (data.type === "event") lane.events.push(data.event);
+    else if (data.type === "report") { lane.reports.push(data.line); status(data.line); }
+  };
+  worker.onerror = (error) => lane.reports.push("CONF_FAIL worker " + error.message);
+  lane.step = (phase) => worker.postMessage({ type: "step", phase });
+  lane.stepThenLose = (phase) => worker.postMessage({ type: "lose", phase });
+  window.conformance = lane;
+} else {
+  const lane = await loadConformance({ canvas: document.getElementById("gpu"), report: status });
+  lane.mode = "main";
+  lane.stepThenLose = (phase) => { lane.step(phase); lane.host.device.destroy(); };
+  window.conformance = lane;
+}
+</script></body></html>
