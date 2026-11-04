@@ -1,4 +1,4 @@
-import { decodeGpuBatch, GPU_FIXED_LAYOUTS } from "./gpu-host.generated.js";
+import { decodeGpuBatch, writeGpuProtocolHeader, GPU_FIXED_LAYOUTS, GPU_PROTOCOL_HEADER_BYTES } from "./gpu-host.generated.js";
 
 const median = (values) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
 
@@ -7,11 +7,12 @@ export async function measureGpu(demo) {
   const host = demo.host;
   const count = 500, trials = 101, warmups = 20;
   const layout = GPU_FIXED_LAYOUTS.renderSetScissor;
-  const bytes = new Uint8Array(count * layout.bytes);
+  const bytes = new Uint8Array(GPU_PROTOCOL_HEADER_BYTES + count * layout.bytes);
   const view = new DataView(bytes.buffer);
   const handle = 1948578;
+  writeGpuProtocolHeader(bytes);
   for (let i = 0; i < count; i++) {
-    const offset = i * layout.bytes;
+    const offset = GPU_PROTOCOL_HEADER_BYTES + i * layout.bytes;
     bytes[offset] = layout.code;
     view.setUint32(offset + layout.fields.pass, handle, true);
     view.setUint32(offset + layout.fields.x, 0, true); view.setUint32(offset + layout.fields.y, 0, true);

@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "maxBatchBytes": 16777216,
   "maxArrayLength": 65536,
   "handle": {
@@ -25,60 +25,17 @@
     "SHADER_STAGE_VERTEX": 1,
     "SHADER_STAGE_FRAGMENT": 2,
     "SHADER_STAGE_COMPUTE": 4,
-    "FEATURE_TIMESTAMP_QUERY": 1,
     "MAP_MODE_READ": 1,
     "MAP_MODE_WRITE": 2,
-    "LOAD_LOAD": 1,
-    "LOAD_CLEAR": 2,
-    "STORE_STORE": 1,
-    "STORE_DISCARD": 2,
-    "INDEX_UINT16": 1,
-    "INDEX_UINT32": 2,
-    "TOPOLOGY_POINT_LIST": 1,
-    "TOPOLOGY_LINE_LIST": 2,
-    "TOPOLOGY_LINE_STRIP": 3,
-    "TOPOLOGY_TRIANGLE_LIST": 4,
-    "TOPOLOGY_TRIANGLE_STRIP": 5,
-    "FRONT_FACE_CCW": 1,
-    "FRONT_FACE_CW": 2,
-    "CULL_NONE": 0,
-    "CULL_FRONT": 1,
-    "CULL_BACK": 2,
-    "STEP_VERTEX": 0,
-    "STEP_INSTANCE": 1,
     "BINDING_BUFFER": 1,
     "BINDING_SAMPLER": 2,
     "BINDING_TEXTURE": 3,
     "BINDING_STORAGE_TEXTURE": 4,
-    "BUFFER_BINDING_UNIFORM": 1,
-    "BUFFER_BINDING_STORAGE": 2,
-    "BUFFER_BINDING_READ_ONLY_STORAGE": 3,
-    "SAMPLER_FILTERING": 1,
-    "SAMPLER_NON_FILTERING": 2,
-    "SAMPLER_COMPARISON": 3,
-    "TEXTURE_SAMPLE_FLOAT": 1,
-    "TEXTURE_SAMPLE_UNFILTERABLE_FLOAT": 2,
-    "TEXTURE_SAMPLE_DEPTH": 3,
-    "TEXTURE_SAMPLE_SINT": 4,
-    "TEXTURE_SAMPLE_UINT": 5,
-    "VIEW_1D": 1,
-    "VIEW_2D": 2,
-    "VIEW_2D_ARRAY": 3,
-    "VIEW_CUBE": 4,
-    "VIEW_CUBE_ARRAY": 5,
-    "VIEW_3D": 6,
-    "STORAGE_WRITE_ONLY": 1,
-    "STORAGE_READ_ONLY": 2,
-    "STORAGE_READ_WRITE": 3,
-    "FORMAT_RGBA8UNORM": 1,
-    "FORMAT_BGRA8UNORM": 2,
-    "FORMAT_RGBA16FLOAT": 3,
-    "FORMAT_R32FLOAT": 4,
-    "FORMAT_R32UINT": 5,
-    "FORMAT_RG32FLOAT": 6,
-    "FORMAT_RGBA32FLOAT": 7,
-    "FORMAT_DEPTH24PLUS": 8,
-    "FORMAT_DEPTH32FLOAT": 9
+    "COLOR_WRITE_RED": 1,
+    "COLOR_WRITE_GREEN": 2,
+    "COLOR_WRITE_BLUE": 4,
+    "COLOR_WRITE_ALPHA": 8,
+    "COLOR_WRITE_ALL": 15
   },
   "events": [
     {
@@ -136,7 +93,8 @@
         "powerPreference:u32",
         "featureBits:u32",
         "maxBufferSize:f64"
-      ]
+      ],
+      "completes": "CAPABILITIES"
     },
     {
       "code": 2,
@@ -207,7 +165,8 @@
         "requestId:u32",
         "code:str",
         "label:str"
-      ]
+      ],
+      "completes": "SHADER_INFO"
     },
     {
       "code": 7,
@@ -258,7 +217,8 @@
         "shader:handle",
         "entry:str",
         "label:str"
-      ]
+      ],
+      "completes": "PIPELINE_READY"
     },
     {
       "code": 12,
@@ -305,7 +265,8 @@
         "blend:u32",
         "vertexLayouts:f64[]",
         "label:str"
-      ]
+      ],
+      "completes": "PIPELINE_READY"
     },
     {
       "code": 14,
@@ -645,7 +606,8 @@
       "name": "DESTROY",
       "args": [
         "resource:handle"
-      ]
+      ],
+      "control": true
     },
     {
       "code": 45,
@@ -657,26 +619,30 @@
         "offset:f64",
         "size:f64",
         "destination:readback"
-      ]
+      ],
+      "completes": "MAP_READY"
     },
     {
       "code": 46,
       "name": "ON_SUBMITTED_WORK_DONE",
       "args": [
         "requestId:u32"
-      ]
+      ],
+      "completes": "WORK_DONE"
     },
     {
       "code": 47,
       "name": "REQUEST_FRAME",
-      "args": []
+      "args": [],
+      "control": true
     },
     {
       "code": 48,
       "name": "RELEASE",
       "args": [
         "resource:handle"
-      ]
+      ],
+      "control": true
     },
     {
       "code": 49,
@@ -692,6 +658,185 @@
         "buffer:handle",
         "bufferOffset:f64",
         "data:upload"
+      ]
+    },
+    {
+      "code": 51,
+      "name": "PROTOCOL",
+      "header": true,
+      "args": [
+        "version:u32",
+        "identity:u32"
+      ]
+    },
+    {
+      "code": 52,
+      "name": "REQUEST_DEVICE_WITH",
+      "completes": "CAPABILITIES",
+      "args": [
+        "requestId:u32",
+        "powerPreference:u32",
+        "requiredFeatures:u32",
+        "optionalFeatures:u32",
+        "limits:f64[]"
+      ]
+    },
+    {
+      "code": 53,
+      "name": "CANCEL_REQUEST",
+      "control": true,
+      "args": [
+        "request:u32"
+      ]
+    },
+    {
+      "code": 54,
+      "name": "DESTROY_DEVICE",
+      "args": []
+    },
+    {
+      "code": 55,
+      "name": "CREATE_RENDER_PIPELINE_WITH",
+      "result": "renderPipeline",
+      "args": [
+        "layout:handle",
+        "vertexShader:handle",
+        "vertexEntry:str",
+        "fragmentShader:handle",
+        "fragmentEntry:str",
+        "targets:f64[]",
+        "primitive:f64[]",
+        "depthStencil:f64[]",
+        "multisample:f64[]",
+        "vertexLayouts:f64[]",
+        "constants:f64[]",
+        "label:str"
+      ]
+    },
+    {
+      "code": 56,
+      "name": "CREATE_RENDER_PIPELINE_ASYNC_WITH",
+      "result": "renderPipeline",
+      "completes": "PIPELINE_READY",
+      "args": [
+        "requestId:u32",
+        "layout:handle",
+        "vertexShader:handle",
+        "vertexEntry:str",
+        "fragmentShader:handle",
+        "fragmentEntry:str",
+        "targets:f64[]",
+        "primitive:f64[]",
+        "depthStencil:f64[]",
+        "multisample:f64[]",
+        "vertexLayouts:f64[]",
+        "constants:f64[]",
+        "label:str"
+      ]
+    },
+    {
+      "code": 57,
+      "name": "CREATE_COMPUTE_PIPELINE_WITH",
+      "result": "computePipeline",
+      "args": [
+        "layout:handle",
+        "shader:handle",
+        "entry:str",
+        "constants:f64[]",
+        "label:str"
+      ]
+    },
+    {
+      "code": 58,
+      "name": "CREATE_COMPUTE_PIPELINE_ASYNC_WITH",
+      "result": "computePipeline",
+      "completes": "PIPELINE_READY",
+      "args": [
+        "requestId:u32",
+        "layout:handle",
+        "shader:handle",
+        "entry:str",
+        "constants:f64[]",
+        "label:str"
+      ]
+    },
+    {
+      "code": 59,
+      "name": "BEGIN_RENDER_PASS_WITH",
+      "result": "renderPass",
+      "args": [
+        "encoder:handle",
+        "colors:f64[]",
+        "depthStencil:f64[]",
+        "occlusionQuerySet:handle",
+        "timestampQuerySet:handle",
+        "beginIndex:u32",
+        "endIndex:u32",
+        "label:str"
+      ]
+    },
+    {
+      "code": 60,
+      "name": "RENDER_SET_STENCIL_REFERENCE",
+      "args": [
+        "pass:handle",
+        "reference:u32"
+      ]
+    },
+    {
+      "code": 61,
+      "name": "RENDER_SET_BLEND_CONSTANT",
+      "args": [
+        "pass:handle",
+        "r:f64",
+        "g:f64",
+        "b:f64",
+        "a:f64"
+      ]
+    },
+    {
+      "code": 62,
+      "name": "RENDER_BEGIN_OCCLUSION_QUERY",
+      "args": [
+        "pass:handle",
+        "index:u32"
+      ]
+    },
+    {
+      "code": 63,
+      "name": "RENDER_END_OCCLUSION_QUERY",
+      "args": [
+        "pass:handle"
+      ]
+    },
+    {
+      "code": 64,
+      "name": "COPY_TEXTURE_TO_BUFFER",
+      "args": [
+        "encoder:handle",
+        "source:handle",
+        "mipLevel:u32",
+        "originX:u32",
+        "originY:u32",
+        "originZ:u32",
+        "aspect:u32",
+        "destination:handle",
+        "offset:f64",
+        "bytesPerRow:u32",
+        "rowsPerImage:u32",
+        "width:u32",
+        "height:u32",
+        "depth:u32"
+      ]
+    },
+    {
+      "code": 65,
+      "name": "CLEAR_BUFFER",
+      "args": [
+        "encoder:handle",
+        "buffer:handle",
+        "offset:f64",
+        "size:f64"
       ]
     }
   ],
@@ -803,7 +948,41 @@
       "rg32float",
       "rgba32float",
       "depth24plus",
-      "depth32float"
+      "depth32float",
+      "r8unorm",
+      "r8snorm",
+      "r8uint",
+      "r8sint",
+      "r16uint",
+      "r16sint",
+      "r16float",
+      "rg8unorm",
+      "rg8snorm",
+      "rg8uint",
+      "rg8sint",
+      "r32sint",
+      "rg16uint",
+      "rg16sint",
+      "rg16float",
+      "rgba8unorm-srgb",
+      "rgba8snorm",
+      "rgba8uint",
+      "rgba8sint",
+      "bgra8unorm-srgb",
+      "rgb10a2uint",
+      "rgb10a2unorm",
+      "rg11b10ufloat",
+      "rgb9e5ufloat",
+      "rg32uint",
+      "rg32sint",
+      "rgba16uint",
+      "rgba16sint",
+      "rgba32uint",
+      "rgba32sint",
+      "stencil8",
+      "depth16unorm",
+      "depth24plus-stencil8",
+      "depth32float-stencil8"
     ],
     "vertexFormat": [
       null,
@@ -819,7 +998,97 @@
       "sint32x2",
       "sint32x3",
       "sint32x4",
-      "unorm8x4"
+      "unorm8x4",
+      "uint8",
+      "uint8x2",
+      "uint8x4",
+      "sint8",
+      "sint8x2",
+      "sint8x4",
+      "unorm8",
+      "unorm8x2",
+      "snorm8",
+      "snorm8x2",
+      "snorm8x4",
+      "uint16",
+      "uint16x2",
+      "uint16x4",
+      "sint16",
+      "sint16x2",
+      "sint16x4",
+      "unorm16",
+      "unorm16x2",
+      "unorm16x4",
+      "snorm16",
+      "snorm16x2",
+      "snorm16x4",
+      "float16",
+      "float16x2",
+      "float16x4",
+      "unorm10-10-10-2",
+      "unorm8x4-bgra"
+    ],
+    "index": [
+      null,
+      "uint16",
+      "uint32"
+    ],
+    "step": [
+      "vertex",
+      "instance"
+    ],
+    "blendFactor": [
+      null,
+      "zero",
+      "one",
+      "src",
+      "one-minus-src",
+      "src-alpha",
+      "one-minus-src-alpha",
+      "dst",
+      "one-minus-dst",
+      "dst-alpha",
+      "one-minus-dst-alpha",
+      "src-alpha-saturated",
+      "constant",
+      "one-minus-constant",
+      "src1",
+      "one-minus-src1",
+      "src1-alpha",
+      "one-minus-src1-alpha"
+    ],
+    "blendOperation": [
+      null,
+      "add",
+      "subtract",
+      "reverse-subtract",
+      "min",
+      "max"
+    ],
+    "stencilOperation": [
+      null,
+      "keep",
+      "zero",
+      "replace",
+      "invert",
+      "increment-clamp",
+      "decrement-clamp",
+      "increment-wrap",
+      "decrement-wrap"
+    ],
+    "queryType": [
+      null,
+      "timestamp",
+      "occlusion"
+    ],
+    "limitMode": [
+      null,
+      "required",
+      "preferred"
+    ],
+    "power": [
+      "low-power",
+      "high-performance"
     ]
   },
   "records": {
@@ -851,6 +1120,274 @@
       "shaderLocation",
       "offset",
       "format"
+    ],
+    "colorTarget": [
+      "format",
+      "writeMask",
+      "blend",
+      "colorOperation",
+      "colorSrcFactor",
+      "colorDstFactor",
+      "alphaOperation",
+      "alphaSrcFactor",
+      "alphaDstFactor"
+    ],
+    "primitive": [
+      "topology",
+      "stripIndexFormat",
+      "frontFace",
+      "cullMode",
+      "unclippedDepth"
+    ],
+    "depthStencil": [
+      "format",
+      "depthWrite",
+      "depthCompare",
+      "frontCompare",
+      "frontFail",
+      "frontDepthFail",
+      "frontPass",
+      "backCompare",
+      "backFail",
+      "backDepthFail",
+      "backPass",
+      "stencilReadMask",
+      "stencilWriteMask",
+      "depthBias",
+      "depthBiasSlopeScale",
+      "depthBiasClamp"
+    ],
+    "multisample": [
+      "count",
+      "mask",
+      "alphaToCoverage"
+    ],
+    "colorAttachment": [
+      "view",
+      "resolveView",
+      "load",
+      "store",
+      "clearR",
+      "clearG",
+      "clearB",
+      "clearA",
+      "depthSlicePlusOne"
+    ],
+    "depthStencilAttachment": [
+      "view",
+      "depthLoad",
+      "depthStore",
+      "depthClear",
+      "depthReadOnly",
+      "stencilLoad",
+      "stencilStore",
+      "stencilClear",
+      "stencilReadOnly"
+    ],
+    "limitRequest": [
+      "limit",
+      "value",
+      "mode"
+    ],
+    "constant": [
+      "stages",
+      "id",
+      "value"
     ]
-  }
+  },
+  "statuses": [
+    {
+      "code": 0,
+      "name": "OK"
+    },
+    {
+      "code": 1,
+      "name": "ERROR"
+    },
+    {
+      "code": 2,
+      "name": "CANCELLED"
+    },
+    {
+      "code": 3,
+      "name": "LOST"
+    }
+  ],
+  "enumConstants": {
+    "format": "FORMAT",
+    "vertexFormat": "VERTEX_FORMAT",
+    "dimension": "DIMENSION",
+    "view": "VIEW",
+    "address": "ADDRESS",
+    "filter": "FILTER",
+    "compare": "COMPARE",
+    "topology": "TOPOLOGY",
+    "front": "FRONT_FACE",
+    "cull": "CULL",
+    "load": "LOAD",
+    "store": "STORE",
+    "aspect": "ASPECT",
+    "buffer": "BUFFER_BINDING",
+    "sampler": "SAMPLER",
+    "sample": "TEXTURE_SAMPLE",
+    "access": "STORAGE",
+    "index": "INDEX",
+    "step": "STEP",
+    "blendFactor": "BLEND_FACTOR",
+    "blendOperation": "BLEND_OP",
+    "stencilOperation": "STENCIL_OP",
+    "queryType": "QUERY_TYPE",
+    "limitMode": "LIMIT_MODE",
+    "power": "POWER"
+  },
+  "features": [
+    "timestamp-query",
+    "depth-clip-control",
+    "depth32float-stencil8",
+    "texture-compression-bc",
+    "texture-compression-bc-sliced-3d",
+    "texture-compression-etc2",
+    "texture-compression-astc",
+    "texture-compression-astc-sliced-3d",
+    "indirect-first-instance",
+    "shader-f16",
+    "rg11b10ufloat-renderable",
+    "bgra8unorm-storage",
+    "float32-filterable",
+    "float32-blendable",
+    "clip-distances",
+    "dual-source-blending",
+    "subgroups",
+    "core-features-and-limits",
+    "primitive-index",
+    "texture-formats-tier1",
+    "texture-formats-tier2"
+  ],
+  "limits": [
+    null,
+    {
+      "name": "maxTextureDimension1D",
+      "class": "maximum"
+    },
+    {
+      "name": "maxTextureDimension2D",
+      "class": "maximum"
+    },
+    {
+      "name": "maxTextureDimension3D",
+      "class": "maximum"
+    },
+    {
+      "name": "maxTextureArrayLayers",
+      "class": "maximum"
+    },
+    {
+      "name": "maxBindGroups",
+      "class": "maximum"
+    },
+    {
+      "name": "maxBindGroupsPlusVertexBuffers",
+      "class": "maximum"
+    },
+    {
+      "name": "maxBindingsPerBindGroup",
+      "class": "maximum"
+    },
+    {
+      "name": "maxDynamicUniformBuffersPerPipelineLayout",
+      "class": "maximum"
+    },
+    {
+      "name": "maxDynamicStorageBuffersPerPipelineLayout",
+      "class": "maximum"
+    },
+    {
+      "name": "maxSampledTexturesPerShaderStage",
+      "class": "maximum"
+    },
+    {
+      "name": "maxSamplersPerShaderStage",
+      "class": "maximum"
+    },
+    {
+      "name": "maxStorageBuffersPerShaderStage",
+      "class": "maximum"
+    },
+    {
+      "name": "maxStorageTexturesPerShaderStage",
+      "class": "maximum"
+    },
+    {
+      "name": "maxUniformBuffersPerShaderStage",
+      "class": "maximum"
+    },
+    {
+      "name": "maxUniformBufferBindingSize",
+      "class": "maximum"
+    },
+    {
+      "name": "maxStorageBufferBindingSize",
+      "class": "maximum"
+    },
+    {
+      "name": "minUniformBufferOffsetAlignment",
+      "class": "alignment"
+    },
+    {
+      "name": "minStorageBufferOffsetAlignment",
+      "class": "alignment"
+    },
+    {
+      "name": "maxVertexBuffers",
+      "class": "maximum"
+    },
+    {
+      "name": "maxBufferSize",
+      "class": "maximum"
+    },
+    {
+      "name": "maxVertexAttributes",
+      "class": "maximum"
+    },
+    {
+      "name": "maxVertexBufferArrayStride",
+      "class": "maximum"
+    },
+    {
+      "name": "maxInterStageShaderVariables",
+      "class": "maximum"
+    },
+    {
+      "name": "maxColorAttachments",
+      "class": "maximum"
+    },
+    {
+      "name": "maxColorAttachmentBytesPerSample",
+      "class": "maximum"
+    },
+    {
+      "name": "maxComputeWorkgroupStorageSize",
+      "class": "maximum"
+    },
+    {
+      "name": "maxComputeInvocationsPerWorkgroup",
+      "class": "maximum"
+    },
+    {
+      "name": "maxComputeWorkgroupSizeX",
+      "class": "maximum"
+    },
+    {
+      "name": "maxComputeWorkgroupSizeY",
+      "class": "maximum"
+    },
+    {
+      "name": "maxComputeWorkgroupSizeZ",
+      "class": "maximum"
+    },
+    {
+      "name": "maxComputeWorkgroupsPerDimension",
+      "class": "maximum"
+    }
+  ]
 }
