@@ -1,5 +1,37 @@
 {
   "modifiers": { "Alt": 1, "Control": 2, "Meta": 4, "Shift": 8 },
   "namedKeys": ["Enter", "Escape", "ArrowUp", "ArrowDown", "Delete", "Backspace", "Tab", "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12"],
-  "palette": ["Meta+k", "Control+k"]
+  "maxLength": 64,
+  "palette": ["Meta+k", "Control+k"],
+  "commandModifiers": ["Control", "Meta"],
+  "unmodifiedKeys": ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12"],
+  "reserved": {
+    "Meta+q": "quits the application",
+    "Meta+w": "closes the window",
+    "Meta+h": "hides the application",
+    "Meta+m": "minimises the window",
+    "Meta+t": "opens a browser tab",
+    "Meta+n": "opens a browser window",
+    "Meta+Shift+t": "reopens a browser tab",
+    "Meta+Shift+n": "opens a private browser window",
+    "Meta+Tab": "switches applications",
+    "Meta+Shift+Tab": "switches applications",
+    "Control+w": "closes the browser tab",
+    "Control+t": "opens a browser tab",
+    "Control+n": "opens a browser window",
+    "Control+Shift+t": "reopens a browser tab",
+    "Control+Shift+n": "opens a private browser window",
+    "Control+Shift+w": "closes the browser window",
+    "Control+Tab": "switches browser tabs",
+    "Control+Shift+Tab": "switches browser tabs",
+    "Alt+F4": "closes the window",
+    "Meta+a": "selects all text",
+    "Meta+c": "copies text",
+    "Meta+v": "pastes text",
+    "Meta+x": "cuts text",
+    "Control+a": "selects all text",
+    "Control+c": "copies text",
+    "Control+v": "pastes text",
+    "Control+x": "cuts text"
+  }
 }
