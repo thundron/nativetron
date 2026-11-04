@@ -153,7 +153,7 @@ test("protocol identity is generated from the schema for guest and host", () => 
 test("batches without the exact protocol header are refused before any operation", async () => {
   const f = await connected();
   const scissor = [["createBuffer", h(9), 64, C.BUFFER_USAGE_COPY_DST, false, "never"]];
-  for (const header of [null, headerBytes(GPU_PROTOCOL_VERSION + 1), headerBytes(GPU_PROTOCOL_VERSION, GPU_PROTOCOL_IDENTITY ^ 1)]) {
+  for (const header of [null, headerBytes(GPU_PROTOCOL_VERSION + 1), headerBytes(GPU_PROTOCOL_VERSION, (GPU_PROTOCOL_IDENTITY ^ 1) >>> 0)]) {
     assert.equal(f.apply(scissor, { header }), false);
   }
   await settle();

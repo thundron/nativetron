@@ -1,8 +1,8 @@
 // generated from gpu/ops.json by gpu/generate.mjs — do not edit
 import { begin, beginResult, end, u8, u32, i32, f32, f64, str, u32Array, f64Array, upload, readback, releaseHandle, type UploadSlice, type ReadbackSlice } from "./encode.js";
 
-export const GPU_PROTOCOL_VERSION = 2;
-export const GPU_PROTOCOL_IDENTITY = 0x49f0fe82;
+export const GPU_PROTOCOL_VERSION = 3;
+export const GPU_PROTOCOL_IDENTITY = 0xbc024fc5;
 
 export const BUFFER_USAGE_MAP_READ = 1;
 export const BUFFER_USAGE_MAP_WRITE = 2;

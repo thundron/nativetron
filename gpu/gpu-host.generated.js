@@ -283,8 +283,8 @@ export const GPU_STATUS_ERROR = 1;
 export const GPU_STATUS_CANCELLED = 2;
 export const GPU_STATUS_LOST = 3;
 
-export const GPU_PROTOCOL_VERSION = 2;
-export const GPU_PROTOCOL_IDENTITY = 0x49f0fe82;
+export const GPU_PROTOCOL_VERSION = 3;
+export const GPU_PROTOCOL_IDENTITY = 0xbc024fc5;
 export const GPU_PROTOCOL_OPCODE = 51;
 export const GPU_PROTOCOL_HEADER_BYTES = 9;
 export const GPU_MAX_BATCH_BYTES = 16777216;

@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "maxBatchBytes": 16777216,
   "maxArrayLength": 65536,
   "handle": {

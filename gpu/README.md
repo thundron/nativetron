@@ -15,7 +15,7 @@ NT_GPU_SKIP_MEASURE=1 node gpu/browser-test.mjs  # demo acceptance without the t
 
 ## Memory and scheduling
 
-The guest installs `setSink((batch, uploads, readbacks) => gpuPresent(batch, uploads, readbacks))`. The three callback arguments are borrowed views of the reactor's linear memory. `flush()` invokes that callback once, then resets command and upload cursors. Every batch starts with the generated protocol header. Upload bytes are not serialized into the command batch. The host uses `queue.writeBuffer(buffer, offset, memory.buffer, ptr, length)` and reacquires the backing memory for every upload. All callback byte views are read-only; the host never writes through them.
+The guest installs `setSink((batch, uploads, readbacks) => gpuPresent(batch, uploads, readbacks))`. The three callback arguments are borrowed views of the reactor's linear memory. `flush()` invokes that callback once, then resets command and upload cursors. Every batch starts with the generated protocol header. Upload bytes are not serialized into the command batch. The host uses `queue.writeBuffer(buffer, offset, memory.buffer, ptr, length)` and reacquires the backing memory for every upload. All callback byte views are read-only; the host never writes through them. Protocol 3 requires the guest-export readback delivery below (protocol 2 used an invalid borrowed-buffer write contract).
 
 `reserveUpload(length)` reserves an upload range; obtain its current view with `uploadView(slice)` and fill it before `flush()`. Arena growth invalidates previously obtained views; slices remain offsets, so reacquire the view after another reservation. `uploadBytes(bytes)` explicitly copies existing bytes into the arena; generate geometry directly into `uploadView` to avoid that copy. `writeBuffer` offsets and sizes must be multiples of 4 and stay inside the buffer; the target must not be mapped or mapping.
 
@@ -121,7 +121,7 @@ The `...With` operations take descriptor records (below) for multiple render tar
 ## Protocol identity
 
 <!-- generated:protocol -->
-Protocol version 2, identity `0x49f0fe82` (FNV-1a of `gpu/ops.json`). Every batch starts with the 9-byte header: opcode 51, u32 version, u32 identity, little-endian.
+Protocol version 3, identity `0xbc024fc5` (FNV-1a of `gpu/ops.json`). Every batch starts with the 9-byte header: opcode 51, u32 version, u32 identity, little-endian.
 <!-- /generated:protocol -->
 
 The guest encoder writes the header into every batch, and the host refuses a batch whose version or identity differs from its generated decoder. The CAPABILITIES event reports the host's `protocol: { version, identity }`; the guest exposes `GPU_PROTOCOL_VERSION` and `GPU_PROTOCOL_IDENTITY`. Host-side tools that build batches use `writeGpuProtocolHeader(bytes, offset)` from `gpu-host.generated.js`.
