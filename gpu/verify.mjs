@@ -111,6 +111,7 @@ test("stale and wrong-type handles are reported; generations do not wrap", async
   assert.throws(() => h.get(2097153, "texture"), /expected/);
   const encoded = batch([{ op: op("WRITE_BUFFER"), values: [1048577, 0, { offset: 0, length: 4 }] }]);
   assert.equal(f.apply(encoded.bytes), false);
+  await tick();
   assert.match(f.events.at(-1).message, /stale/);
   for (let generation = 2; generation <= 4095; generation++) {
     const handle = generation * 1048576 + 1;

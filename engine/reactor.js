@@ -27,14 +27,15 @@ export async function loadReactor(options) {
     api = await module.instantiateFromBytes(await response.arrayBuffer(), {
       gpuPresent: (batch, uploads, readbacks) => host.apply(batch, uploads, readbacks),
       gpuReport: (message) => {
-        report(message);
         const payload = new TextEncoder().encode(message);
-        post(encodeEngineMessage(ENGINE_REPORT, LANE_ENGINE, LANE_NATIVE, 0, 0, payload));
+        const frame = encodeEngineMessage(ENGINE_REPORT, LANE_ENGINE, LANE_NATIVE, 0, 0, payload);
+        queueMicrotask(() => { if (!disposed) { report(message); post(frame); } });
       },
       engineSend: (bytes) => {
         const message = decodeEngineMessage(bytes);
         if (!message || message.source !== LANE_ENGINE) throw new Error("invalid outbound engine message");
-        post(bytes.slice());
+        const frame = bytes.slice();
+        queueMicrotask(() => { if (!disposed) post(frame); });
       },
     });
     while (queued.length) deliver(queued.shift());

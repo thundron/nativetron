@@ -88,7 +88,8 @@ export function createGpuHost(options) {
   const cancelRaf = options.cancelAnimationFrame ?? scope.cancelAnimationFrame?.bind(scope);
   const emit = (type, requestId = 0, handle = 0, status = 0, data = {}) => {
     if (stopped) return;
-    options.onEvent?.({ type, requestId, handle: handle >>> 0, status, ...data });
+    const event = { type, requestId, handle: handle >>> 0, status, ...data };
+    queueMicrotask(() => { if (!stopped) options.onEvent?.(event); });
   };
   const errorMessage = (error) => error instanceof Error ? error.message : String(error);
   const fail = (error, requestId = 0, handle = 0) => emit(9, requestId, handle, 1, { message: errorMessage(error) });
