@@ -1,3 +1,8 @@
+#if defined(NT_ASSET_HOST) && defined(__APPLE__)
+extern "C" void nt_assets_install(void *configuration);
+extern "C" const char *nt_assets_entry(void);
+#define WEBVIEW_CONFIGURATION_HOOK(configuration) nt_assets_install(configuration)
+#endif
 #include "webview/webview.h"
 
 #if defined(__APPLE__)
@@ -1158,7 +1163,11 @@ void nt_set_document_css(const uint8_t *s, size_t n) {
 void nt_load_document(void) {
   if (!g_w || g_document_started) return;
   g_document_started = true;
+#if defined(NT_ASSET_HOST) && defined(__APPLE__)
+  g_w->navigate(nt_assets_entry());
+#else
   g_w->navigate("about:blank");
+#endif
 }
 
 // Ops cross as base64 inside a constant call. The evaluated source is

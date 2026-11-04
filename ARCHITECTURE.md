@@ -56,6 +56,10 @@ imports, glue emission, and a size posture. See `FORK.md` in the scriptc fork.
 frame and replay against a real 2D context. Generated from `canvas/ops.json`,
 verified subpixel-exact against direct DOM calls.
 
+## GPU engine lane
+
+`gpu/` provides a generated WebGPU transport. `engine/` loads a separate wasm reactor inside the page, preferring a dedicated Worker with OffscreenCanvas after a real capability probe and falling back to the main thread. GPU batches, uploads and readbacks stay in page-owned linear memory; native only exchanges bounded coarse control messages described by `ipc/engine.json`. The engine schedules a single rAF on demand and does not run an idle frame loop. The desktop demo serves allowlisted offline assets through `app://local`.
+
 ## Limitations
 
 - JSX requires the typed ahead-of-time transform in `app/jsx/build.mjs`; only

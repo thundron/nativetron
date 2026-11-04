@@ -38,6 +38,7 @@ let pipelinesReady = 0;
 let colour = 0.08;
 let ready = false;
 let firstFrame = true;
+let reportColour = false;
 let result: ReadbackSlice = { offset: 0, length: 0 };
 let timings: ReadbackSlice = { offset: 0, length: 0 };
 
@@ -49,6 +50,8 @@ export function start(): number {
   flush();
   return 0;
 }
+
+interface DemoCapabilities { format: string; }
 
 function setup(timestamp: boolean, format: string): void {
   gpu.configureCanvas(format, gpu.TEXTURE_USAGE_RENDER_ATTACHMENT, 0, 0);
@@ -83,7 +86,8 @@ function setup(timestamp: boolean, format: string): void {
 export function event(type: number, requestId: number, handle: number, status: number, value: number, text: string): number {
   if (type === gpu.GPU_EVENT_CAPABILITIES) {
     if (status !== 0) { gpuReport("GPU_UNAVAILABLE " + text); return 0; }
-    setup(value !== 0, text);
+    const capabilities = JSON.parse(text) as DemoCapabilities;
+    setup(value !== 0, capabilities.format);
   } else if (type === gpu.GPU_EVENT_PIPELINE_READY && status === 0) {
     pipelinesReady++;
     if (pipelinesReady === 2) {
@@ -102,6 +106,8 @@ export function event(type: number, requestId: number, handle: number, status: n
     const begin = view.getUint32(0, true) + view.getUint32(4, true) * 4294967296;
     const end = view.getUint32(8, true) + view.getUint32(12, true) * 4294967296;
     gpuReport("GPU_TIMESTAMP_NS " + (end - begin));
+  } else if (type === gpu.GPU_EVENT_WORK_DONE && requestId === 33) {
+    gpuReport("GPU_COLOUR_CHANGED");
   } else if (type === gpu.GPU_EVENT_RESIZE && ready) {
     gpu.requestFrame();
     flush();
@@ -140,6 +146,7 @@ export function frame(_timeMs: number): number {
     if (queries !== 0) gpu.mapAsync(31, queryReadback, gpu.MAP_MODE_READ, 0, 16, timings);
     gpu.onSubmittedWorkDone(32);
   }
+  if (reportColour) { gpu.onSubmittedWorkDone(33); reportColour = false; }
   gpu.destroy(pass);
   gpu.destroy(renderPass);
   gpu.destroy(command);
@@ -155,6 +162,7 @@ export function frame(_timeMs: number): number {
 export function message(kind: number, _payload: Uint8Array): number {
   if (kind === 1 && ready) {
     colour = colour < 0.3 ? 0.55 : 0.08;
+    reportColour = true;
     gpu.requestFrame();
     flush();
   }

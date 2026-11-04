@@ -1,0 +1,49 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>nativetron engine lane</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>body{font:15px system-ui;margin:16px;background:#101822;color:#ddd}canvas{width:640px;max-width:100%;height:400px}button{padding:8px}pre{white-space:pre-wrap}</style></head>
+<body><div id="nt-root"></div><canvas id="surface" width="640" height="400"></canvas><pre id="report"></pre>
+<script type="module">
+import { startEngine } from "./host.js";
+import { instantiateFromBytes } from "./.scriptc/ui.mjs";
+import { bindEventCallbacks } from "../host/event.generated.mjs";
+import { decodeEngineMessage, encodeEngineMessage, ENGINE_REPORT, LANE_ENGINE, LANE_UI, LANE_NATIVE } from "../ipc/engine.generated.mjs";
+import { engineEnvelope, engineFromBase64 } from "../ipc/engine-bridge.generated.mjs";
+const native = window.__nt_ipc || (window.webkit?.messageHandlers?.ntEngine ? (text) => window.webkit.messageHandlers.ntEngine.postMessage(text) : window.ntEngine ? (text) => window.ntEngine.postMessage(text) : null);
+if (!window.__nt) { window.__nt_send = native || (() => {}); await import("../host/dom-host.js"); }
+const reports = [], events = [], pending = [];
+let lane, ui;
+const report = (line) => {
+  reports.push(line);
+  document.getElementById("report").textContent += line + "\n";
+  if (ui) ui.nt_message(encodeEngineMessage(ENGINE_REPORT, LANE_ENGINE, LANE_UI, 0, 0, new TextEncoder().encode(line)));
+  if (line.startsWith("ENGINE_MODE ")) native?.(engineEnvelope(encodeEngineMessage(ENGINE_REPORT, LANE_ENGINE, LANE_NATIVE, 0, 0, new TextEncoder().encode(line))));
+};
+window.__nt_engine_receive = (base64) => {
+  const bytes = engineFromBase64(base64);
+  if (!bytes) throw new Error("invalid native engine frame");
+  if (lane) lane.send(bytes, LANE_NATIVE);
+  else if (pending.length < 32) pending.push(bytes);
+  else throw new Error("engine startup queue full");
+};
+try {
+  ui = await instantiateFromBytes(await (await fetch("./.scriptc/ui.wasm")).arrayBuffer(), {
+    uiPresent: (bytes) => window.__nt.applyBin(bytes),
+    uiToEngine: (bytes) => lane?.send(bytes, LANE_UI),
+  });
+  bindEventCallbacks(window, () => ui, "nt");
+  ui.nt_start();
+  lane = await startEngine({
+    canvas: document.getElementById("surface"),
+    moduleUrl: new URL("../gpu/.scriptc/demo.mjs", location.href).href,
+    wasmUrl: new URL("../gpu/.scriptc/demo.wasm", location.href).href,
+    prefix: "ntgpu_", report,
+    forceMain: new URL(location.href).searchParams.has("main"),
+    postNative: (bytes) => native?.(engineEnvelope(bytes)),
+    postUi: (bytes) => ui.nt_message(bytes),
+    onEvent: (event) => { events.push(event); if (event.type === 1) report("GPU_CAPABILITIES " + JSON.stringify(event)); },
+  });
+  for (const bytes of pending) lane.send(bytes, LANE_NATIVE);
+  pending.length = 0;
+  window.engineDemo = { lane, ui, reports, events };
+} catch (error) { report("ENGINE_ERROR " + (error.stack || error.message)); }
+</script></body></html>

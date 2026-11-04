@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "maxPayloadBytes": 65536,
+  "maxMessagesPerSecond": 60,
+  "lanes": { "NATIVE": 0, "UI": 1, "ENGINE": 2 },
+  "kinds": { "COMMAND": 1, "RESULT": 2, "ERROR": 3, "EVENT": 4, "REPORT": 5 },
+  "header": ["version:u8", "kind:u8", "source:u8", "target:u8", "requestId:u32", "topic:u32", "payloadLength:u32"],
+  "envelope": { "marker": "ntEngine", "version": 1, "field": "frame" }
+}

@@ -1,3 +1,5 @@
+import { dispatchEngineMessage } from "./engine.js";
+import { ENGINE_ENVELOPE_LIMIT } from "../ipc/engine-bridge.generated.js";
 import { HOST_JS } from "./host-embed.generated.js";
 import "./window.js";
 import "./desktop.js";
@@ -25,7 +27,7 @@ declare function ntActivate(): void;
 
 const START_MS = Date.now();
 const BENCH_START_MS = +(process.env.NT_BENCH_START_MS ?? "0");
-const WEBVIEW_MESSAGE_LIMIT = 65536;
+const WEBVIEW_MESSAGE_LIMIT = ENGINE_ENVELOPE_LIMIT + 64;
 const readyCallbacks: (() => void)[] = [];
 let hostReady = false;
 let hostSettled = false;
@@ -112,6 +114,7 @@ export function mountStyled(title: string, w: number, h: number, css: string): v
   ntOnMessage((req: string) => {
     const rawMessage = webviewMessage(req);
     if (rawMessage === null) return;
+    if (dispatchEngineMessage(rawMessage)) return;
     const event = parseNativeEventMessage(rawMessage);
     if (event !== null) {
       dispatchNativeEvent(event, dispatchSlotRich);

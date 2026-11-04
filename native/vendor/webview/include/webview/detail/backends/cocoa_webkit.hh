@@ -463,6 +463,9 @@ private:
     objc::autoreleasepool arp;
 
     auto config{objc::autorelease(WKWebViewConfiguration_new())};
+#ifdef WEBVIEW_CONFIGURATION_HOOK
+    WEBVIEW_CONFIGURATION_HOOK(config);
+#endif
 
     m_manager = WKWebViewConfiguration_get_userContentController(config);
 

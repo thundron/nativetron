@@ -7,6 +7,8 @@ mkdir -p "$ROOT/build"
 
 node "$ROOT/abi/generate.mjs" --check
 node "$ROOT/canvas/generate.mjs" --check
+node "$ROOT/gpu/generate.mjs" --check
+node "$ROOT/ipc/generate-engine.mjs" --check
 node "$ROOT/compat/generate.mjs" --check
 node "$ROOT/desktop/generate.mjs" --check
 

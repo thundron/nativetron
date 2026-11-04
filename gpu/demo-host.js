@@ -16,7 +16,7 @@ export async function loadGpuDemo(canvas, report = console.log) {
         let text = event.message ?? event.reason ?? "";
         let value = 0;
         if (event.type === 1 && event.available) {
-          text = event.format;
+          text = JSON.stringify(event);
           value = event.features.includes("timestamp-query") ? 1 : 0;
           report("GPU_CAPABILITIES " + JSON.stringify(event));
         } else if (event.type === 7) text = JSON.stringify(event.messages);
