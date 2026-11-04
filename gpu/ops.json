@@ -83,39 +83,48 @@
   "events": [
     {
       "code": 1,
-      "name": "CAPABILITIES"
+      "name": "CAPABILITIES",
+      "terminal": true
     },
     {
       "code": 2,
-      "name": "PIPELINE_READY"
+      "name": "PIPELINE_READY",
+      "terminal": true
     },
     {
       "code": 3,
-      "name": "MAP_READY"
+      "name": "MAP_READY",
+      "terminal": true
     },
     {
       "code": 4,
-      "name": "WORK_DONE"
+      "name": "WORK_DONE",
+      "terminal": true
     },
     {
       "code": 5,
-      "name": "DEVICE_LOST"
+      "name": "DEVICE_LOST",
+      "terminal": false
     },
     {
       "code": 6,
-      "name": "UNCAUGHT_ERROR"
+      "name": "UNCAUGHT_ERROR",
+      "terminal": false
     },
     {
       "code": 7,
-      "name": "SHADER_INFO"
+      "name": "SHADER_INFO",
+      "terminal": true
     },
     {
       "code": 8,
-      "name": "RESIZE"
+      "name": "RESIZE",
+      "terminal": false
     },
     {
       "code": 9,
-      "name": "ERROR"
+      "name": "ERROR",
+      "terminal": true
     }
   ],
   "ops": [

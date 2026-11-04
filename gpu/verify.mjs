@@ -39,7 +39,7 @@ const deferred = () => { let resolve, reject; const promise = new Promise((yes, 
 const tick = () => new Promise((done) => setImmediate(done));
 
 // These unit fixtures test protocol semantics; browser-test.mjs tests the real GPU.
-function fixture() {
+function fixture(onEvent = () => {}) {
   const memory = new WebAssembly.Memory({ initial: 4 });
   const events = [], writes = [], frames = [];
   const lost = deferred();
@@ -55,7 +55,7 @@ function fixture() {
   };
   const adapter = { features: new Set(["timestamp-query"]), requestDevice: async () => device };
   const canvas = { width: 100, height: 100, clientWidth: 100, clientHeight: 100 };
-  const host = createGpuHost({ canvas, gpu: { requestAdapter: async () => adapter, getPreferredCanvasFormat: () => "bgra8unorm" }, scope: {}, getMemory: () => memory.buffer, onEvent: (event) => events.push(event), requestAnimationFrame: (fn) => { frames.push(fn); return frames.length; }, cancelAnimationFrame() {} });
+  const host = createGpuHost({ canvas, gpu: { requestAdapter: async () => adapter, getPreferredCanvasFormat: () => "bgra8unorm" }, scope: {}, getMemory: () => memory.buffer, onEvent: (event) => { events.push(event); onEvent(event); }, requestAnimationFrame: (fn) => { frames.push(fn); return frames.length; }, cancelAnimationFrame() {} });
   const apply = (bytes, uploadOffset = 16384, uploadLength = 16384, readbackOffset = 32768, readbackLength = 16384) => {
     new Uint8Array(memory.buffer, 0, bytes.length).set(bytes);
     return host.apply(new Uint8Array(memory.buffer, 0, bytes.length), new Uint8Array(memory.buffer, uploadOffset, uploadLength), new Uint8Array(memory.buffer, readbackOffset, readbackLength));
@@ -195,4 +195,21 @@ test("absent WebGPU is a capability event", async () => {
   assert.equal(events[0].type, 1);
   assert.equal(events[0].available, false);
   host.dispose();
+});
+
+test("completion releases request ids before delivering the event", async () => {
+  let completions = 0;
+  const f = fixture((event) => {
+    if (event.type !== 4) return;
+    completions++;
+    if (completions === 1) f.host.onSubmittedWorkDone(99);
+  });
+  f.host.requestDevice(1, 1, 1, 0);
+  await tick();
+  f.host.onSubmittedWorkDone(99);
+  f.submitted.resolve();
+  await tick(); await tick();
+  assert.equal(completions, 2);
+  assert.equal(f.events.some(event => event.type === 9), false);
+  f.host.dispose();
 });

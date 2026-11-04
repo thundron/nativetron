@@ -83,6 +83,7 @@ export const GPU_EVENT_ERROR = 9;
 
 export const GPU_PROTOCOL_VERSION = 1;
 export const GPU_MAX_BATCH_BYTES = 16777216;
+export const GPU_TERMINAL_EVENTS = new Set([1,2,3,4,7,9]);
 export const GPU_MAX_ARRAY_LENGTH = 65536;
 export const GPU_HANDLE_SLOT_BITS = 20;
 export const GPU_HANDLE_GENERATION_BITS = 12;
@@ -554,6 +555,7 @@ export function readGpuRecord(kind, values, offset = 0) {
 const decoder = new TextDecoder();
 
 export function decodeGpuBatch(host, bytes) {
+  let activeRequest = 0, activeHandle = 0;
   try {
     if (!(bytes instanceof Uint8Array)) throw new Error("GPU batch is not bytes");
     if (bytes.byteLength > GPU_MAX_BATCH_BYTES) throw new Error("GPU batch limit exceeded");
@@ -572,20 +574,21 @@ export function decodeGpuBatch(host, bytes) {
     const f64Array = () => { const length = count(); const values = new Array(length); for (let i = 0; i < length; i++) values[i] = f64(); return values; };
     const range = (readback) => ({ offset: u32(), length: u32(), readback });
     while (offset < bytes.byteLength) {
+      activeRequest = 0; activeHandle = 0;
       switch (u8()) {
-        case 1: host.requestDevice(u32(), u32(), u32(), f64()); break;
+        case 1: { const requestId = u32(); activeRequest = requestId; const powerPreference = u32(); const featureBits = u32(); const maxBufferSize = f64(); host.requestDevice(requestId, powerPreference, featureBits, maxBufferSize); break; }
         case 2: host.createBuffer(u32(), f64(), u32(), bool(), str()); break;
         case 3: host.createTexture(u32(), u32(), u32(), u32(), u32(), u32(), u32(), str(), u32(), str()); break;
         case 4: host.createTextureView(u32(), u32(), str(), u32(), u32(), u32(), u32(), u32(), u32(), str()); break;
         case 5: host.createSampler(u32(), u32(), u32(), u32(), u32(), u32(), u32(), f32(), f32(), u32(), u32(), str()); break;
-        case 6: host.createShaderModule(u32(), u32(), str(), str()); break;
+        case 6: { const handle = u32(); activeHandle = handle; const requestId = u32(); activeRequest = requestId; const code = str(); const label = str(); host.createShaderModule(handle, requestId, code, label); break; }
         case 7: host.createBindGroupLayout(u32(), f64Array(), str()); break;
         case 8: host.createBindGroup(u32(), u32(), f64Array(), str()); break;
         case 9: host.createPipelineLayout(u32(), u32Array(), str()); break;
         case 10: host.createComputePipeline(u32(), u32(), u32(), str(), str()); break;
-        case 11: host.createComputePipelineAsync(u32(), u32(), u32(), u32(), str(), str()); break;
+        case 11: { const handle = u32(); activeHandle = handle; const requestId = u32(); activeRequest = requestId; const layout = u32(); const shader = u32(); const entry = str(); const label = str(); host.createComputePipelineAsync(handle, requestId, layout, shader, entry, label); break; }
         case 12: host.createRenderPipeline(u32(), u32(), u32(), str(), u32(), str(), str(), str(), u32(), u32(), u32(), u32(), bool(), u32(), u32(), f64Array(), str()); break;
-        case 13: host.createRenderPipelineAsync(u32(), u32(), u32(), u32(), str(), u32(), str(), str(), str(), u32(), u32(), u32(), u32(), bool(), u32(), u32(), f64Array(), str()); break;
+        case 13: { const handle = u32(); activeHandle = handle; const requestId = u32(); activeRequest = requestId; const layout = u32(); const vertexShader = u32(); const vertexEntry = str(); const fragmentShader = u32(); const fragmentEntry = str(); const colorFormat = str(); const depthFormat = str(); const topology = u32(); const frontFace = u32(); const cullMode = u32(); const sampleCount = u32(); const depthWrite = bool(); const depthCompare = u32(); const blend = u32(); const vertexLayouts = f64Array(); const label = str(); host.createRenderPipelineAsync(handle, requestId, layout, vertexShader, vertexEntry, fragmentShader, fragmentEntry, colorFormat, depthFormat, topology, frontFace, cullMode, sampleCount, depthWrite, depthCompare, blend, vertexLayouts, label); break; }
         case 14: host.createQuerySet(u32(), u32(), u32(), str()); break;
         case 15: host.createCommandEncoder(u32(), str()); break;
         case 16: host.beginComputePass(u32(), u32(), u32(), u32(), u32(), str()); break;
@@ -617,8 +620,8 @@ export function decodeGpuBatch(host, bytes) {
         case 42: host.configureCanvas(str(), u32(), u32(), u32()); break;
         case 43: host.getCurrentTexture(u32()); break;
         case 44: host.destroy(u32()); break;
-        case 45: host.mapAsync(u32(), u32(), u32(), f64(), f64(), range(true)); break;
-        case 46: host.onSubmittedWorkDone(u32()); break;
+        case 45: { const requestId = u32(); activeRequest = requestId; const buffer = u32(); activeHandle = buffer; const mode = u32(); const offset = f64(); const size = f64(); const destination = range(true); host.mapAsync(requestId, buffer, mode, offset, size, destination); break; }
+        case 46: { const requestId = u32(); activeRequest = requestId; host.onSubmittedWorkDone(requestId); break; }
         case 47: host.requestFrame(); break;
         case 48: host.release(u32()); break;
         case 49: host.unmap(u32()); break;
@@ -628,7 +631,7 @@ export function decodeGpuBatch(host, bytes) {
     }
     return true;
   } catch (error) {
-    host.protocolError(error instanceof Error ? error.message : String(error));
+    host.protocolError(error instanceof Error ? error.message : String(error), activeRequest, activeHandle);
     return false;
   }
 }

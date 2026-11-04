@@ -1,4 +1,4 @@
-import { decodeGpuBatch, GPU_HANDLE_SLOT_BITS, GPU_HANDLE_GENERATION_BITS, GPU_ENUMS, GPU_RECORDS, GPU_MAX_PENDING_REQUESTS, readGpuRecord } from "./gpu-host.generated.js";
+import { decodeGpuBatch, GPU_HANDLE_SLOT_BITS, GPU_HANDLE_GENERATION_BITS, GPU_ENUMS, GPU_RECORDS, GPU_MAX_PENDING_REQUESTS, readGpuRecord, GPU_TERMINAL_EVENTS } from "./gpu-host.generated.js";
 
 const SLOT_MASK = 2 ** GPU_HANDLE_SLOT_BITS - 1;
 const GENERATION_MASK = 2 ** GPU_HANDLE_GENERATION_BITS - 1;
@@ -88,6 +88,7 @@ export function createGpuHost(options) {
   const cancelRaf = options.cancelAnimationFrame ?? scope.cancelAnimationFrame?.bind(scope);
   const emit = (type, requestId = 0, handle = 0, status = 0, data = {}) => {
     if (stopped) return;
+    if (requestId && GPU_TERMINAL_EVENTS.has(type)) pending.delete(requestId);
     const event = { type, requestId, handle: handle >>> 0, status, ...data };
     queueMicrotask(() => { if (!stopped) options.onEvent?.(event); });
   };

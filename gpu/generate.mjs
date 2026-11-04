@@ -85,6 +85,12 @@ const hostRead = (arg) => {
   throw new Error(`no host reader for ${arg.type}`);
 };
 const cases = spec.ops.map((op) => {
+  if (op.args.some(arg => arg.name === "requestId")) {
+    const argumentsToRead = [...(op.result ? [{ name: "handle", type: "handle" }] : []), ...op.args];
+    const resource = argumentsToRead.find(arg => arg.type === "handle")?.name;
+    const reads = argumentsToRead.map(arg => `const ${arg.name} = ${hostRead(arg)};${arg.name === "requestId" ? " activeRequest = requestId;" : ""}${arg.name === resource ? ` activeHandle = ${resource};` : ""}`).join(" ");
+    return `        case ${op.code}: { ${reads} host.${camel(op.name)}(${argumentsToRead.map(arg => arg.name).join(", ")}); break; }`;
+  }
   const reads = [];
   if (op.result) reads.push("u32()");
   for (const arg of op.args) reads.push(hostRead(arg));
@@ -109,6 +115,7 @@ const host = `// generated from gpu/ops.json by gpu/generate.mjs — do not edit
   spec.events.map((event) => `export const GPU_EVENT_${upper(event.name)} = ${event.code};`).join("\n") + `\n\n` +
 `export const GPU_PROTOCOL_VERSION = ${spec.version};
 export const GPU_MAX_BATCH_BYTES = ${spec.maxBatchBytes};
+export const GPU_TERMINAL_EVENTS = new Set(${JSON.stringify(spec.events.filter(event => event.terminal).map(event => event.code))});
 export const GPU_MAX_ARRAY_LENGTH = ${spec.maxArrayLength};
 export const GPU_HANDLE_SLOT_BITS = ${spec.handle.slotBits};
 export const GPU_HANDLE_GENERATION_BITS = ${spec.handle.generationBits};
@@ -128,6 +135,7 @@ export function readGpuRecord(kind, values, offset = 0) {
 const decoder = new TextDecoder();
 
 export function decodeGpuBatch(host, bytes) {
+  let activeRequest = 0, activeHandle = 0;
   try {
     if (!(bytes instanceof Uint8Array)) throw new Error("GPU batch is not bytes");
     if (bytes.byteLength > GPU_MAX_BATCH_BYTES) throw new Error("GPU batch limit exceeded");
@@ -146,6 +154,7 @@ export function decodeGpuBatch(host, bytes) {
     const f64Array = () => { const length = count(); const values = new Array(length); for (let i = 0; i < length; i++) values[i] = f64(); return values; };
     const range = (readback) => ({ offset: u32(), length: u32(), readback });
     while (offset < bytes.byteLength) {
+      activeRequest = 0; activeHandle = 0;
       switch (u8()) {
 ${cases}
         default: throw new Error("unknown GPU opcode");
@@ -153,7 +162,7 @@ ${cases}
     }
     return true;
   } catch (error) {
-    host.protocolError(error instanceof Error ? error.message : String(error));
+    host.protocolError(error instanceof Error ? error.message : String(error), activeRequest, activeHandle);
     return false;
   }
 }
