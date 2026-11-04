@@ -298,7 +298,7 @@ export function createGpuHost(options) {
     renderDrawIndexedIndirect(pass, buffer, offset) { ref(pass, "renderPass").drawIndexedIndirect(ref(buffer, "buffer"), integer(offset, "indirect offset")); },
     endRenderPass(pass) { ref(pass, "renderPass").end(); },
     copyBufferToBuffer(encoder, source, sourceOffset, destination, destinationOffset, size) { ref(encoder, "commandEncoder").copyBufferToBuffer(ref(source, "buffer"), integer(sourceOffset, "copy offset"), ref(destination, "buffer"), integer(destinationOffset, "copy offset"), integer(size, "copy size")); },
-    copyBufferToTexture(encoder, source, sourceOffset, bytesPerRow, rowsPerImage, destination, mipLevel, originX, originY, originZ, aspect, width, height, depth) { ref(encoder, "commandEncoder").copyBufferToTexture({ buffer: ref(source, "buffer"), offset: sourceOffset, bytesPerRow, rowsPerImage }, { texture: ref(destination, "texture"), mipLevel, origin: [originX, originY, originZ], aspect: choice(enums.aspect, aspect) }, [width, height, depth]); },
+    copyBufferToTexture(encoder, source, sourceOffset, bytesPerRow, rowsPerImage, destination, mipLevel, originX, originY, originZ, aspect, width, height, depth) { ref(encoder, "commandEncoder").copyBufferToTexture({ buffer: ref(source, "buffer"), offset: integer(sourceOffset, "copy offset"), bytesPerRow, rowsPerImage }, { texture: ref(destination, "texture"), mipLevel, origin: [originX, originY, originZ], aspect: choice(enums.aspect, aspect) }, [width, height, depth]); },
     copyTextureToTexture(encoder, source, sourceMip, sourceX, sourceY, sourceZ, destination, destinationMip, destinationX, destinationY, destinationZ, width, height, depth) { ref(encoder, "commandEncoder").copyTextureToTexture({ texture: ref(source, "texture"), mipLevel: sourceMip, origin: [sourceX, sourceY, sourceZ] }, { texture: ref(destination, "texture"), mipLevel: destinationMip, origin: [destinationX, destinationY, destinationZ] }, [width, height, depth]); },
     resolveQuerySet(encoder, querySet, first, count, destination, offset) { ref(encoder, "commandEncoder").resolveQuerySet(ref(querySet, "querySet"), first, count, ref(destination, "buffer"), integer(offset, "query offset")); },
     finishCommandEncoder(handle, encoder, label) { create(handle, "commandBuffer", () => ref(encoder, "commandEncoder").finish({ label })); },
@@ -335,7 +335,7 @@ export function createGpuHost(options) {
       const resource = ref(buffer, "buffer");
       const epoch = deviceEpoch;
       request(requestId, async (current) => {
-        await resource.mapAsync(mode, offset, size);
+        await resource.mapAsync(mode, integer(offset, "map offset"), size);
         try {
           if (!current() || epoch !== deviceEpoch) return;
           const memory = getMemory();

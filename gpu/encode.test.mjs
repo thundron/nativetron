@@ -1,0 +1,10 @@
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { mkdirSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+const root = fileURLToPath(new URL("../", import.meta.url));
+const output = fileURLToPath(new URL("../build/gpu-encode-selftest", import.meta.url));
+mkdirSync(new URL("../build/", import.meta.url), { recursive: true });
+execFileSync(process.execPath, [fileURLToPath(new URL("../../../scriptc/packages/cli/dist/main.js", import.meta.url)), "build", "gpu/encode.selftest.ts", "--backend", "llvm", "-o", output], { cwd: root, stdio: "inherit" });
+assert.equal(execFileSync(output, { encoding: "utf8" }), "5/4294967295/-2147483648\n");
+console.log("GPU encoder: integer bounds refuse coercion and preserve signed operands");

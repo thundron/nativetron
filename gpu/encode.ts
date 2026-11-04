@@ -95,6 +95,7 @@ export function u8(value: number): void {
 }
 
 export function u32(value: number): void {
+  if (!Number.isInteger(value) || value < 0 || value > 4294967295) throw new Error("invalid GPU u32 operand");
   needCommand(4);
   commands[commandOffset++] = value & 255;
   commands[commandOffset++] = (value >>> 8) & 255;
@@ -103,7 +104,8 @@ export function u32(value: number): void {
 }
 
 export function i32(value: number): void {
-  u32(value);
+  if (!Number.isInteger(value) || value < -2147483648 || value > 2147483647) throw new Error("invalid GPU i32 operand");
+  u32(value >>> 0);
 }
 
 const numberScratch = new Uint8Array(8);
