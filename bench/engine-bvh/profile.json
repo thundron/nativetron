@@ -1,0 +1,62 @@
+{
+  "profile_format": 1,
+  "name": "nt-bvh-benchmark",
+  "entry": "workload.ts",
+  "emission": "llvm",
+  "abi": {
+    "prefix": "bvh_",
+    "init_symbol": "bvh_init",
+    "sink_register_symbol": "bvh_sink",
+    "collect_symbol": "bvh_collect",
+    "result_reset_symbol": null
+  },
+  "exports": [
+    {
+      "export": "prepare",
+      "symbol": "bvh_prepare",
+      "params": [
+        "f64"
+      ],
+      "returns": "f64"
+    },
+    {
+      "export": "build",
+      "symbol": "bvh_build",
+      "params": [],
+      "returns": "f64"
+    },
+    {
+      "export": "refit",
+      "symbol": "bvh_refit",
+      "params": [],
+      "returns": "f64"
+    },
+    {
+      "export": "checksum",
+      "symbol": "bvh_checksum",
+      "params": [],
+      "returns": "f64"
+    },
+    {
+      "export": "validate",
+      "symbol": "bvh_validate",
+      "params": [],
+      "returns": "f64"
+    },
+    {
+      "export": "f32Probe",
+      "symbol": "bvh_f32Probe",
+      "params": [
+        "f64",
+        "f64"
+      ],
+      "returns": "f64"
+    },
+    {
+      "export": "perturb",
+      "symbol": "bvh_perturb",
+      "params": [],
+      "returns": "f64"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { instantiateFromBytes } from "./.scriptc/workload.mjs";
+const llvm = readFileSync(new URL("./.scriptc/workload.lib.ll", import.meta.url), "utf8");
+const body = llvm.match(/^define internal double @sc_f_f32Probe\([^]*?^}/m)?.[0];
+assert.ok(body, "f32 probe was not emitted");
+for (const pattern of [/load float/, /fpext float/, /fmul double/, /fadd double/, /fptrunc double/]) assert.match(body, pattern);
+const bytes = readFileSync(new URL("./.scriptc/workload.wasm", import.meta.url));
+const module = new WebAssembly.Module(bytes);
+const api = await instantiateFromBytes(bytes, {});
+assert.equal(api.__memory() instanceof SharedArrayBuffer, false);
+console.log(JSON.stringify({ sharedLinearMemory: false, imports: WebAssembly.Module.imports(module), f32ProbeInstructions: body.split("\n").filter(line => /load float|fpext|fptrunc|fmul|fadd/.test(line)).map(line => line.trim()) }, null, 2));
