@@ -1,76 +1,130 @@
 # House-planner integration gaps
 
-Inspected scriptc `internal` at `76dc1100ef9a45ad91ca52760534c611d13eb1d3`. No scriptc files or refs were changed. The house-planner checkout was read only; benchmark code is a local adaptation, not a runtime dependency.
+I inspected scriptc `internal` at `76dc1100ef9a45ad91ca52760534c611d13eb1d3` (0.4.8) and house-planner at `119c919` (study §7.6, `gi/binned.ts`, `rt/wbvh/`). Both checkouts were read only, and no files or refs were changed. The benchmark code is a local copy, not a runtime dependency. Line references below are to that scriptc revision. The binary facts come from `bench/engine-bvh/inspect.mjs`, which uses a dependency-free opcode census, run on reactors built locally with `SCRIPTC=…/scriptc/packages/cli/dist/main.js`.
+
+Every effort figure below is a planning range, not measured implementation effort. Nothing in this report claims a SIMD, threading or f32 speedup.
 
 ## SIMD128
 
-The current public wasm build path does not expose `-msimd128` or a wasm SIMD feature option. The target in `packages/compiler/src/backend/targets.ts` is wasm32, generic CPU, empty features. `native/llvm-codegen/src/target.cpp` constructs its target machine with `generic` and an empty feature string; `backend/native-codegen.ts` passes the triple and optimization level, not a wasm feature list. `--target-cpu` is restricted to x86-64 levels and rejects non-x86 targets in `backend/target-cpu.ts`. The release optimizer in `backend/wasm-opt.ts` also lists enabled nontrapping-conversion/bulk-memory/sign-extension/mutable-global features, not SIMD; its validation/feature posture must be extended consistently.
+**State.** The wasm32-wasi build path cannot request SIMD128:
 
-LLVM/Zig can generate wasm SIMD, so this is a compiler/toolchain-plumbing gap, not a WebGPU or TypeScript-language prohibition. Merely appending `-msimd128` to the final link would not recompile the already emitted program object, nor guarantee useful vectorization. A supported feature flag must reach LLVM emission, helper identity/protocol and cache keys, and participate in binary feature/compatibility tests. Scalar runtime objects can coexist with SIMD program code; SIMD runtime variants would need their own pack metadata and validation if pursued.
+- `packages/compiler/src/backend/targets.ts:189-190` types every `NativeTargetSpec` as `cpu: "generic"; features: ""`, as string literal types. `WASM32_WASI_TARGET` (`:469-474`) follows that shape. Adding a feature means a type change that affects every target, along with its cache identity.
+- `native/llvm-codegen/src/target.cpp:153-154` constructs the LLVM target machine with CPU `"generic"` and an empty feature string. The native helper ships prebuilt (`@scriptc/llvm-<platform>`), so a features parameter means a helper protocol change and a rebuild of the helper on every host platform (CONTRIBUTING: CMake, Ninja, LLVM 22, Zig 0.16).
+- `backend/target-cpu.ts:114-121` accepts `--target-cpu` levels for x86-64 only and refuses other targets. `scriptc build --lib` rejects `--target-cpu` and `--optimization` outright, because the profile pins the posture. Any SIMD switch for reactors therefore needs a profile field, not just a CLI flag.
+- `backend/wasm-opt.ts:8-13` hands wasm-opt `-Oz` with nontrapping-float-to-int, bulk-memory, sign-ext and mutable-globals enabled. `index.ts:2572` runs it only for the `release` posture. A module containing SIMD would fail that validation unless `--enable-simd` is added. The `speed` posture skips wasm-opt.
+- Emitted binaries, in both postures: 0 SIMD128 (0xFD) instructions. The same modules do contain other post-MVP features: 508/525 saturating truncations and 136 bulk-memory operations, from program and runtime objects together. SIMD128 is the feature that is absent. In the IR, typed-array element loads are `align 1` (`expr-bytes.ts:549`).
+- scriptc's separate wasm *translator* (native programs loading `.wasm`) rejects modules that use SIMD or threads (`docs/content/limitations/webassembly-modules.mdx`). That is a different direction and does not affect reactor emission.
 
-Estimate: 2–4 engineering days for a guarded opt-in feature and end-to-end emission/compatibility tests, assuming no runtime-pack redesign; another 1–2 weeks to investigate useful vectorization of actual geometry loops, bounds/alias checks and any explicit vector API. These are planning estimates, not measured implementation effort. No SIMD speedup is claimed by the benchmark below.
+**What enabling would take.** The SIMD feature has to reach LLVM emission, and also the helper protocol, the build and cache identity, wasm-opt flags, runtime-pack selection (if the runtime is ever built with SIMD) and compatibility tests. Appending `-msimd128` to the final link would not recompile the already-emitted program object.
+
+Enabling the feature would not by itself vectorise these loops. LLVM might autovectorise them only if it overcame several obstacles:
+
+- Float32Array data widened to f64 arithmetic (below)
+- alignment-1 loads
+- data-dependent min/max branches
+- the builder's indirect `order[i]` gathers
+
+An explicit vector API would be a separate language-surface design with Node-parity semantics.
+
+**Estimates.**
+
+- 3–6 engineering days for a guarded opt-in reactor target feature: types, helper protocol and rebuilds, cache keys, wasm-opt flags, and validation/compatibility tests, assuming no runtime-pack redesign.
+- Another 1–3 weeks to establish whether the real geometry loops vectorise usefully, including alias/bounds analysis.
+- An explicit vector intrinsic surface is unestimated; it needs a design first.
 
 ## Wasm threads and shared memory
 
-The produced reactor exports ordinary, unshared linear memory. `bench/engine-bvh/inspect.mjs` instantiates the real module and checks that its buffer is not a SharedArrayBuffer. The current generated glue instantiates each reactor independently, stages entry arguments into that instance's allocator, and defines no imported shared memory or thread-start protocol. The current library restrictions on promises/async/timers do not themselves prohibit multiple host Workers, but Workers are not equivalent to sharing one reactor heap.
+**State.**
 
-scriptc has native shared-storage/Atomics machinery (`runtime/src/scr_shared.c`) and native worker support; that does not establish a browser wasm-threads ABI. The runtime's threaded waits use the native worker/thread-instance configuration. A browser implementation still needs atomics/bulk-memory target features, a bounded shared-memory linker contract, worker bootstrap and independent stacks/TLS, allocator synchronization, runtime/global initialization rules, ownership/collection safety, and panic/teardown semantics. Reinstantiating the current module against one shared memory would not make its globals, stacks and allocator safe.
+- The reactor defines one memory: limits flags `0` (unshared), 266 initial pages, **no maximum** (wasm shared memories require a maximum). It exports the memory and imports none. The module imports only four WASI functions and `scriptc.panic`. It contains 0 atomic (0xFE) instructions. `inspect.mjs` asserts all of this.
+- `backend/native-toolchain.ts:73-87` (`wasmReactorLinkArgs`) links with `-mexec-model=reactor -Wl,--no-entry` plus exports. There are no `--shared-memory`, `--import-memory` or `--max-memory` arguments and no thread-start protocol. The generated glue instantiates each reactor independently.
+- `library/prepare.ts:827-856` refuses `abi.instance_per_thread` on wasm with "instantiate separate Wasm instances instead", and refuses `abi.localize_runtime`. The limitations pages say the same: `wasi-target.mdx:8` ("Native runtime localization and thread instances are unsupported") and `native-worker-threads.mdx:46` ("Workers are unsupported in WASI, compiled libraries…").
+- Native executables do have shared-storage and Atomics machinery. `runtime/src/scr_shared.c` implements it, and SharedArrayBuffer views in worker programs use relaxed atomic accesses with inline `atomicrmw` Atomics (`expr-bytes.ts:278-283`, `:1262-1279`). `@scriptc/threads` `publish()` shares immutable graphs between native threads, but it refuses typed arrays (`threads.mdx:132`), so it would not share BVH buffers even natively.
 
-Estimate: 4–8 engineering weeks for a constrained shared-bytes worker ABI with platform validation; arbitrary shared object graphs and concurrent collection may take longer. This should be designed separately from native `@scriptc/threads` publication, rather than assuming that API becomes a browser implementation unchanged.
+**What enabling would take.** A browser threads ABI needs:
 
-For now, the nativetron engine can run in a dedicated Worker, and applications can use independent reactor instances with coarse binary messages. That is isolation/parallel task execution, not shared-heap wasm threading. COOP/COEP headers are available on the bundled WebKit/Android responses and browser test server; Windows virtual-host header injection is not implemented. Headers alone do not prove crossOriginIsolated or SharedArrayBuffer support for custom webview origins. Each target must be tested before enabling a shared-memory lane.
+- atomics and bulk-memory target features, plus a bounded shared memory with a maximum
+- imported memory, a worker bootstrap, and per-thread stacks and TLS
+- allocator synchronisation
+- rules for runtime and global initialisation
+- safety for reference counting and the cycle collector across threads
+- panic and teardown semantics
+- glue for Worker instantiation
+
+Reinstantiating today's module against one shared memory would not make its globals, stack or allocator safe.
+
+**Estimates.**
+
+- 4–8 engineering weeks for a constrained "shared bytes + per-worker instances" ABI with platform validation.
+- Arbitrary shared object graphs or concurrent collection would take longer.
+- This should be designed separately from native `@scriptc/threads`.
+
+What works today: the engine can run in one dedicated Worker, and an application can run independent reactor instances that exchange coarse binary messages. That is isolation and task parallelism, not shared-heap threading. Response headers needed for cross-origin isolation are platform work owned by the host streams. Headers alone do not prove `crossOriginIsolated` or SharedArrayBuffer support on custom webview origins; each target must be tested before a shared-memory lane is enabled.
 
 ## f32 arithmetic
 
-Float32Array storage is 32-bit; JavaScript `number` arithmetic remains f64. In `backend/llvm/expr-bytes.ts` and `byte-numbers.ts`, float loads widen to double and stores truncate to float. `Math.fround` in `backend/llvm/lib-filesystem.ts` explicitly emits `fptrunc double ... to float` followed by `fpext float ... to double`.
+**State.** Float32Array storage is 32-bit, but `number` arithmetic stays f64:
 
-The emitted `f32Probe` in the benchmark confirms this sequence:
+- Loads widen (`expr-bytes.ts:549-550`: `load float` then `fpext`), and stores narrow (`byte-numbers.ts:194`).
+- `Math.fround` emits `fptrunc double → float` followed by `fpext` (`lib-filesystem.ts:1333-1339`).
+- Emitted IR of the Float32 `buildBinary`: 160 `load float`, each followed by `fpext`; 53 `fptrunc` stores; **0** float arithmetic; 257 double arithmetic instructions; 0 vector types.
+- The whole release binary contains 16 f32 comparisons and 1 f32 numeric instruction. LLVM narrows a comparison of two widened f32 values exactly. Everything else is f64.
 
-```llvm
-load float
-fpext float ... to double
-fmul double
-fadd double
-fptrunc double ... to float
-fpext float ... to double
-```
+**Observed narrowing (an LLVM optimisation, not a scriptc guarantee).** `bench/engine-bvh/f32-probe.ts` compiles one expression two ways. The form `c[i] = a[i] * b[i] + a[i]` (rounded once at the store) emits 0 f32 arithmetic. The form `Math.fround(Math.fround(a[i] * b[i]) + a[i])` emits f32 arithmetic at -O2 (3 `f32.add` and 1 `f32.mul` in the binary, which LLVM unrolled). Both return the same results as V8. Rounding after each `+ − × ÷` on f32 operands is exactly IEEE single-precision arithmetic, so the narrowing is legal. Today, though, it depends on LLVM InstCombine rather than on a compiler contract.
 
-Thus Float32Array expressions do not automatically become f32 arithmetic, and Math.fround rounds an expression's result rather than changing all preceding operators to f32. LLVM may optimize particular expressions when equivalence is provable; there is no promise of an f32 instruction lane. This preserves JavaScript numeric semantics. An explicit f32 IR/type or intrinsic surface would need a separate design and numerical tests; silently enabling fast-math or changing Number semantics is not proposed.
+FFI's `f32` class (`ffi_format` 6) only rounds values at the native boundary; it is not a compute type.
 
-## Binned SAH and refit measurement
+**Numerical consequence (deterministic, measured by the smoke run).** The renderer-facing Float32 builder is not topology-identical to the original Float64 builder. At 4,096 and 50,000 triangles, its topology differs in 6 of 7 distributions; only `coincident-centroids` matches. The SAH ratio (Σ node half-areas / root) differs from the original by at most 0.03 %, and the maximum depths are equal. Switching precision is therefore a behaviour change that needs renderer-level tests, not a free storage optimisation.
 
-Source: `bench/engine-bvh/algorithm.ts`, adapted from house-planner's `packages/render/src/gi/binned.ts` without importing that repository. Both V8 and wasm execute the same local source. The adaptation uses Float32Array bounds/centroids/bin bounds and Uint32Array primitive order; original house-planner binary-builder bounds use Float64Array. This measures the requested Float32/Uint32 lane, not an unchanged production WBVH build.
+**Estimates.**
 
-50,000 deterministic triangles; 16 bins; three-axis binned SAH; one primitive per leaf; 99,999 nodes. Refit recomputes leaf AABBs from nine Float32 vertex coordinates and unions internal children bottom-up. Input generation/instantiation and validation are outside timed windows; build includes its normal allocation/partitioning costs. Five warmups, then 21 paired/interleaved trials, reversing V8/wasm order each trial. Both lanes run in the same official Node process/V8 runtime.
+- 1–2 weeks to make per-operation f32 a documented and tested contract (for example, a recognised `Math.fround(a op b)` pattern with corpus and IR tests).
+- 3–5 weeks for an explicit f32 type or intrinsic surface with Node-parity semantics.
+- Silently enabling fast-math or changing `number` semantics is not proposed.
 
-Apple M4 Max, macOS arm64, official Node 24.22.1, V8 13.6.233.17-node.58, ICU 78.3:
+## Binned SAH and refit harness
 
-| workload | V8 median | wasm median | wasm / V8 | V8 p95 | wasm p95 |
-|---|---:|---:|---:|---:|---:|
-| 50k-triangle binned SAH build | 85.12 ms | 99.56 ms | 1.17× | 88.52 ms | 101.31 ms |
-| 99,999-node AABB refit | 1.13 ms | 1.48 ms | 1.31× | 3.57 ms | 1.56 ms |
+`bench/engine-bvh/` (see its README) now runs:
 
-Wasm is slower at the median in both workloads. The V8 build had a 220.64 ms outlier; all raw samples are retained in `bench/engine-bvh/last-run.json`. This is not evidence that an AOT wasm engine is faster than V8, nor an estimate of complete house-planner frame time.
+- **Two variants:** the verbatim original-precision Float64 `binned.ts` (provenance hash-checked) and the mechanical Float32/Uint32 substitution.
+- **Seven deterministic distributions:** architectural, uniform soup, coincident centroids, geometric clusters, long slivers, far-offset mm parts and planar duplicates.
+- **Three lanes:** V8, the scriptc `release` posture (-O2, wasm-opt -Oz) and the `speed` posture (-O2, size-for-speed runtime, no wasm-opt). All three execute the same source in one official Node 24.22.1 process.
+- **Four timed windows:** allocation-only probe, bounds, build including allocation, and refit of changed geometry.
 
-Every trial checks node count, parent/child containment, leaf bounds against triangle vertices, one occurrence of every primitive, and a full topology/bounds/order checksum (`3659461890`) across implementations, before and after refit. An additional deformed-triangle refit checks that the result changes and still matches V8. The timed refit inputs are the unchanged deterministic mesh. The module is 100,297 bytes; final linear memory is 36,175,872 bytes, including runtime/stack capacity, not RSS.
+Every trial is paired and lane-rotated, and all raw and warmup samples are retained. Each trial is gated by in-module validation in every lane, exact cross-lane bit hashes and an independent JS validator. A corruption self-test shows that both validators reject bad trees.
 
-Reproduce under the official Node distribution:
+Smoke evidence: the default smoke run (sizes 1–4,096) and a 50,000-triangle smoke run pass every gate in every lane. Smoke mode prints no timings and writes nothing.
 
-```sh
-PATH=/tmp/node-v24.22.1-darwin-arm64/bin:$PATH bench/engine-bvh/build.sh
-/tmp/node-v24.22.1-darwin-arm64/bin/node bench/engine-bvh/run.mjs
-/tmp/node-v24.22.1-darwin-arm64/bin/node bench/engine-bvh/inspect.mjs
-```
+**Pending:** final timings. The exclusive run happens after integration (`NT_BVH_EXCLUSIVE=1 node bench/engine-bvh/run.mjs --final`), and this section should then be replaced with its medians, paired ratios and spread.
 
-The absolute Node path is the installation used here; substitute another official Node 24.22.1 installation, not a Homebrew build with different ICU. The harness refuses the wrong Node/ICU pairing. Browser/V8, Windows/Android/iOS CPU results, SIMD variants and multiworker speedups were not measured.
+`last-run.json` still holds the previous revision's result, recorded at 2026-11-04T19:01Z under these conditions:
+
+- one Float32 variant
+- the uniform distribution only
+- release lane only
+- unchanged-geometry refit
+
+Its V8/wasm medians were 85.12/99.56 ms for build and 1.13/1.48 ms for refit at 50k triangles on an Apple M4 Max. Those numbers are superseded and are not evidence for the new variants, distributions or postures.
+
+Scope limits:
+
+- The CWBVH collapse, quantisation and triangle repack are not copied.
+- house-planner's Bresso fixture is not used: no house-planner data is imported. S1's "36 ms build, 2.5 ms refit, 20 ms extraction" is therefore not reproduced here.
+- Browser, Windows, Android and iOS CPU results are not measured.
 
 ## Framework/platform delivery and remaining scope
 
-- P1: generated WebGPU command surface, async request ids/events, generational resource handles, direct linear-memory uploads, readback, resize/DPR notifications and one-shot frame scheduling. Real Chrome acceptance includes compute-generated vertices/indirect draw, checked readback, presented pixels, 16 MiB upload, memory growth during frame encoding, shader line numbers, device loss and idle checks. See `gpu/README.md` for the exact API and measured transport cost.
-- P2: separate in-page engine reactor and independently compiled UI, preferred Worker/OffscreenCanvas lane with detected main fallback, generated bounded binary control IPC, offline custom-scheme assets, and a native-menu colour-change test. Chrome worker/main and WKWebView on macOS 27.0.1 pass; macOS 26 is not available here.
-- P3: iOS simulator build/launch reports no WebGPU correctly on iOS 18.6. Android APK and Windows PE cross-build. There is no connected Android device or available physical iOS 26 device, and no Windows runtime; those GPU paths remain untested. See `hosts/README.md` for build evidence and limitations.
-- P4: English-first generated cardinal messages, real host Intl number/unit formatting through an installed bounded callback, command registry/palette, fixed-row virtual lists/tables and a generated scroll event. Compiled Chrome integration passes. Other locale rules, native formatter adapters, focus trapping, variable-height virtualization, split panes and docking are not implemented.
+This summary is conservative. The iOS, Android, Windows, engine, GPU, i18n, commands and virtualisation streams are still being integrated (see `docs/HOUSE-PLANNER-EXECUTION.md`), and the integrator's final ledger supersedes this section.
 
-The GPU surface is deliberately not a complete WebGPU binding: current render passes/pipelines expose one colour target and optional depth/resolve; blend choices are none or standard source-alpha; mapping is readback or mapped-at-creation upload/unmap. Multiple colour targets, stencil state, arbitrary blends, texture-to-buffer copies and additional device features need schema extensions and tests. Resource creation errors fail explicitly; no renderer is substituted when WebGPU is absent.
+- Baseline `5c48621` provides a generated WebGPU command surface with transport measurements in `gpu/README.md`, an in-page engine reactor lane with generated bounded control IPC, platform host shells, and English-first i18n, commands and fixed-row virtualisation. The respective READMEs describe what was exercised at that baseline.
+- Runtime verification on Android devices, Windows, physical iOS devices and iOS WebGPU is not claimed here. A cross-build or mock is not runtime evidence.
+- The GPU surface is deliberately not a complete WebGPU binding; its schema and its limits are owned by the GPU stream.
 
-Open questions: which additional render targets/features/formats does the first engine milestone require; should unavailable WebGPU disable 3D editing or offer a separately scoped fallback; which physical iOS/Android and Windows machines should form the acceptance matrix; and should SIMD work begin with compiler flag plumbing or with profiling the scalar BVH loops? scriptc integration-history changes (including the requested rebase preference) remain separate and were not performed under this read-only brief.
+Open questions:
+
+- Which render targets, features and formats does the first engine milestone need?
+- Should an unavailable WebGPU disable 3D editing or offer a separately scoped fallback?
+- Which physical devices form the acceptance matrix?
+- For SIMD, should work begin with reactor feature plumbing (above) or with profiling the scalar BVH loops once final timings exist?
+
+scriptc integration-history changes were not performed under this read-only brief.
