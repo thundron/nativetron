@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>nativetron GPU reactor</title>
+<style>html,body{margin:0;background:#101822;color:#ddd;font:14px system-ui}canvas{width:640px;height:400px;max-width:100%}pre{white-space:pre-wrap}</style></head>
+<body><canvas id="gpu" width="640" height="400"></canvas><pre id="status"></pre>
+<script type="module">
+import { loadGpuDemo } from "./demo-host.js";
+window.demo = await loadGpuDemo(document.getElementById("gpu"), (line) => {
+  document.getElementById("status").textContent += line + "\n";
+});
+window.ready = true;
+</script></body></html>

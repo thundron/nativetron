@@ -1,0 +1,76 @@
+{
+  "profile_format": 1,
+  "name": "nt-gpu",
+  "entry": "demo.ts",
+  "emission": "llvm",
+  "abi": {
+    "prefix": "ntgpu_",
+    "init_symbol": "ntgpu_init",
+    "sink_register_symbol": "ntgpu_sink",
+    "collect_symbol": "ntgpu_collect",
+    "result_reset_symbol": null,
+    "callback_register_symbol": "ntgpu_callback"
+  },
+  "callbacks": [
+    {
+      "name": "gpuPresent",
+      "params": [
+        "bytes",
+        "bytes",
+        "bytes"
+      ],
+      "returns": "void"
+    },
+    {
+      "name": "gpuReport",
+      "params": [
+        "string"
+      ],
+      "returns": "void"
+    }
+  ],
+  "exports": [
+    {
+      "export": "start",
+      "symbol": "ntgpu_start",
+      "params": [],
+      "returns": "f64"
+    },
+    {
+      "export": "frame",
+      "symbol": "ntgpu_frame",
+      "params": [
+        "f64"
+      ],
+      "returns": "f64"
+    },
+    {
+      "export": "event",
+      "symbol": "ntgpu_event",
+      "params": [
+        "f64",
+        "f64",
+        "f64",
+        "f64",
+        "f64",
+        "string"
+      ],
+      "returns": "f64"
+    },
+    {
+      "export": "message",
+      "symbol": "ntgpu_message",
+      "params": [
+        "f64",
+        "bytes"
+      ],
+      "returns": "f64"
+    },
+    {
+      "export": "prepareUpload",
+      "symbol": "ntgpu_prepare_upload",
+      "params": [],
+      "returns": "f64"
+    }
+  ]
+}

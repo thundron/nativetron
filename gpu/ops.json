@@ -1,0 +1,847 @@
+{
+  "version": 1,
+  "maxBatchBytes": 16777216,
+  "maxArrayLength": 65536,
+  "handle": {
+    "slotBits": 20,
+    "generationBits": 12
+  },
+  "constants": {
+    "BUFFER_USAGE_MAP_READ": 1,
+    "BUFFER_USAGE_MAP_WRITE": 2,
+    "BUFFER_USAGE_COPY_SRC": 4,
+    "BUFFER_USAGE_COPY_DST": 8,
+    "BUFFER_USAGE_INDEX": 16,
+    "BUFFER_USAGE_VERTEX": 32,
+    "BUFFER_USAGE_UNIFORM": 64,
+    "BUFFER_USAGE_STORAGE": 128,
+    "BUFFER_USAGE_INDIRECT": 256,
+    "BUFFER_USAGE_QUERY_RESOLVE": 512,
+    "TEXTURE_USAGE_COPY_SRC": 1,
+    "TEXTURE_USAGE_COPY_DST": 2,
+    "TEXTURE_USAGE_TEXTURE_BINDING": 4,
+    "TEXTURE_USAGE_STORAGE_BINDING": 8,
+    "TEXTURE_USAGE_RENDER_ATTACHMENT": 16,
+    "SHADER_STAGE_VERTEX": 1,
+    "SHADER_STAGE_FRAGMENT": 2,
+    "SHADER_STAGE_COMPUTE": 4,
+    "FEATURE_TIMESTAMP_QUERY": 1,
+    "MAP_MODE_READ": 1,
+    "MAP_MODE_WRITE": 2,
+    "LOAD_LOAD": 1,
+    "LOAD_CLEAR": 2,
+    "STORE_STORE": 1,
+    "STORE_DISCARD": 2,
+    "INDEX_UINT16": 1,
+    "INDEX_UINT32": 2,
+    "TOPOLOGY_POINT_LIST": 1,
+    "TOPOLOGY_LINE_LIST": 2,
+    "TOPOLOGY_LINE_STRIP": 3,
+    "TOPOLOGY_TRIANGLE_LIST": 4,
+    "TOPOLOGY_TRIANGLE_STRIP": 5,
+    "FRONT_FACE_CCW": 1,
+    "FRONT_FACE_CW": 2,
+    "CULL_NONE": 0,
+    "CULL_FRONT": 1,
+    "CULL_BACK": 2,
+    "STEP_VERTEX": 0,
+    "STEP_INSTANCE": 1,
+    "BINDING_BUFFER": 1,
+    "BINDING_SAMPLER": 2,
+    "BINDING_TEXTURE": 3,
+    "BINDING_STORAGE_TEXTURE": 4,
+    "BUFFER_BINDING_UNIFORM": 1,
+    "BUFFER_BINDING_STORAGE": 2,
+    "BUFFER_BINDING_READ_ONLY_STORAGE": 3,
+    "SAMPLER_FILTERING": 1,
+    "SAMPLER_NON_FILTERING": 2,
+    "SAMPLER_COMPARISON": 3,
+    "TEXTURE_SAMPLE_FLOAT": 1,
+    "TEXTURE_SAMPLE_UNFILTERABLE_FLOAT": 2,
+    "TEXTURE_SAMPLE_DEPTH": 3,
+    "TEXTURE_SAMPLE_SINT": 4,
+    "TEXTURE_SAMPLE_UINT": 5,
+    "VIEW_1D": 1,
+    "VIEW_2D": 2,
+    "VIEW_2D_ARRAY": 3,
+    "VIEW_CUBE": 4,
+    "VIEW_CUBE_ARRAY": 5,
+    "VIEW_3D": 6,
+    "STORAGE_WRITE_ONLY": 1,
+    "STORAGE_READ_ONLY": 2,
+    "STORAGE_READ_WRITE": 3,
+    "FORMAT_RGBA8UNORM": 1,
+    "FORMAT_BGRA8UNORM": 2,
+    "FORMAT_RGBA16FLOAT": 3,
+    "FORMAT_R32FLOAT": 4,
+    "FORMAT_R32UINT": 5,
+    "FORMAT_RG32FLOAT": 6,
+    "FORMAT_RGBA32FLOAT": 7,
+    "FORMAT_DEPTH24PLUS": 8,
+    "FORMAT_DEPTH32FLOAT": 9
+  },
+  "events": [
+    {
+      "code": 1,
+      "name": "CAPABILITIES"
+    },
+    {
+      "code": 2,
+      "name": "PIPELINE_READY"
+    },
+    {
+      "code": 3,
+      "name": "MAP_READY"
+    },
+    {
+      "code": 4,
+      "name": "WORK_DONE"
+    },
+    {
+      "code": 5,
+      "name": "DEVICE_LOST"
+    },
+    {
+      "code": 6,
+      "name": "UNCAUGHT_ERROR"
+    },
+    {
+      "code": 7,
+      "name": "SHADER_INFO"
+    },
+    {
+      "code": 8,
+      "name": "RESIZE"
+    },
+    {
+      "code": 9,
+      "name": "ERROR"
+    }
+  ],
+  "ops": [
+    {
+      "code": 1,
+      "name": "REQUEST_DEVICE",
+      "args": [
+        "requestId:u32",
+        "powerPreference:u32",
+        "featureBits:u32",
+        "maxBufferSize:f64"
+      ]
+    },
+    {
+      "code": 2,
+      "name": "CREATE_BUFFER",
+      "result": "buffer",
+      "args": [
+        "size:f64",
+        "usage:u32",
+        "mappedAtCreation:bool",
+        "label:str"
+      ]
+    },
+    {
+      "code": 3,
+      "name": "CREATE_TEXTURE",
+      "result": "texture",
+      "args": [
+        "width:u32",
+        "height:u32",
+        "depth:u32",
+        "mipLevels:u32",
+        "samples:u32",
+        "dimension:u32",
+        "format:str",
+        "usage:u32",
+        "label:str"
+      ]
+    },
+    {
+      "code": 4,
+      "name": "CREATE_TEXTURE_VIEW",
+      "result": "textureView",
+      "args": [
+        "texture:handle",
+        "format:str",
+        "dimension:u32",
+        "baseMip:u32",
+        "mipCount:u32",
+        "baseLayer:u32",
+        "layerCount:u32",
+        "aspect:u32",
+        "label:str"
+      ]
+    },
+    {
+      "code": 5,
+      "name": "CREATE_SAMPLER",
+      "result": "sampler",
+      "args": [
+        "addressU:u32",
+        "addressV:u32",
+        "addressW:u32",
+        "magFilter:u32",
+        "minFilter:u32",
+        "mipmapFilter:u32",
+        "lodMin:f32",
+        "lodMax:f32",
+        "compare:u32",
+        "maxAnisotropy:u32",
+        "label:str"
+      ]
+    },
+    {
+      "code": 6,
+      "name": "CREATE_SHADER_MODULE",
+      "result": "shaderModule",
+      "args": [
+        "requestId:u32",
+        "code:str",
+        "label:str"
+      ]
+    },
+    {
+      "code": 7,
+      "name": "CREATE_BIND_GROUP_LAYOUT",
+      "result": "bindGroupLayout",
+      "args": [
+        "entries:f64[]",
+        "label:str"
+      ]
+    },
+    {
+      "code": 8,
+      "name": "CREATE_BIND_GROUP",
+      "result": "bindGroup",
+      "args": [
+        "layout:handle",
+        "entries:f64[]",
+        "label:str"
+      ]
+    },
+    {
+      "code": 9,
+      "name": "CREATE_PIPELINE_LAYOUT",
+      "result": "pipelineLayout",
+      "args": [
+        "layouts:handle[]",
+        "label:str"
+      ]
+    },
+    {
+      "code": 10,
+      "name": "CREATE_COMPUTE_PIPELINE",
+      "result": "computePipeline",
+      "args": [
+        "layout:handle",
+        "shader:handle",
+        "entry:str",
+        "label:str"
+      ]
+    },
+    {
+      "code": 11,
+      "name": "CREATE_COMPUTE_PIPELINE_ASYNC",
+      "result": "computePipeline",
+      "args": [
+        "requestId:u32",
+        "layout:handle",
+        "shader:handle",
+        "entry:str",
+        "label:str"
+      ]
+    },
+    {
+      "code": 12,
+      "name": "CREATE_RENDER_PIPELINE",
+      "result": "renderPipeline",
+      "args": [
+        "layout:handle",
+        "vertexShader:handle",
+        "vertexEntry:str",
+        "fragmentShader:handle",
+        "fragmentEntry:str",
+        "colorFormat:str",
+        "depthFormat:str",
+        "topology:u32",
+        "frontFace:u32",
+        "cullMode:u32",
+        "sampleCount:u32",
+        "depthWrite:bool",
+        "depthCompare:u32",
+        "blend:u32",
+        "vertexLayouts:f64[]",
+        "label:str"
+      ]
+    },
+    {
+      "code": 13,
+      "name": "CREATE_RENDER_PIPELINE_ASYNC",
+      "result": "renderPipeline",
+      "args": [
+        "requestId:u32",
+        "layout:handle",
+        "vertexShader:handle",
+        "vertexEntry:str",
+        "fragmentShader:handle",
+        "fragmentEntry:str",
+        "colorFormat:str",
+        "depthFormat:str",
+        "topology:u32",
+        "frontFace:u32",
+        "cullMode:u32",
+        "sampleCount:u32",
+        "depthWrite:bool",
+        "depthCompare:u32",
+        "blend:u32",
+        "vertexLayouts:f64[]",
+        "label:str"
+      ]
+    },
+    {
+      "code": 14,
+      "name": "CREATE_QUERY_SET",
+      "result": "querySet",
+      "args": [
+        "type:u32",
+        "count:u32",
+        "label:str"
+      ]
+    },
+    {
+      "code": 15,
+      "name": "CREATE_COMMAND_ENCODER",
+      "result": "commandEncoder",
+      "args": [
+        "label:str"
+      ]
+    },
+    {
+      "code": 16,
+      "name": "BEGIN_COMPUTE_PASS",
+      "result": "computePass",
+      "args": [
+        "encoder:handle",
+        "querySet:handle",
+        "beginIndex:u32",
+        "endIndex:u32",
+        "label:str"
+      ]
+    },
+    {
+      "code": 17,
+      "name": "COMPUTE_SET_PIPELINE",
+      "args": [
+        "pass:handle",
+        "pipeline:handle"
+      ]
+    },
+    {
+      "code": 18,
+      "name": "COMPUTE_SET_BIND_GROUP",
+      "args": [
+        "pass:handle",
+        "index:u32",
+        "bindGroup:handle",
+        "dynamicOffsets:u32[]"
+      ]
+    },
+    {
+      "code": 19,
+      "name": "COMPUTE_DISPATCH",
+      "args": [
+        "pass:handle",
+        "x:u32",
+        "y:u32",
+        "z:u32"
+      ]
+    },
+    {
+      "code": 20,
+      "name": "COMPUTE_DISPATCH_INDIRECT",
+      "args": [
+        "pass:handle",
+        "buffer:handle",
+        "offset:f64"
+      ]
+    },
+    {
+      "code": 21,
+      "name": "END_COMPUTE_PASS",
+      "args": [
+        "pass:handle"
+      ]
+    },
+    {
+      "code": 22,
+      "name": "BEGIN_RENDER_PASS",
+      "result": "renderPass",
+      "args": [
+        "encoder:handle",
+        "colorView:handle",
+        "resolveView:handle",
+        "colorLoad:u32",
+        "colorStore:u32",
+        "clearR:f32",
+        "clearG:f32",
+        "clearB:f32",
+        "clearA:f32",
+        "depthView:handle",
+        "depthLoad:u32",
+        "depthStore:u32",
+        "clearDepth:f32",
+        "querySet:handle",
+        "beginIndex:u32",
+        "endIndex:u32",
+        "label:str"
+      ]
+    },
+    {
+      "code": 23,
+      "name": "RENDER_SET_VIEWPORT",
+      "args": [
+        "pass:handle",
+        "x:f32",
+        "y:f32",
+        "width:f32",
+        "height:f32",
+        "minDepth:f32",
+        "maxDepth:f32"
+      ]
+    },
+    {
+      "code": 24,
+      "name": "RENDER_SET_SCISSOR",
+      "args": [
+        "pass:handle",
+        "x:u32",
+        "y:u32",
+        "width:u32",
+        "height:u32"
+      ]
+    },
+    {
+      "code": 25,
+      "name": "RENDER_SET_PIPELINE",
+      "args": [
+        "pass:handle",
+        "pipeline:handle"
+      ]
+    },
+    {
+      "code": 26,
+      "name": "RENDER_SET_BIND_GROUP",
+      "args": [
+        "pass:handle",
+        "index:u32",
+        "bindGroup:handle",
+        "dynamicOffsets:u32[]"
+      ]
+    },
+    {
+      "code": 27,
+      "name": "RENDER_SET_VERTEX_BUFFER",
+      "args": [
+        "pass:handle",
+        "slot:u32",
+        "buffer:handle",
+        "offset:f64",
+        "size:f64"
+      ]
+    },
+    {
+      "code": 28,
+      "name": "RENDER_SET_INDEX_BUFFER",
+      "args": [
+        "pass:handle",
+        "buffer:handle",
+        "format:u32",
+        "offset:f64",
+        "size:f64"
+      ]
+    },
+    {
+      "code": 29,
+      "name": "RENDER_DRAW",
+      "args": [
+        "pass:handle",
+        "vertexCount:u32",
+        "instanceCount:u32",
+        "firstVertex:u32",
+        "firstInstance:u32"
+      ]
+    },
+    {
+      "code": 30,
+      "name": "RENDER_DRAW_INDEXED",
+      "args": [
+        "pass:handle",
+        "indexCount:u32",
+        "instanceCount:u32",
+        "firstIndex:u32",
+        "baseVertex:i32",
+        "firstInstance:u32"
+      ]
+    },
+    {
+      "code": 31,
+      "name": "RENDER_DRAW_INDIRECT",
+      "args": [
+        "pass:handle",
+        "buffer:handle",
+        "offset:f64"
+      ]
+    },
+    {
+      "code": 32,
+      "name": "RENDER_DRAW_INDEXED_INDIRECT",
+      "args": [
+        "pass:handle",
+        "buffer:handle",
+        "offset:f64"
+      ]
+    },
+    {
+      "code": 33,
+      "name": "END_RENDER_PASS",
+      "args": [
+        "pass:handle"
+      ]
+    },
+    {
+      "code": 34,
+      "name": "COPY_BUFFER_TO_BUFFER",
+      "args": [
+        "encoder:handle",
+        "source:handle",
+        "sourceOffset:f64",
+        "destination:handle",
+        "destinationOffset:f64",
+        "size:f64"
+      ]
+    },
+    {
+      "code": 35,
+      "name": "COPY_BUFFER_TO_TEXTURE",
+      "args": [
+        "encoder:handle",
+        "source:handle",
+        "sourceOffset:f64",
+        "bytesPerRow:u32",
+        "rowsPerImage:u32",
+        "destination:handle",
+        "mipLevel:u32",
+        "originX:u32",
+        "originY:u32",
+        "originZ:u32",
+        "aspect:u32",
+        "width:u32",
+        "height:u32",
+        "depth:u32"
+      ]
+    },
+    {
+      "code": 36,
+      "name": "COPY_TEXTURE_TO_TEXTURE",
+      "args": [
+        "encoder:handle",
+        "source:handle",
+        "sourceMip:u32",
+        "sourceX:u32",
+        "sourceY:u32",
+        "sourceZ:u32",
+        "destination:handle",
+        "destinationMip:u32",
+        "destinationX:u32",
+        "destinationY:u32",
+        "destinationZ:u32",
+        "width:u32",
+        "height:u32",
+        "depth:u32"
+      ]
+    },
+    {
+      "code": 37,
+      "name": "RESOLVE_QUERY_SET",
+      "args": [
+        "encoder:handle",
+        "querySet:handle",
+        "first:u32",
+        "count:u32",
+        "destination:handle",
+        "offset:f64"
+      ]
+    },
+    {
+      "code": 38,
+      "name": "FINISH_COMMAND_ENCODER",
+      "result": "commandBuffer",
+      "args": [
+        "encoder:handle",
+        "label:str"
+      ]
+    },
+    {
+      "code": 39,
+      "name": "QUEUE_SUBMIT",
+      "args": [
+        "commandBuffers:handle[]"
+      ]
+    },
+    {
+      "code": 40,
+      "name": "WRITE_BUFFER",
+      "args": [
+        "buffer:handle",
+        "bufferOffset:f64",
+        "data:upload"
+      ]
+    },
+    {
+      "code": 41,
+      "name": "WRITE_TEXTURE",
+      "args": [
+        "texture:handle",
+        "mipLevel:u32",
+        "originX:u32",
+        "originY:u32",
+        "originZ:u32",
+        "aspect:u32",
+        "data:upload",
+        "bytesPerRow:u32",
+        "rowsPerImage:u32",
+        "width:u32",
+        "height:u32",
+        "depth:u32"
+      ]
+    },
+    {
+      "code": 42,
+      "name": "CONFIGURE_CANVAS",
+      "args": [
+        "format:str",
+        "usage:u32",
+        "alphaMode:u32",
+        "colorSpace:u32"
+      ]
+    },
+    {
+      "code": 43,
+      "name": "GET_CURRENT_TEXTURE",
+      "result": "texture",
+      "args": []
+    },
+    {
+      "code": 44,
+      "name": "DESTROY",
+      "args": [
+        "resource:handle"
+      ]
+    },
+    {
+      "code": 45,
+      "name": "MAP_ASYNC",
+      "args": [
+        "requestId:u32",
+        "buffer:handle",
+        "mode:u32",
+        "offset:f64",
+        "size:f64",
+        "destination:readback"
+      ]
+    },
+    {
+      "code": 46,
+      "name": "ON_SUBMITTED_WORK_DONE",
+      "args": [
+        "requestId:u32"
+      ]
+    },
+    {
+      "code": 47,
+      "name": "REQUEST_FRAME",
+      "args": []
+    },
+    {
+      "code": 48,
+      "name": "RELEASE",
+      "args": [
+        "resource:handle"
+      ]
+    },
+    {
+      "code": 49,
+      "name": "UNMAP",
+      "args": [
+        "buffer:handle"
+      ]
+    },
+    {
+      "code": 50,
+      "name": "WRITE_MAPPED_BUFFER",
+      "args": [
+        "buffer:handle",
+        "bufferOffset:f64",
+        "data:upload"
+      ]
+    }
+  ],
+  "maxUploadBytes": 536870912,
+  "maxReadbackBytes": 16777216,
+  "maxPendingRequests": 1024,
+  "enums": {
+    "dimension": [
+      null,
+      "1d",
+      "2d",
+      "3d"
+    ],
+    "view": [
+      null,
+      "1d",
+      "2d",
+      "2d-array",
+      "cube",
+      "cube-array",
+      "3d"
+    ],
+    "address": [
+      "clamp-to-edge",
+      "repeat",
+      "mirror-repeat"
+    ],
+    "filter": [
+      "nearest",
+      "linear"
+    ],
+    "compare": [
+      null,
+      "never",
+      "less",
+      "equal",
+      "less-equal",
+      "greater",
+      "not-equal",
+      "greater-equal",
+      "always"
+    ],
+    "topology": [
+      null,
+      "point-list",
+      "line-list",
+      "line-strip",
+      "triangle-list",
+      "triangle-strip"
+    ],
+    "front": [
+      null,
+      "ccw",
+      "cw"
+    ],
+    "cull": [
+      "none",
+      "front",
+      "back"
+    ],
+    "load": [
+      null,
+      "load",
+      "clear"
+    ],
+    "store": [
+      null,
+      "store",
+      "discard"
+    ],
+    "aspect": [
+      "all",
+      "stencil-only",
+      "depth-only"
+    ],
+    "buffer": [
+      null,
+      "uniform",
+      "storage",
+      "read-only-storage"
+    ],
+    "sampler": [
+      null,
+      "filtering",
+      "non-filtering",
+      "comparison"
+    ],
+    "sample": [
+      null,
+      "float",
+      "unfilterable-float",
+      "depth",
+      "sint",
+      "uint"
+    ],
+    "access": [
+      null,
+      "write-only",
+      "read-only",
+      "read-write"
+    ],
+    "format": [
+      null,
+      "rgba8unorm",
+      "bgra8unorm",
+      "rgba16float",
+      "r32float",
+      "r32uint",
+      "rg32float",
+      "rgba32float",
+      "depth24plus",
+      "depth32float"
+    ],
+    "vertexFormat": [
+      null,
+      "float32",
+      "float32x2",
+      "float32x3",
+      "float32x4",
+      "uint32",
+      "uint32x2",
+      "uint32x3",
+      "uint32x4",
+      "sint32",
+      "sint32x2",
+      "sint32x3",
+      "sint32x4",
+      "unorm8x4"
+    ]
+  },
+  "records": {
+    "bindGroupLayout": [
+      "binding",
+      "visibility",
+      "kind",
+      "type",
+      "dynamic",
+      "minSize",
+      "dimension",
+      "multisampled",
+      "format",
+      "access"
+    ],
+    "bindGroup": [
+      "binding",
+      "kind",
+      "resource",
+      "offset",
+      "size"
+    ],
+    "vertexBuffer": [
+      "arrayStride",
+      "step",
+      "attributeCount"
+    ],
+    "vertexAttribute": [
+      "shaderLocation",
+      "offset",
+      "format"
+    ]
+  }
+}
