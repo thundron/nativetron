@@ -28,6 +28,7 @@ int main(){
   const uint8_t payload[]={0,255,19};
   assert(nt_control_command(7,payload,sizeof(payload))==0); assert(sends==1); assert(sent.size()==19);
   assert(nt_control_receive(sent.data(),sent.size())==1);assert(receives==0);
+  auto outbound=sent; assert(nt_control_send(outbound.data(),outbound.size())==0); assert(sends==2);
   const uint8_t incoming[]={${[...frame].join(",")}};
   assert(nt_control_receive(incoming,sizeof(incoming))==0);assert(receives==1);
   assert(received==std::vector<uint8_t>(incoming,incoming+sizeof(incoming)));
@@ -37,7 +38,7 @@ int main(){
   assert(nt_control_command(4294967296.0,nullptr,0)==1);
   assert(nt_control_command(std::numeric_limits<double>::quiet_NaN(),nullptr,0)==1);
   std::vector<uint8_t> oversized(65537);
-  assert(nt_control_command(1,oversized.data(),oversized.size())==1);assert(sends==1);
+  assert(nt_control_command(1,oversized.data(),oversized.size())==1);assert(sends==2);
   nt_control_collect(); puts("native control: callbacks, borrowed-data copies, routes and bounds passed");
 }
 `;

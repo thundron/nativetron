@@ -5,7 +5,13 @@ declare function controlReceive(bytes: Uint8Array): void;
 
 export function command(topic: number, payload: Uint8Array): number {
   if (!Number.isInteger(topic) || topic < 0 || topic > 4294967295 || payload.length > ENGINE_MAX_PAYLOAD) return 1;
-  controlSend(encodeEngineMessage(ENGINE_COMMAND, LANE_NATIVE, LANE_ENGINE, 0, topic, payload));
+  return send(encodeEngineMessage(ENGINE_COMMAND, LANE_NATIVE, LANE_ENGINE, 0, topic, payload));
+}
+
+export function send(bytes: Uint8Array): number {
+  const message = decodeEngineMessage(bytes);
+  if (message === null || message.source !== LANE_NATIVE || message.target !== LANE_ENGINE) return 1;
+  controlSend(bytes);
   return 0;
 }
 

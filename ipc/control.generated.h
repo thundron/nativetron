@@ -14,6 +14,7 @@ void nt_control_sink(nt_control_panic_callback callback, void *userdata);
 int32_t nt_control_set_callback(const char *name, void (*callback)(void), void *userdata);
 double nt_control_command(double arg0, const uint8_t *arg1, size_t arg1_length);
 double nt_control_receive(const uint8_t *arg0, size_t arg0_length);
+double nt_control_send(const uint8_t *arg0, size_t arg0_length);
 #ifdef __cplusplus
 }
 #endif
