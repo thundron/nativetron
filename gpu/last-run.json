@@ -1,5 +1,5 @@
 {
-  "date": "2026-11-04T19:09:01.844Z",
+  "date": "2026-11-04T19:32:26.366Z",
   "platform": "darwin",
   "arch": "arm64",
   "cpu": "Apple M4 Max",
@@ -8,10 +8,10 @@
   "warmups": 20,
   "pairedInterleaved": true,
   "opsPerBatch": 500,
-  "decode500Ms": 0.029999971389770508,
-  "direct500Ms": 0.010000109672546387,
-  "opsPerMs": 16666.682561253765,
-  "upload16MiBMs": 0.315000057220459,
-  "directUpload16MiBMs": 0.31499993801116943,
+  "decode500Ms": 0.019999980926513672,
+  "direct500Ms": 0.009999990463256836,
+  "opsPerMs": 25000.023841880648,
+  "upload16MiBMs": 0.23000001907348633,
+  "directUpload16MiBMs": 0.23000001907348633,
   "memoryGrew": true
 }

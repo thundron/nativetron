@@ -109,8 +109,8 @@ Current render-pass scope is one colour attachment plus optional depth and resol
 
 | workload | transport | direct JS |
 |---|---|---|
-| setScissor operations/ms | 16,667 | 50,000 |
-| 500-op decode/calls | 0.030 ms | 0.010 ms |
-| 16 MiB writeBuffer | 0.315 ms | 0.315 ms |
+| setScissor operations/ms | 25,000 | 50,000 |
+| 500-op decode/calls | 0.020 ms | 0.010 ms |
+| 16 MiB writeBuffer | 0.230 ms | 0.230 ms |
 
-Chrome 154.0.8037.98 headless, Apple M4 Max/macOS arm64, 101 paired/interleaved trials after 20 warmups. COOP/COEP enables the higher-resolution timer. The decoder benchmark replays real WebGPU calls, excluding command encoding and encoder/pass creation; it is not end-to-end engine time. Uploads use the same reactor memory, same queue and same destination; allocation and filling are excluded on both sides. `gpu/browser-test.mjs` prints fresh numbers; `NT_RECORD_GPU=1` records `gpu/last-run.json`. Recent 500-op medians ranged from 0.025 to 0.030 ms. The browser gate also verifies presented triangle/background pixels, forces linear-memory growth after a frame has begun encoding, and checks real device loss and line-numbered shader diagnostics. The demo draws compute-generated vertex positions from the storage buffer and verified all 1,024 readback words and reported a compute timestamp of 7,916 ns in the initial run; GPU timestamps vary between runs.
+Chrome 154.0.8037.98 headless, Apple M4 Max/macOS arm64, 101 paired/interleaved trials after 20 warmups. COOP/COEP enables the higher-resolution timer. The decoder benchmark replays real WebGPU calls, excluding command encoding and encoder/pass creation; it is not end-to-end engine time. Uploads use the same reactor memory, same queue and same destination; allocation and filling are excluded on both sides. `gpu/browser-test.mjs` prints fresh numbers; `NT_RECORD_GPU=1` records `gpu/last-run.json`. Recent 500-op medians ranged from 0.020 to 0.030 ms. The browser gate also verifies presented triangle/background pixels, forces linear-memory growth after a frame has begun encoding, and checks real device loss and line-numbered shader diagnostics. The demo draws compute-generated vertex positions from the storage buffer and verified all 1,024 readback words and reported a compute timestamp of 7,916 ns in the initial run; GPU timestamps vary between runs.
