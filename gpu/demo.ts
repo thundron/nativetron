@@ -1,8 +1,8 @@
-import * as gpu from "./gpu.generated.js";
+import * as gpu from "./index.js";
 import {
   setSink, flush, reserveUpload, uploadView, reserveReadback, readbackView,
   type ReadbackSlice,
-} from "./encode.js";
+} from "./index.js";
 
 declare function gpuPresent(batch: Uint8Array, uploads: Uint8Array, readbacks: Uint8Array): void;
 declare function gpuReport(message: string): void;

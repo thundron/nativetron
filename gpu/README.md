@@ -24,7 +24,7 @@ Handles encode a 20-bit slot and 12-bit generation. The guest allocates them wit
 
 ## Public guest API
 
-Import commands and constants from `gpu/gpu.generated.ts`; import staging and `setSink`/`flush` from `gpu/encode.ts`. Offsets and sizes use nonnegative safe integers encoded as f64 where WebGPU accepts GPUSize64. Resource creation returns a u32 handle. Async creation returns the handle immediately; do not use it until PIPELINE_READY.
+The public barrel is `gpu/index.ts`: it re-exports all commands/constants below from `gpu/gpu.generated.ts` and exactly these staging exports from the encoder: `setSink`, `flush`, `reserveUpload`, `uploadBytes`, `uploadView`, `reserveReadback`, `readbackView`, `resetReadbacks`, and the `UploadSlice`/`ReadbackSlice` types. Offsets and sizes use nonnegative safe integers encoded as f64 where WebGPU accepts GPUSize64. Resource creation returns a u32 handle. Async creation returns the handle immediately; do not use it until PIPELINE_READY.
 
 <!-- generated:ops -->
 | opcode | operation | result | arguments |

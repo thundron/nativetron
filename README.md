@@ -80,9 +80,24 @@ listeners, and refs.
 | `host/` | DOM host runtime used by both lanes |
 | `native/` | C++ webview wrapper exposing a C ABI |
 | `desktop/` | generated desktop capability contract |
+| `gpu/`, `engine/` | generated WebGPU surface and in-page wasm engine lane |
+| `hosts/` | offline iOS, Android and Windows shells |
+| `i18n/`, `locales/`, `commands/` | catalogues, host formatting, command registry and palette |
 | `stress/` | lifecycle, crash, idle-memory, and orphan-cleanup tests |
 | `packaging/` | app-bundle, signing, notarization, install, and release tools |
 | `app/`, `web/` | desktop and browser entry points |
 | `bench/` | benchmarks against React and Electron |
 
 See [ARCHITECTURE.md](./ARCHITECTURE.md) for how the pieces fit together, [compat/COMPATIBILITY.md](./compat/COMPATIBILITY.md) for the compiled React/Node surface, and [desktop/COMPATIBILITY.md](./desktop/COMPATIBILITY.md) for native desktop capabilities.
+
+## In-page GPU engines
+
+```sh
+engine/build.sh                       # two wasm reactors + macOS desktop host
+NT_ENGINE_SELFTEST=1 ./build/engine-desktop
+node gpu/browser-test.mjs
+node engine/browser-test.mjs
+node framework/components.test.mjs
+```
+
+The engine never runs in native code. WebGPU commands/uploads stay inside the page, with Worker/OffscreenCanvas preferred and detected main-thread fallback. Native handles windows, menus and coarse bounded control messages. Bundled assets work offline. See [GPU API/measurements](gpu/README.md), [engine lane](engine/README.md), [platform hosts](hosts/README.md), [virtual lists/tables](framework/VIRTUAL.md), and [compiler gaps/BVH measurements](docs/HOUSE-PLANNER-GAPS.md). Cross-built platforms and device tests are distinguished in those reports; Android/Windows and iOS WebGPU are not claimed as runtime-verified here.
