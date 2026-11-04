@@ -1,5 +1,6 @@
+import { createHash } from "node:crypto";
 import assert from "node:assert/strict";
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { cpus, platform, arch } from "node:os";
 import { fileURLToPath } from "node:url";
 import { testBrowser } from "../host/test-browser.mjs";
@@ -44,10 +45,18 @@ try {
   assert.ok(shader.messages.some((message) => message.type === "error" && message.lineNum === 2));
   // NT_GPU_SKIP_MEASURE=1 runs the correctness gates only; timings belong to serialized benchmark runs.
   const measurements = process.env.NT_GPU_SKIP_MEASURE === "1" ? null : await evaluate("import('./measure.js').then(module => module.measureGpu(demo))");
+  if (measurements) {
+    assert.equal(measurements.raw.length, measurements.trials);
+    assert.equal(measurements.warmupSamples.length, measurements.warmups);
+    assert.equal(measurements.correctness.guestBatchesDecodedExactly, 2);
+    assert.equal(measurements.correctness.uploadFirst4096AndLast4Checked, 2);
+    assert.ok(measurements.raw.every(sample => ["guestEncode","decodeOnly","decode","direct"].every(key => Number.isFinite(sample.cpu[key]))));
+  }
   if (measurements) console.log("GPU_MEASUREMENTS " + JSON.stringify(measurements));
   if (measurements && process.env.NT_RECORD_GPU === "1") {
     const version = await browser.send("Browser.getVersion");
-    writeFileSync(new URL("./last-run.json", import.meta.url), JSON.stringify({ date: new Date().toISOString(), platform: platform(), arch: arch(), cpu: cpus()[0].model, browser: version.product, ...measurements }, null, 2) + "\n");
+    const hashes = Object.fromEntries([".scriptc/demo.wasm", "profile.json", "measure.js", "ops.json"].map(path => [path, createHash("sha256").update(readFileSync(new URL(path, import.meta.url))).digest("hex")]));
+    writeFileSync(new URL("./last-run.json", import.meta.url), JSON.stringify({ hashes, date: new Date().toISOString(), platform: platform(), arch: arch(), cpu: cpus()[0].model, browser: version.product, ...measurements }, null, 2) + "\n");
   }
   await evaluate("demo.host.device.destroy()");
   await delay(250);

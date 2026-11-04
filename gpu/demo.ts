@@ -7,6 +7,7 @@ import {
 
 declare function gpuPresent(batch: Uint8Array, uploads: Uint8Array, readbacks: Uint8Array): void;
 declare function gpuReport(message: string): void;
+declare function gpuBenchmark(batch: Uint8Array): void;
 declare function engineSend(frame: Uint8Array): void;
 
 const COMPUTE = `
@@ -206,3 +207,16 @@ export function receive(bytes: Uint8Array): number {
 }
 
 export function readback(offset: number, bytes: Uint8Array): number { return gpu.writeReadback(offset, bytes); }
+
+// Demo-only benchmark: an opaque import consumes the batch, preventing dead-store elimination.
+function benchmarkSink(batch: Uint8Array, _uploads: Uint8Array, _readbacks: Uint8Array): void { gpuBenchmark(batch); }
+function presentSink(batch: Uint8Array, uploads: Uint8Array, readbacks: Uint8Array): void { gpuPresent(batch, uploads, readbacks); }
+export function encodeBenchmark(count: number): number {
+  if (!Number.isInteger(count) || count < 1 || count > 65536) return 1;
+  setSink(benchmarkSink);
+  try {
+    for (let i = 0; i < count; i++) gpu.renderSetScissor(1948578, 0, 0, 32, 32);
+    flush();
+  } finally { setSink(presentSink); }
+  return 0;
+}

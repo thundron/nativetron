@@ -34,6 +34,13 @@
         "bytes"
       ],
       "returns": "void"
+    },
+    {
+      "name": "gpuBenchmark",
+      "params": [
+        "bytes"
+      ],
+      "returns": "void"
     }
   ],
   "exports": [
@@ -99,6 +106,14 @@
       "params": [
         "f64",
         "bytes"
+      ],
+      "returns": "f64"
+    },
+    {
+      "export": "encodeBenchmark",
+      "symbol": "ntgpu_encode_benchmark",
+      "params": [
+        "f64"
       ],
       "returns": "f64"
     }

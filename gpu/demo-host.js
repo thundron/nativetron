@@ -4,6 +4,7 @@ import { createGpuHost } from "./host.js";
 export async function loadGpuDemo(canvas, report = console.log) {
   let api;
   let uploadSource = null;
+  let benchmarkObserver = () => {};
   const events = [], reports = [], messages = [];
   // Events always enter on a later microtask, never recursively during a wasm import.
   const host = createGpuHost({
@@ -35,8 +36,9 @@ export async function loadGpuDemo(canvas, report = console.log) {
     },
     gpuReport: (message) => { reports.push(message); report(message); },
     engineSend: frame => messages.push(frame.slice()),
+    gpuBenchmark: bytes => benchmarkObserver(bytes),
   });
   const initialMemoryBytes = api.__memory().byteLength;
   api.ntgpu_start();
-  return { api, host, events, reports, messages, initialMemoryBytes, get uploadSource() { return uploadSource; }, message: (kind, bytes = new Uint8Array()) => api.ntgpu_message(kind, bytes), dispose: () => host.dispose() };
+  return { api, host, events, reports, messages, initialMemoryBytes, setBenchmarkObserver: fn => { benchmarkObserver = fn; }, get uploadSource() { return uploadSource; }, message: (kind, bytes = new Uint8Array()) => api.ntgpu_message(kind, bytes), dispose: () => host.dispose() };
 }
