@@ -36,6 +36,7 @@ test("lists dot-directory assets and hashes inline scripts exactly", () => {
 test("refuses unservable bundles", () => {
   for (const files of [
     { "engine/page.html": "", "engine/blob.bin": "" },
+    { "engine/page.html": "", "engine/unknown.js": "" },
     { "engine/page.html": "", "engine/no-extension": "" },
     { "engine/page.html": "", "engine/bad name.js": "" },
     { "engine/page.html": "<button onclick=\"x()\">" },

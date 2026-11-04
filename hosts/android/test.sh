@@ -22,7 +22,7 @@ fi
 clang -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-sanitize-recover=undefined \
   -I ipc -I "$HERE/jni" -o "$OUT/control_host_test" "$HERE/test/control_host_test.c" "$HERE/jni/nt_control_host.c" "$OUT/control.host.a" -lm -lpthread
 "$OUT/control_host_test"
-javac -Xlint:all -Werror -d "$OUT/classes" "$HERE/src/dev/nativetron/app/AssetPolicy.java" "$HERE/test/AssetPolicyTest.java"
+javac -Xlint:all -Werror -d "$OUT/classes" "$HERE/src/dev/nativetron/app/AssetPolicy.java" "$HERE/src/dev/nativetron/app/BundledAssets.java" "$HERE/test/AssetPolicyTest.java"
 MIME_PAIRS="$(node --input-type=module -e "const m = await import('$HERE/tools/bundle-manifest.mjs'); console.log(Object.entries(m.MIME).map(([k, v]) => k + '=' + v).join(' '))")"
 java -cp "$OUT/classes" dev.nativetron.app.AssetPolicyTest $MIME_PAIRS
 node --test "$HERE/test/bundle-manifest.test.mjs"

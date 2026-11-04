@@ -4,6 +4,7 @@
 // natively on any build machine; main.cc applies it on Windows.
 #pragma once
 #include "../../ipc/engine.generated.h"
+#include "../../native/assets.generated.h"
 #include "webview/detail/json.hh"
 #include <cstdint>
 #include <cstdlib>
@@ -17,7 +18,7 @@ namespace nt_windows {
 // no folder mapping, DNS or network access is involved. `.localhost` avoids
 // the `.local` mDNS navigation delay documented for WebView2 virtual hosts.
 constexpr const char *origin = "https://nativetron.localhost";
-constexpr const char *entry = "engine/page.html";
+const char *const entry = NT_ASSET_ENTRY;
 constexpr size_t max_path_bytes = 512;
 constexpr size_t max_asset_bytes = 64u << 20;
 constexpr size_t max_assets = 4096;
@@ -226,7 +227,8 @@ inline response_plan plan_response(const std::string &method, const std::string 
   if (request.kind == request_class::external) { plan.status = 403; plan.reason = "Offline"; plan.mime = "text/plain; charset=utf-8"; return plan; }
   if (request.kind == request_class::malformed) { plan.status = 400; plan.reason = "Bad Request"; plan.mime = "text/plain; charset=utf-8"; return plan; }
   if (!method_allowed(method)) { plan.status = 405; plan.reason = "Method Not Allowed"; plan.mime = "text/plain; charset=utf-8"; return plan; }
-  const auto mime = mime_for(request.path);
+  const char *declared = nt_asset_mime(request.path.c_str());
+  const std::string mime = declared ? std::string(declared) + (std::string(declared).rfind("text/", 0) == 0 ? "; charset=utf-8" : "") : "";
   if (mime.empty() || !allowlist.count(request.path)) { plan.mime = "text/plain; charset=utf-8"; return plan; }
   plan.status = 200; plan.reason = "OK"; plan.mime = mime; plan.body = method == "GET";
   return plan;
@@ -306,14 +308,14 @@ constexpr uint32_t topic_change_colour = 1;
 struct menu_item { command_id id; const char *label; };
 // "\t" separates the displayed accelerator; AcceleratorKeyPressed implements it.
 constexpr menu_item engine_menu[] = {
-  {command_change_colour, "Change clear colour\tCtrl+K"},
+  {command_change_colour, "Change clear colour\tCtrl+R"},
   {command_none, nullptr},  // separator
   {command_quit, "Quit\tCtrl+Q"},
 };
 
 inline command_id accelerator(unsigned virtual_key, bool control, bool shift, bool alt) {
   if (!control || shift || alt) return command_none;
-  if (virtual_key == 'K') return command_change_colour;
+  if (virtual_key == 'R') return command_change_colour;
   if (virtual_key == 'Q') return command_quit;
   return command_none;
 }

@@ -128,6 +128,7 @@ func assetTests() throws {
   try write("engine/host.js", "export {}")
   try write("engine/.scriptc/ui.wasm", "\0asm")
   try write("engine/secret.plist", "<plist/>")
+  try write("engine/unknown.js", "export {}")
   try write("outside.js", "outside", in: base)
   try FileManager.default.createSymbolicLink(at: root.appendingPathComponent("engine/link.js"), withDestinationURL: base.appendingPathComponent("outside.js"))
   guard let catalog = AssetCatalog(root: root) else { expect(false, "catalog builds"); return }
@@ -145,6 +146,7 @@ func assetTests() throws {
   expect(head.status == 200 && head.file == nil, "HEAD has headers and no body")
   expect(get("app://local/engine/host.js", "POST").status == 405, "POST refused")
   expect(get("app://local/engine/absent.js").status == 404, "missing file 404")
+  expect(get("app://local/engine/unknown.js").status == 404, "unmanifested JavaScript not served")
   expect(get("app://local/engine/link.js").status == 404, "symlink not served")
   expect(get("app://local/engine/secret.plist").status == 404, "non-allowlisted type not served")
   expect(get("app://local/outside.js").status == 404, "file outside root not served")

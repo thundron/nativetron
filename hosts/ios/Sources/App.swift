@@ -34,7 +34,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
   override func buildMenu(with builder: UIMenuBuilder) {
     super.buildMenu(with: builder)
     guard builder.system == .main else { return }
-    let command = UIKeyCommand(title: "Change Clear Colour", action: #selector(HostController.changeClearColour(_:)), input: "k", modifierFlags: .command)
+    let command = UIKeyCommand(title: "Change Clear Colour", action: #selector(HostController.changeClearColour(_:)), input: "r", modifierFlags: .command)
     builder.insertSibling(UIMenu(title: "Engine", children: [command]), afterMenu: .view)
   }
 }

@@ -8,7 +8,7 @@ final class AssetPolicy {
   static final String SCHEME = "https";
   static final String HOST = "appassets.androidplatform.net";
   static final String ORIGIN = SCHEME + "://" + HOST;
-  static final String ENTRY = "engine/page.html";
+  static final String ENTRY = BundledAssets.ENTRY;
   static final int MAX_PATH = 512;
 
   static final class Decision {
@@ -61,7 +61,7 @@ final class AssetPolicy {
     for (String part : asset.split("/", -1)) {
       if (part.isEmpty() || part.equals(".") || part.equals("..")) return new Decision(404, null, "text/plain", false);
     }
-    String mime = mime(asset);
+    String mime = BundledAssets.FILES.get(asset);
     if (mime == null || !bundle.contains(asset)) return new Decision(404, null, "text/plain", false);
     return new Decision(200, asset, mime, !head);
   }

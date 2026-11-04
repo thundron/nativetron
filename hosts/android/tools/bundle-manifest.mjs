@@ -3,17 +3,19 @@
 // hashes of inline page scripts. Refuses files the host policy cannot serve.
 // usage: node bundle-manifest.mjs <asset-dir> <output.java> [entry]
 import { createHash } from "node:crypto";
-import { mkdirSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, lstatSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join, relative, sep } from "node:path";
 
 export const MIME = { ".wasm": "application/wasm", ".js": "text/javascript", ".mjs": "text/javascript", ".html": "text/html", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png" };
+const ALLOWED = new Set(JSON.parse(readFileSync(new URL("../../../engine/assets.json", import.meta.url), "utf8")).files.map(file => file.path));
 const SAFE = /^[A-Za-z0-9._\/-]+$/;
 
 function walk(root, dir = root, out = []) {
   for (const name of readdirSync(dir).sort()) {
     const path = join(dir, name);
-    const info = statSync(path);
+    const info = lstatSync(path);
+    if (info.isSymbolicLink()) throw new Error(`symlink in bundle: ${path}`);
     if (info.isDirectory()) walk(root, path, out);
     else if (info.isFile()) out.push(relative(root, path).split(sep).join("/"));
     else throw new Error(`unsupported bundle entry ${path}`);
@@ -22,7 +24,8 @@ function walk(root, dir = root, out = []) {
 }
 
 export function bundleManifest(root, entry = "engine/page.html") {
-  const files = walk(root);
+  const files = walk(root).filter(path => path !== "asset-manifest.json");
+  for (const file of files) if (!ALLOWED.has(file)) throw new Error(`bundle file ${file} is outside engine/assets.json`);
   if (!files.includes(entry)) throw new Error(`bundle entry ${entry} missing`);
   const hashes = new Set();
   for (const file of files) {

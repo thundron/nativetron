@@ -33,7 +33,7 @@ else
   cp "$ROOT/ipc/.scriptc/control.lib.a" "$ARCHIVE"
 fi
 HARNESS_SOURCES=("$HERE/tests/main.swift" "$HERE/Sources/ControlLibrary.swift" "$HERE/Sources/AssetCatalog.swift" \
-  "$HERE/Sources/AssetProbe.swift" "$HERE/Sources/Evidence.swift" "$HERE/Sources/EngineProtocol.generated.swift")
+  "$HERE/Sources/BundledAssets.generated.swift" "$HERE/Sources/AssetProbe.swift" "$HERE/Sources/Evidence.swift" "$HERE/Sources/EngineProtocol.generated.swift")
 xcrun swiftc -O -target arm64-apple-macos14 -swift-version 5 -import-objc-header "$HERE/Sources/NativetronControl-Bridging.h" \
   -I "$ROOT/ipc" "${HARNESS_SOURCES[@]}" "$ARCHIVE" -o "$OUT/ios-host-harness"
 STATUS=0

@@ -164,13 +164,13 @@ static void test_ipc() {
 }
 
 static void test_menu_dpi() {
-  CHECK(accelerator('K', true, false, false) == command_change_colour);
+  CHECK(accelerator('R', true, false, false) == command_change_colour);
   CHECK(accelerator('Q', true, false, false) == command_quit);
-  CHECK(accelerator('K', false, false, false) == command_none);
-  CHECK(accelerator('K', true, true, false) == command_none);
-  CHECK(accelerator('K', true, false, true) == command_none);
-  CHECK(accelerator('R', true, false, false) == command_none);
-  CHECK(engine_menu[0].id == command_change_colour && std::strstr(engine_menu[0].label, "Ctrl+K"));
+  CHECK(accelerator('R', false, false, false) == command_none);
+  CHECK(accelerator('R', true, true, false) == command_none);
+  CHECK(accelerator('R', true, false, true) == command_none);
+  CHECK(accelerator('K', true, false, false) == command_none);
+  CHECK(engine_menu[0].id == command_change_colour && std::strstr(engine_menu[0].label, "Ctrl+R"));
   CHECK(engine_menu[1].label == nullptr && engine_menu[2].id == command_quit);
 
   CHECK(scale(900, 96, 96) == 900 && scale(900, 144, 96) == 1350 && scale(700, 120, 96) == 875);
@@ -271,7 +271,8 @@ static void test_packaged(int argc, char **argv) {
   std::set<std::string> keys;
   for (int i = 1; i < argc; i++) {
     const std::string key = argv[i];
-    const bool servable = valid_asset_key(key) && !mime_for(key).empty();
+    if (key == "asset-manifest.json") { CHECK(plan_response("GET", url("/" + key), {key}).status == 404); continue; }
+    const bool servable = valid_asset_key(key) && nt_asset_mime(key.c_str()) != nullptr;
     if (!servable) std::fprintf(stderr, "unservable packaged asset %s\n", argv[i]);
     CHECK(servable);
     keys.insert(key);

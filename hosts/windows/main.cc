@@ -170,7 +170,7 @@ private:
         if (valid_asset_key(key)) ok = scan(directory + L"\\" + name, key + "/", depth + 1, error);
         continue;
       }
-      if (!valid_asset_key(key) || mime_for(key).empty()) continue;
+      if (!valid_asset_key(key) || !nt_asset_mime(key.c_str())) continue;
       if (data.nFileSizeHigh || data.nFileSizeLow > max_asset_bytes) { error = "asset too large: " + sanitize(key, 256); ok = false; break; }
       if (keys_.size() >= max_assets) { error = "too many assets"; ok = false; break; }
       keys_.insert(key);

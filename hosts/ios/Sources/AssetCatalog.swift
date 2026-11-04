@@ -13,22 +13,11 @@ final class AssetCatalog {
 
   static let scheme = "app"
   static let host = "local"
-  static let entry = "engine/page.html"
+  static let entry = BundledAssets.entry
   static let origin = "app://local"
   static let maxFileBytes = 64 << 20
   static let maxPathBytes = 1024
-  static let types: [String: String] = [
-    "html": "text/html; charset=utf-8",
-    "js": "text/javascript; charset=utf-8",
-    "mjs": "text/javascript; charset=utf-8",
-    "wasm": "application/wasm",
-    "json": "application/json; charset=utf-8",
-    "css": "text/css; charset=utf-8",
-    "wgsl": "text/plain; charset=utf-8",
-    "txt": "text/plain; charset=utf-8",
-    "png": "image/png",
-    "svg": "image/svg+xml",
-  ]
+
 
   let root: URL
   private let files: [String: (url: URL, size: Int)]
@@ -47,12 +36,11 @@ final class AssetCatalog {
     for case let url as URL in walker {
       guard let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey]),
         values.isSymbolicLink != true, values.isRegularFile == true,
-        let size = values.fileSize, size <= Self.maxFileBytes,
-        Self.types[url.pathExtension.lowercased()] != nil else { continue }
+        let size = values.fileSize, size <= Self.maxFileBytes else { continue }
       let path = url.standardizedFileURL.path
       guard path.hasPrefix(prefix) else { continue }
       let relative = String(path.dropFirst(prefix.count))
-      guard Self.validRelative(relative) else { continue }
+      guard Self.validRelative(relative), BundledAssets.files[relative] != nil else { continue }
       files[relative] = (url.standardizedFileURL, size)
     }
     guard files[Self.entry] != nil else { return nil }
@@ -75,7 +63,8 @@ final class AssetCatalog {
     guard Self.validRelative(relative) else { return error(400) }
     guard let file = files[relative] else { return error(404) }
     var headers = Self.baseHeaders
-    headers["Content-Type"] = Self.types[file.url.pathExtension.lowercased()]!
+    let mime = BundledAssets.files[relative]!
+    headers["Content-Type"] = mime.hasPrefix("text/") ? mime + "; charset=utf-8" : mime
     headers["Content-Length"] = String(file.size)
     return Response(status: 200, headers: headers, file: method == "GET" ? file.url : nil)
   }

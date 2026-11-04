@@ -19,8 +19,10 @@ public final class AssetPolicyTest {
     check("application/wasm".equals(get("/engine/.scriptc/ui.wasm").mime), "wasm MIME");
     check("text/javascript".equals(get("/engine/.scriptc/ui.mjs").mime), "mjs MIME");
     check("text/javascript".equals(get("/engine/worker.js").mime), "worker MIME");
-    check("text/css".equals(get("/style/app.css").mime), "css MIME");
-    check("application/json".equals(get("/data/table.json").mime), "json MIME");
+    check("text/css".equals(AssetPolicy.mime("style/app.css")), "css MIME");
+    check(get("/style/app.css").status == 404, "unmanifested CSS refused");
+    check("application/json".equals(AssetPolicy.mime("data/table.json")), "json MIME");
+    check(get("/data/table.json").status == 404, "unmanifested JSON refused");
     check(get("/secret.bin").status == 404, "unknown extension not served even if bundled");
     check(get("/engine/missing.js").status == 404, "unbundled file");
     check(get("/").status == 404, "root");
