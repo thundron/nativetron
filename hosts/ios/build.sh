@@ -1,31 +1,56 @@
 #!/usr/bin/env bash
+# iOS host build. Modes:
+#   sim-build       build only, iOS Simulator (arm64), unsigned, isolated derived data
+#   device-compile  build only, iphoneos, unsigned compile/link check (not installable)
+#   device-build    signed device build; requires NT_IOS_TEAM (your own team)
+#   sim | device    build, install and launch (runtime; prefer hosts/ios/accept.sh for evidence)
+# NT_IOS_SKIP_ENGINE=1 reuses an existing build/engine-assets bundle.
 set -euo pipefail
-ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+HERE="$(cd "$(dirname "$0")" && pwd)"
+ROOT="$(cd "$HERE/../.." && pwd)"
 MODE="${1:-sim}"
-case "$MODE" in sim|device) ;; *) echo 'usage: build.sh sim|device' >&2; exit 1;; esac
-if [[ "$MODE" == device ]]; then
-  : "${NT_IOS_TEAM:?set NT_IOS_TEAM to your own Apple developer team}"
-  [[ "$NT_IOS_TEAM" =~ ^[A-Z0-9]{10}$ ]] || { echo 'invalid Apple developer team id' >&2; exit 1; }
-  case "$NT_IOS_TEAM" in UQBV6LD494|DM6V8H4Q6Q) echo 'GEWISS signing teams are prohibited' >&2; exit 1;; esac
-fi
+case "$MODE" in sim|device|sim-build|device-build|device-compile) ;; *) echo 'usage: build.sh sim|device|sim-build|device-build|device-compile' >&2; exit 1;; esac
+# Signing policy runs before any build, project generation or toolchain action.
+source "$HERE/signing-policy.sh"
+nt_ios_check_team "$MODE"
 cd "$ROOT"
-engine/build.sh --web
-node ipc/generate-engine.mjs --check
-mkdir -p build/ios-project
+case "$MODE" in sim|sim-build) SDK=iphonesimulator ;; *) SDK=iphoneos ;; esac
 
+if [[ "${NT_IOS_SKIP_ENGINE:-0}" != 1 ]]; then engine/build.sh --web; fi
+[[ -f build/engine-assets/engine/page.html ]] || { echo 'ios: build/engine-assets is missing; run engine/build.sh --web' >&2; exit 1; }
+node ipc/generate-engine.mjs --check
+node ipc/generate-control.mjs --check
+"$HERE/build-control.sh" "$SDK"
+mkdir -p build/ios-project
 xcodegen generate --spec hosts/ios/project.yml --project build/ios-project --quiet
-if [[ "$MODE" == sim ]]; then
-  SIM="${NT_IOS_SIMULATOR:-$(xcrun simctl list devices -j | python3 -c 'import json,sys; d=[x for k,v in json.load(sys.stdin)["devices"].items() if "iOS-18-6" in k for x in v if x["isAvailable"]]; print(d[0]["udid"] if d else "")')}"
-  [[ -n "$SIM" ]] || { echo 'iOS 18.6 simulator required; do not use the iOS 26 simulator on macOS 27' >&2; exit 1; }
-  RUNTIME="$(xcrun simctl list devices -j | python3 -c 'import json,sys; print(next((k for k,v in json.load(sys.stdin)["devices"].items() if any(x["udid"]==sys.argv[1] for x in v)), ""))' "$SIM")"
-  if [[ "$(sw_vers -productVersion)" == 27.* && "$RUNTIME" == *iOS-26* ]]; then echo 'iOS 26 simulator WebContent JIT PAC crash on macOS 27: use iOS 18.6 or a physical device' >&2; exit 1; fi
-  xcrun simctl boot "$SIM" 2>/dev/null || true
-  xcodebuild -project build/ios-project/Nativetron.xcodeproj -scheme Nativetron -configuration Debug -destination "id=$SIM" -derivedDataPath build/ios CODE_SIGNING_ALLOWED=NO -quiet
-  xcrun simctl install "$SIM" build/ios/Build/Products/Debug-iphonesimulator/Nativetron.app
-  xcrun simctl launch "$SIM" dev.nativetron.gpu
-else
-  : "${NT_IOS_DEVICE:?set NT_IOS_DEVICE to the physical device identifier}"
-  xcodebuild -project build/ios-project/Nativetron.xcodeproj -scheme Nativetron -configuration Debug -destination "id=$NT_IOS_DEVICE" -derivedDataPath build/ios DEVELOPMENT_TEAM="$NT_IOS_TEAM" -allowProvisioningUpdates -quiet
-  xcrun devicectl device install app --device "$NT_IOS_DEVICE" build/ios/Build/Products/Debug-iphoneos/Nativetron.app
-  xcrun devicectl device process launch --device "$NT_IOS_DEVICE" dev.nativetron.gpu
-fi
+PROJECT=build/ios-project/Nativetron.xcodeproj
+DERIVED="build/ios-$SDK"
+APP="$DERIVED/Build/Products/Debug-$SDK/Nativetron.app"
+
+case "$MODE" in
+  sim-build)
+    xcodebuild -project "$PROJECT" -scheme Nativetron -configuration Debug -destination 'generic/platform=iOS Simulator' \
+      -derivedDataPath "$DERIVED" CODE_SIGNING_ALLOWED=NO NT_IOS_TEAM= DEVELOPMENT_TEAM= -quiet build
+    echo "ios: built $APP" ;;
+  device-compile)
+    xcodebuild -project "$PROJECT" -scheme Nativetron -configuration Debug -destination 'generic/platform=iOS' \
+      -derivedDataPath "$DERIVED" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO NT_IOS_TEAM= DEVELOPMENT_TEAM= -quiet build
+    echo "ios: compiled unsigned $APP (not installable)" ;;
+  device-build|device)
+    DEST='generic/platform=iOS'
+    if [[ "$MODE" == device ]]; then : "${NT_IOS_DEVICE:?set NT_IOS_DEVICE to the physical device identifier}"; DEST="id=$NT_IOS_DEVICE"; fi
+    xcodebuild -project "$PROJECT" -scheme Nativetron -configuration Debug -destination "$DEST" -derivedDataPath "$DERIVED" \
+      NT_IOS_TEAM="$NT_IOS_TEAM" DEVELOPMENT_TEAM="$NT_IOS_TEAM" -allowProvisioningUpdates -quiet build
+    nt_ios_verify_signature "$APP"
+    if [[ "$MODE" == device ]]; then
+      xcrun devicectl device install app --device "$NT_IOS_DEVICE" "$APP"
+      xcrun devicectl device process launch --device "$NT_IOS_DEVICE" dev.nativetron.gpu
+    fi ;;
+  sim)
+    SIM="$("$HERE/select-simulator.sh")"
+    xcodebuild -project "$PROJECT" -scheme Nativetron -configuration Debug -destination "id=$SIM" \
+      -derivedDataPath "$DERIVED" CODE_SIGNING_ALLOWED=NO NT_IOS_TEAM= DEVELOPMENT_TEAM= -quiet build
+    xcrun simctl boot "$SIM" 2>/dev/null || true
+    xcrun simctl install "$SIM" "$APP"
+    xcrun simctl launch "$SIM" dev.nativetron.gpu ;;
+esac
