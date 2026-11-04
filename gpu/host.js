@@ -112,8 +112,8 @@ export function createGpuHost(options) {
   };
   const pixels = () => {
     const dpr = options.getPixelRatio?.() ?? scope.devicePixelRatio ?? 1;
-    const width = Math.max(1, Math.round((canvas.clientWidth ?? canvas.width) * dpr));
-    const height = Math.max(1, Math.round((canvas.clientHeight ?? canvas.height) * dpr));
+    const width = Math.max(1, Math.round(canvas.clientWidth === undefined ? canvas.width : canvas.clientWidth * dpr));
+    const height = Math.max(1, Math.round(canvas.clientHeight === undefined ? canvas.height : canvas.clientHeight * dpr));
     const key = `${width}/${height}/${dpr}`;
     if (key === lastSize) return;
     lastSize = key;
@@ -126,12 +126,18 @@ export function createGpuHost(options) {
     media = scope.matchMedia(`(resolution: ${scope.devicePixelRatio ?? 1}dppx)`);
     media.addEventListener("change", changedDpr, { once: true });
   };
+  let resizeFrame = null;
   const changedDpr = () => { pixels(); watchDpr(); };
+  const changedWindow = () => {
+    if (resizeFrame !== null || !raf) return;
+    resizeFrame = raf(() => { resizeFrame = null; changedDpr(); });
+  };
   if (scope.ResizeObserver && canvas) {
     observer = new scope.ResizeObserver(pixels);
     observer.observe(canvas);
   }
   watchDpr();
+  scope.addEventListener?.("resize", changedWindow);
   const timestampWrites = (querySet, beginIndex, endIndex) => querySet ? { querySet: ref(querySet, "querySet"), beginningOfPassWriteIndex: beginIndex, endOfPassWriteIndex: endIndex } : undefined;
   const computeDescriptor = (layout, shader, entry, label) => ({ label, layout: layout ? ref(layout, "pipelineLayout") : "auto", compute: { module: ref(shader, "shaderModule"), entryPoint: entry } });
   const vertexLayouts = (values) => {
@@ -363,7 +369,8 @@ export function createGpuHost(options) {
       stopped = true; deviceEpoch++;
       if (frameToken !== null) cancelRaf?.(frameToken);
       frameToken = null;
-      observer?.disconnect(); media?.removeEventListener("change", changedDpr);
+      observer?.disconnect(); media?.removeEventListener("change", changedDpr); scope.removeEventListener?.("resize", changedWindow);
+      if (resizeFrame !== null) cancelRaf?.(resizeFrame);
       handles.clear(); context?.unconfigure(); device?.destroy(); device = null;
     },
     handles,

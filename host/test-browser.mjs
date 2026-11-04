@@ -56,6 +56,7 @@ export async function testBrowser(root) {
       pending.set(id, { resolve, reject, timeout });
       ws.send(JSON.stringify({ id, method, params }));
     });
+    await send("Page.enable");
     await send("Runtime.enable");
     await send("Log.enable");
     return {

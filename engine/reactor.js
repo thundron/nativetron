@@ -4,6 +4,7 @@ import { decodeEngineMessage, encodeEngineMessage, ENGINE_REPORT, LANE_ENGINE, L
 export async function loadReactor(options) {
   const { canvas, moduleUrl, wasmUrl, prefix, report = console.log, post = () => {} } = options;
   let api, disposed = false;
+  let pixelRatio = options.pixelRatio ?? 1;
   const queued = [];
   const deliver = (event) => {
     if (disposed) return;
@@ -16,6 +17,7 @@ export async function loadReactor(options) {
   };
   const host = createGpuHost({
     canvas, scope: options.scope ?? globalThis,
+    getPixelRatio: () => canvas.clientWidth === undefined ? pixelRatio : ((options.scope ?? globalThis).devicePixelRatio ?? 1),
     getMemory: () => api.__memory(),
     onFrame: (time) => api[`${prefix}frame`](time),
     onEvent: (event) => { queued.push(event); queueMicrotask(() => { if (api && !disposed) { while (queued.length) deliver(queued.shift()); } }); },
@@ -48,7 +50,7 @@ export async function loadReactor(options) {
         api[`${prefix}message`](message.topic, message.payload);
       },
       resize(width, height, dpr) {
-        canvas.width = width; canvas.height = height;
+        canvas.width = width; canvas.height = height; pixelRatio = dpr;
         deliver({ type: 8, requestId: 0, handle: 0, status: 0, width, height, dpr });
       },
       dispose() { disposed = true; queued.length = 0; host.dispose(); },

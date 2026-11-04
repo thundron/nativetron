@@ -18,6 +18,16 @@ try {
     await browser.delay(400);
     assert.equal(await browser.evaluate("engineDemo.reports.includes('GPU_COLOUR_CHANGED')"), true);
     assert.match(await browser.evaluate("document.getElementById('nt-root').textContent"), /GPU_COLOUR_CHANGED/);
-    console.log(`engine: Chrome ${expected}, compiled UI ↔ engine and real GPU readback passed`);
+    await browser.send("Emulation.setDeviceMetricsOverride", { width: 1000, height: 800, deviceScaleFactor: 2, mobile: false });
+    await browser.delay(200);
+    await browser.send("Emulation.setDeviceMetricsOverride", { width: 1001, height: 800, deviceScaleFactor: 2, mobile: false });
+    await browser.delay(300);
+    const resize = await browser.evaluate("engineDemo.events.filter(event => event.type === 8).at(-1)");
+    assert.equal(resize.dpr, 2, "wrong DPR in engine resize event");
+    const width = await browser.evaluate("Math.round(document.getElementById('surface').clientWidth * devicePixelRatio)");
+    assert.equal(resize.width, width, "worker dimensions were scaled twice");
+    await browser.evaluate("engineDemo.lane.dispose()");
+    await browser.send("Emulation.clearDeviceMetricsOverride");
+    console.log(`engine: Chrome ${expected}, compiled UI ↔ engine, real GPU readback and DPR resize passed`);
   }
 } finally { await browser.close(); }

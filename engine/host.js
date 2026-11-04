@@ -39,17 +39,22 @@ export async function startEngine(options) {
         else if (data.type === "gpu-event") options.onEvent?.(data.event);
         else if (data.type === "error") { clearTimeout(timeout); report("ENGINE_ERROR " + data.message); reject(new Error(data.message)); }
       };
-      worker.postMessage({ type: "start", canvas: offscreen, options: { moduleUrl: options.moduleUrl, wasmUrl: options.wasmUrl, prefix: options.prefix } }, [offscreen]);
+      worker.postMessage({ type: "start", canvas: offscreen, options: { moduleUrl: options.moduleUrl, wasmUrl: options.wasmUrl, prefix: options.prefix, pixelRatio: scope.devicePixelRatio ?? 1 } }, [offscreen]);
     }).catch((error) => { worker.terminate(); throw error; });
   } else {
     worker?.terminate(); worker = null;
     reactor = await loadReactor({ ...options, post: route });
   }
   report(`ENGINE_MODE ${mode}${capability.reason ? " (" + capability.reason + ")" : ""}`);
+  let lastResize = "";
   const resize = () => {
     if (disposed || !worker) return;
     const dpr = scope.devicePixelRatio ?? 1;
-    worker.postMessage({ type: "resize", width: Math.max(1, Math.round(canvas.clientWidth * dpr)), height: Math.max(1, Math.round(canvas.clientHeight * dpr)), dpr });
+    const width = Math.max(1, Math.round(canvas.clientWidth * dpr)), height = Math.max(1, Math.round(canvas.clientHeight * dpr));
+    const key = `${width}/${height}/${dpr}`;
+    if (key === lastResize) return;
+    lastResize = key;
+    worker.postMessage({ type: "resize", width, height, dpr });
   };
   const watchDpr = () => {
     if (!scope.matchMedia || !worker) return;
@@ -57,8 +62,13 @@ export async function startEngine(options) {
     media = scope.matchMedia(`(resolution: ${scope.devicePixelRatio ?? 1}dppx)`);
     media.addEventListener("change", changedDpr, { once: true });
   };
+  let resizeFrame = null;
   const changedDpr = () => { resize(); watchDpr(); };
-  if (worker && scope.ResizeObserver) { observer = new scope.ResizeObserver(resize); observer.observe(canvas); resize(); watchDpr(); }
+  const changedWindow = () => {
+    if (resizeFrame !== null) return;
+    resizeFrame = scope.requestAnimationFrame(() => { resizeFrame = null; changedDpr(); });
+  };
+  if (worker && scope.ResizeObserver) { observer = new scope.ResizeObserver(resize); observer.observe(canvas); resize(); watchDpr(); scope.addEventListener?.("resize", changedWindow); }
   return {
     mode, reason: capability.reason ?? "", reactor,
     send(bytes, source = LANE_UI) {
@@ -74,7 +84,8 @@ export async function startEngine(options) {
     dispose() {
       if (disposed) return;
       disposed = true;
-      observer?.disconnect(); media?.removeEventListener("change", changedDpr);
+      observer?.disconnect(); media?.removeEventListener("change", changedDpr); scope.removeEventListener?.("resize", changedWindow);
+      if (resizeFrame !== null) scope.cancelAnimationFrame(resizeFrame);
       worker?.postMessage({ type: "stop" }); worker?.terminate();
       reactor?.dispose();
     },

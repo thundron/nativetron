@@ -15,7 +15,7 @@ node engine/browser-test.mjs
 
 `startEngine({ canvas, moduleUrl, wasmUrl, prefix, report, postNative, postUi, onEvent, forceMain? })` returns a promise of `{ mode, reason, send(bytes, source?), dispose(), reactor }`. `mode` is `worker` or `main`. `reactor` is available only in main mode; applications must not depend on it. `send` validates the generated IPC frame and bounds control traffic to 60 messages/second. Source defaults to UI; native ingress must specify NATIVE. `dispose` stops scheduling and releases GPU resources.
 
-The loader probes WebGPU, device creation, OffscreenCanvas context configuration and worker rAF before transferring the real canvas. Unsupported probes fall back to main. Startup failure after canvas transfer is reported, not silently replaced by a second renderer. Main-thread resize uses the GPU host's observer; worker resize and DPR changes are forwarded from the page without a polling loop.
+The loader probes WebGPU, device creation, OffscreenCanvas context configuration and worker rAF before transferring the real canvas. Unsupported probes fall back to main. Startup failure after canvas transfer is reported, not silently replaced by a second renderer. Main-thread resize uses the GPU host's observer; worker resize and DPR changes are forwarded from the page without a polling loop. Coalesced window-resize checks cover display changes as well as the resolution media query. OffscreenCanvas dimensions are already physical pixels; they are never multiplied by DPR a second time.
 
 The reactor exports `${prefix}start()`, `${prefix}frame(timeMs)`, `${prefix}event(type, requestId, handle, status, value, text)` and `${prefix}message(topic, bytes)`. Its host callbacks are `gpuPresent(batch, uploads, readbacks)`, `gpuReport(text)` and optional `engineSend(frameBytes)`. Capability text is the complete JSON capability object; shader text is the compilation-message array; resize text contains physical width/height, and value contains DPR. No promises, timers or browser objects enter compiled source. Outbound engine messages/reports and GPU events are delivered on later microtasks so a reply cannot reenter an active reactor callback.
 
@@ -31,7 +31,7 @@ See [engine IPC](../ipc/ENGINE.md) for the exact generated description and codec
 
 | host | evidence |
 |---|---|
-| Chrome, macOS arm64 | Worker preferred and forced-main fallback; compute/readback and compiled UI colour change pass |
+| Chrome, macOS arm64 | Worker preferred and forced-main fallback; compute/readback, compiled UI colour change and DPR=2 physical resize pass |
 | WKWebView, macOS 27.0.1 | Worker selected; 16 MiB upload, 4 KiB checked readback, timestamp and actual native-menu colour change pass |
 | WKWebView, macOS 26 | not available on this machine; not verified |
 
