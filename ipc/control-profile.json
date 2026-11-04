@@ -1,0 +1,22 @@
+{
+  "profile_format": 1,
+  "name": "nt-control",
+  "entry": "control.ts",
+  "emission": "llvm",
+  "abi": {
+    "prefix": "nt_control_",
+    "init_symbol": "nt_control_init",
+    "sink_register_symbol": "nt_control_sink",
+    "collect_symbol": "nt_control_collect",
+    "result_reset_symbol": null,
+    "callback_register_symbol": "nt_control_set_callback"
+  },
+  "callbacks": [
+    { "name": "controlSend", "params": ["bytes"], "returns": "void" },
+    { "name": "controlReceive", "params": ["bytes"], "returns": "void" }
+  ],
+  "exports": [
+    { "export": "command", "symbol": "nt_control_command", "params": ["f64", "bytes"], "returns": "f64" },
+    { "export": "receive", "symbol": "nt_control_receive", "params": ["bytes"], "returns": "f64" }
+  ]
+}
