@@ -1,0 +1,26 @@
+name: Nativetron
+options:
+  bundleIdPrefix: dev.nativetron
+  deploymentTarget:
+    iOS: "18.6"
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    TARGETED_DEVICE_FAMILY: "1,2"
+targets:
+  Nativetron:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources
+      - path: ../../build/engine-assets
+        type: folder
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.nativetron.gpu
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: $(NT_IOS_TEAM)
