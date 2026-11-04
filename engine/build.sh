@@ -5,6 +5,8 @@ SCRIPTC="${SCRIPTC:-$ROOT/../../scriptc/packages/cli/dist/main.js}"
 cd "$ROOT"
 node abi/generate.mjs --check
 node ipc/generate-engine.mjs --check
+node ipc/generate-control.mjs --check
+node engine/generate-assets.mjs --check
 node gpu/generate.mjs --check
 ./gpu/build.sh
 (cd engine && SCRIPTC_TARGET=wasm32-wasi SCRIPTC_CC=zigcc node "$SCRIPTC" build --lib --profile ui-profile.json)

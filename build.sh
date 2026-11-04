@@ -9,6 +9,8 @@ node "$ROOT/abi/generate.mjs" --check
 node "$ROOT/canvas/generate.mjs" --check
 node "$ROOT/gpu/generate.mjs" --check
 node "$ROOT/ipc/generate-engine.mjs" --check
+node "$ROOT/ipc/generate-control.mjs" --check
+node "$ROOT/engine/generate-assets.mjs" --check
 node "$ROOT/i18n/generate.mjs" --check
 node "$ROOT/commands/generate.mjs" --check
 node "$ROOT/compat/generate.mjs" --check

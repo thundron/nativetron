@@ -1,6 +1,7 @@
 #import <Foundation/Foundation.h>
 #import <WebKit/WebKit.h>
 #include <string>
+#include "assets.generated.h"
 
 static NSURL *assetRoot;
 static NSString *assetEntry;
@@ -22,10 +23,11 @@ static BOOL isolationHeaders;
   while ([path hasPrefix:@"/"]) path = [path substringFromIndex:1];
   NSURL *file = [[assetRoot URLByAppendingPathComponent:path] URLByResolvingSymlinksInPath];
   NSString *prefix = [assetRoot.path stringByAppendingString:@"/"];
+  const char *utf8 = path.UTF8String;
+  const char *mime = utf8 ? nt_asset_mime(utf8) : nullptr;
   NSData *data = nil;
-  if ([file.path hasPrefix:prefix]) data = [NSData dataWithContentsOfURL:file options:NSDataReadingMappedIfSafe error:nil];
-  NSDictionary *types = @{@"wasm": @"application/wasm", @"mjs": @"text/javascript", @"js": @"text/javascript", @"html": @"text/html", @"css": @"text/css", @"json": @"application/json", @"wgsl": @"text/plain", @"png": @"image/png"};
-  NSMutableDictionary *headers = [@{@"Content-Type": types[file.pathExtension] ?: @"application/octet-stream", @"Access-Control-Allow-Origin": @"*", @"Cache-Control": @"no-store"} mutableCopy];
+  if (mime && [file.path hasPrefix:prefix]) data = [NSData dataWithContentsOfURL:file options:NSDataReadingMappedIfSafe error:nil];
+  NSMutableDictionary *headers = [@{@"Content-Type": mime ? [NSString stringWithUTF8String:mime] : @"text/plain", @"Access-Control-Allow-Origin": @"*", @"Cache-Control": @"no-store"} mutableCopy];
   if (isolationHeaders) {
     headers[@"Cross-Origin-Opener-Policy"] = @"same-origin";
     headers[@"Cross-Origin-Embedder-Policy"] = @"require-corp";
@@ -44,7 +46,7 @@ extern "C" int32_t nt_assets_configure(const uint8_t *root, size_t rootLength, c
   NSString *directory = [[NSString alloc] initWithBytes:root length:rootLength encoding:NSUTF8StringEncoding];
   NSString *page = [[NSString alloc] initWithBytes:entry length:entryLength encoding:NSUTF8StringEncoding];
   BOOL isDirectory = NO;
-  if (!directory.length || !page.length || ![[NSFileManager defaultManager] fileExistsAtPath:directory isDirectory:&isDirectory] || !isDirectory) return 0;
+  if (!directory.length || !page.length || !nt_asset_mime(page.UTF8String) || ![[NSFileManager defaultManager] fileExistsAtPath:directory isDirectory:&isDirectory] || !isDirectory) return 0;
   assetRoot = [[[NSURL fileURLWithPath:directory isDirectory:YES] URLByResolvingSymlinksInPath] copy];
   assetEntry = [page copy];
   isolationHeaders = isolated != 0;

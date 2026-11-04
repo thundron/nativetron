@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "entry": "engine/page.html",
+  "originHost": "local",
+  "isolationHeaders": {
+    "Cross-Origin-Opener-Policy": "same-origin",
+    "Cross-Origin-Embedder-Policy": "require-corp"
+  },
+  "files": [
+    { "path": "engine/page.html", "mime": "text/html" },
+    { "path": "engine/host.js", "mime": "text/javascript" },
+    { "path": "engine/worker.js", "mime": "text/javascript" },
+    { "path": "engine/reactor.js", "mime": "text/javascript" },
+    { "path": "engine/.scriptc/ui.mjs", "mime": "text/javascript" },
+    { "path": "engine/.scriptc/ui.wasm", "mime": "application/wasm" },
+    { "path": "gpu/.scriptc/demo.mjs", "mime": "text/javascript" },
+    { "path": "gpu/.scriptc/demo.wasm", "mime": "application/wasm" },
+    { "path": "gpu/host.js", "mime": "text/javascript" },
+    { "path": "gpu/gpu-host.generated.js", "mime": "text/javascript" },
+    { "path": "host/dom-host.js", "mime": "text/javascript" },
+    { "path": "host/event.generated.mjs", "mime": "text/javascript" },
+    { "path": "ipc/engine.generated.mjs", "mime": "text/javascript" },
+    { "path": "ipc/engine-bridge.generated.mjs", "mime": "text/javascript" }
+  ]
+}
