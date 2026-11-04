@@ -76,7 +76,7 @@ test("simulator selection prefers iOS 18.6 and refuses iOS 26 on macOS 27", () =
     "com.apple.CoreSimulator.SimRuntime.iOS-26-1": [device("S26")],
     "com.apple.CoreSimulator.SimRuntime.iOS-18-6": [device("S18-OFF", false), device("S18")],
   });
-  const select = (extra) => spawnSync("bash", [join(here, "select-simulator.sh")], { env: { ...process.env, NT_IOS_SIMCTL_JSON: fixture.file, NT_IOS_MACOS_VERSION: "27.0.1", ...extra }, encoding: "utf8" });
+  const select = (extra) => spawnSync("bash", [join(here, "select-simulator.sh")], { env: { ...process.env, NT_IOS_SIMULATOR: "", NT_IOS_SIMCTL_JSON: fixture.file, NT_IOS_MACOS_VERSION: "27.0.1", ...extra }, encoding: "utf8" });
   try {
     assert.equal(select({}).stdout.trim(), "S18");
     const refused = select({ NT_IOS_SIMULATOR: "S26" });
@@ -85,7 +85,7 @@ test("simulator selection prefers iOS 18.6 and refuses iOS 26 on macOS 27", () =
     assert.equal(select({ NT_IOS_SIMULATOR: "S26", NT_IOS_MACOS_VERSION: "15.6" }).stdout.trim(), "S26");
     assert.match(select({ NT_IOS_SIMULATOR: "missing" }).stderr, /not found/);
     const none = simctl({ "com.apple.CoreSimulator.SimRuntime.iOS-26-1": [device("S26")] });
-    const result = spawnSync("bash", [join(here, "select-simulator.sh")], { env: { ...process.env, NT_IOS_SIMCTL_JSON: none.file, NT_IOS_MACOS_VERSION: "27.0.1" }, encoding: "utf8" });
+    const result = spawnSync("bash", [join(here, "select-simulator.sh")], { env: { ...process.env, NT_IOS_SIMULATOR: "", NT_IOS_SIMCTL_JSON: none.file, NT_IOS_MACOS_VERSION: "27.0.1" }, encoding: "utf8" });
     assert.match(result.stderr, /iOS 18.6 simulator required/);
     rmSync(none.dir, { recursive: true, force: true });
   } finally { rmSync(fixture.dir, { recursive: true, force: true }); }
