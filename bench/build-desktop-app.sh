@@ -17,6 +17,6 @@ node -e 'const fs=require("fs");const js=fs.readFileSync(process.argv[1],"utf8")
 clang++ -std=c++17 -O2 -I "$WV_INC" -c "$ROOT/native/nativetron_core.cc" -o "$ROOT/native/nativetron_core.o"
 
 cd "$ROOT"
-CCC_OVERRIDE_OPTIONS="$LINK" node "$SCRIPTC" build bench/desktop-app/renderer.ts --backend c --ffi ffi/nativetron.ffi.json -o "$OUT/renderer"
-node "$SCRIPTC" build bench/desktop-app/main.ts --backend c -o "$OUT/main"
+CCC_OVERRIDE_OPTIONS="$LINK" node "$SCRIPTC" build bench/desktop-app/renderer.ts --backend llvm --ffi ffi/nativetron.ffi.json -o "$OUT/renderer"
+node "$SCRIPTC" build bench/desktop-app/main.ts --backend llvm -o "$OUT/main"
 echo "built desktop benchmark app"

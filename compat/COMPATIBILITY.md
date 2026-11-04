@@ -79,102 +79,67 @@ compile error, not a runtime failure.
 
 ## Node builtins
 
-176 of 239 members lower statically, projected from
-scriptc's manifest at compiler 0.0.36.
+544 of 565 members lower statically, projected from
+scriptc's manifest at compiler 0.4.8.
 
 | module | lowers | missing |
 |---|---|---|
-| `crypto` | 4 | 33 |
-| `assert` | 1 | 9 |
-| `assert/strict` | 1 | 5 |
-| `zlib` | 3 | 5 |
+| `crypto` | 41 | 5 |
+| `assert` | 1 | 3 |
+| `assert/strict` | 1 | 3 |
 | `module` | 1 | 3 |
 | `http2` | 1 | 2 |
-| `stream/consumers` | 1 | 2 |
-| `tls` | 4 | 2 |
-| `child_process` | 5 | 1 |
-| `util` | 2 | 1 |
+| `tls` | 6 | 2 |
+| `child_process` | 6 | 1 |
+| `stream/consumers` | 1 | 1 |
+| `util` | 22 | 1 |
+| `buffer` | 6 | 0 |
 | `cluster` | 4 | 0 |
 | `diagnostics_channel` | 6 | 0 |
-| `fs` | 26 | 0 |
-| `fs/promises` | 15 | 0 |
-| `net` | 3 | 0 |
-| `os` | 10 | 0 |
-| `path` | 12 | 0 |
-| `path/posix` | 12 | 0 |
-| `path/win32` | 12 | 0 |
-| `perf_hooks` | 2 | 0 |
-| `process` | 19 | 0 |
-| `querystring` | 7 | 0 |
+| `fs` | 51 | 0 |
+| `fs/promises` | 30 | 0 |
+| `http` | 2 | 0 |
+| `net` | 6 | 0 |
+| `os` | 24 | 0 |
+| `path` | 16 | 0 |
+| `path/posix` | 16 | 0 |
+| `path/win32` | 16 | 0 |
+| `perf_hooks` | 9 | 0 |
+| `process` | 35 | 0 |
+| `punycode` | 8 | 0 |
+| `querystring` | 8 | 0 |
 | `readline` | 2 | 0 |
-| `timers/promises` | 3 | 0 |
-| `url` | 3 | 0 |
-| `worker_threads` | 3 | 0 |
+| `readline/promises` | 2 | 0 |
+| `timers/promises` | 5 | 0 |
+| `tty` | 2 | 0 |
+| `url` | 10 | 0 |
+| `util/types` | 42 | 0 |
+| `v8` | 2 | 0 |
+| `worker_threads` | 4 | 0 |
+| `zlib` | 142 | 0 |
 
 ### Missing node members
 
 | member | code | why |
 |---|---|---|
-| `assert.AssertionError` | SC2020 | the class itself has no lowering |
-| `assert.deepEqual` | SC2020 | loose == equality has no lowering |
 | `assert.doesNotReject` | SC2020 | await the promise directly |
-| `assert.doesNotThrow` | SC2020 | call the function directly |
-| `assert.equal` | SC2020 | loose == equality has no lowering |
 | `assert.ifError` | SC2020 | test explicitly instead: assert.strictEqual(err, null) / assert.strictEqual(err, undefined) |
-| `assert.notDeepEqual` | SC2020 | loose == equality has no lowering |
-| `assert.notEqual` | SC2020 | loose == equality has no lowering |
 | `assert.rejects` | SC2020 | await the promise inside assert.throws's callback story instead: try { await p; assert.fail("expected rejec... |
-| `assert/strict.AssertionError` | SC2020 | the class itself has no lowering |
 | `assert/strict.doesNotReject` | SC2020 | await the promise directly |
-| `assert/strict.doesNotThrow` | SC2020 | call the function directly |
 | `assert/strict.ifError` | SC2020 | test explicitly instead: assert.strictEqual(err, null) / assert.strictEqual(err, undefined) |
 | `assert/strict.rejects` | SC2020 | await the promise inside assert.throws's callback story instead: try { await p; assert.fail("expected rejec... |
-| `child_process.execFile` | SC2020 | the callback form has no lowering |
-| `crypto.createCipheriv` | SC2020 | symmetric ciphers need a cipher stack the static runtime does not vendor |
-| `crypto.createDecipheriv` | SC2020 | symmetric ciphers need a cipher stack the static runtime does not vendor |
-| `crypto.createDiffieHellman` | SC2020 | asymmetric-key operations need a public-key stack (bignum, RSA/EC/EdDSA math) and a KeyObject value model |
-| `crypto.createDiffieHellmanGroup` | SC2020 | asymmetric-key operations need a public-key stack (bignum, RSA/EC/EdDSA math) and a KeyObject value model |
-| `crypto.createECDH` | SC2020 | asymmetric-key operations need a public-key stack (bignum, RSA/EC/EdDSA math) and a KeyObject value model |
-| `crypto.createHmac` | SC2020 | HMAC has no lowering yet |
-| `crypto.createPrivateKey` | SC2020 | asymmetric-key operations need a public-key stack (bignum, RSA/EC/EdDSA math) and a KeyObject value model |
-| `crypto.createPublicKey` | SC2020 | asymmetric-key operations need a public-key stack (bignum, RSA/EC/EdDSA math) and a KeyObject value model |
-| `crypto.createSecretKey` | SC2020 | asymmetric-key operations need a public-key stack (bignum, RSA/EC/EdDSA math) and a KeyObject value model |
-| `crypto.createSign` | SC2020 | asymmetric-key operations need a public-key stack (bignum, RSA/EC/EdDSA math) and a KeyObject value model |
-| `crypto.createVerify` | SC2020 | asymmetric-key operations need a public-key stack (bignum, RSA/EC/EdDSA math) and a KeyObject value model |
-| `crypto.diffieHellman` | SC2020 | asymmetric-key operations need a public-key stack (bignum, RSA/EC/EdDSA math) and a KeyObject value model |
-| `crypto.generateKey` | SC2020 | asymmetric-key operations need a public-key stack (bignum, RSA/EC/EdDSA math) and a KeyObject value model |
-| `crypto.generateKeyPair` | SC2020 | asymmetric-key operations need a public-key stack (bignum, RSA/EC/EdDSA math) and a KeyObject value model |
-| `crypto.generateKeyPairSync` | SC2020 | asymmetric-key operations need a public-key stack (bignum, RSA/EC/EdDSA math) and a KeyObject value model |
-| `crypto.generateKeySync` | SC2020 | asymmetric-key operations need a public-key stack (bignum, RSA/EC/EdDSA math) and a KeyObject value model |
-| `crypto.getCipherInfo` | SC2020 | symmetric ciphers need a cipher stack the static runtime does not vendor |
-| `crypto.getDiffieHellman` | SC2020 | asymmetric-key operations need a public-key stack (bignum, RSA/EC/EdDSA math) and a KeyObject value model |
-| `crypto.hash` | SC2020 | the one-shot digest has no lowering |
-| `crypto.hkdf` | SC2020 | key-derivation functions have no lowering yet |
-| `crypto.hkdfSync` | SC2020 | key-derivation functions have no lowering yet |
-| `crypto.pbkdf2` | SC2020 | key-derivation functions have no lowering yet |
-| `crypto.pbkdf2Sync` | SC2020 | key-derivation functions have no lowering yet |
-| `crypto.privateDecrypt` | SC2020 | asymmetric-key operations need a public-key stack (bignum, RSA/EC/EdDSA math) and a KeyObject value model |
-| `crypto.privateEncrypt` | SC2020 | asymmetric-key operations need a public-key stack (bignum, RSA/EC/EdDSA math) and a KeyObject value model |
-| `crypto.publicDecrypt` | SC2020 | asymmetric-key operations need a public-key stack (bignum, RSA/EC/EdDSA math) and a KeyObject value model |
-| `crypto.publicEncrypt` | SC2020 | asymmetric-key operations need a public-key stack (bignum, RSA/EC/EdDSA math) and a KeyObject value model |
-| `crypto.scrypt` | SC2020 | key-derivation functions have no lowering yet |
-| `crypto.scryptSync` | SC2020 | key-derivation functions have no lowering yet |
+| `child_process.execFile` | SC2020 | the callback forms execFile(file, callback), execFile(file, args, callback), and execFile(file, args, { enc... |
+| `crypto.privateDecrypt` | SC2020 | RSA encryption has no lowering |
+| `crypto.privateEncrypt` | SC2020 | RSA encryption has no lowering |
+| `crypto.publicDecrypt` | SC2020 | RSA encryption has no lowering |
+| `crypto.publicEncrypt` | SC2020 | RSA encryption has no lowering |
 | `crypto.setFips` | SC2020 | a compiled binary has no FIPS provider to enable, and Node itself throws on setFips(true) in a non-FIPS build |
-| `crypto.sign` | SC2020 | asymmetric-key operations need a public-key stack (bignum, RSA/EC/EdDSA math) and a KeyObject value model |
-| `crypto.verify` | SC2020 | asymmetric-key operations need a public-key stack (bignum, RSA/EC/EdDSA math) and a KeyObject value model |
-| `crypto.webcrypto` | SC2020 | the WebCrypto object has no lowering |
 | `http2.connect` | SC2020 | HTTP/2 client sessions have no lowering |
 | `http2.createServer` | SC2020 | cleartext (h2c) servers have no lowering |
-| `module.createRequire` | SC2020 | the lowered shape is a const binding over createRequire(import.meta.url) (or __filename) whose require call... |
-| `module.isBuiltin` | SC2020 | builtinModules.includes(name) answers the same question over the baked list (strip a node: prefix first; th... |
-| `module.syncBuiltinESMExports` | SC2020 | a compiled program has no live builtin ESM namespace bindings to synchronize |
-| `stream/consumers.arrayBuffer` | SC2020 | no free-standing ArrayBuffer value exists here (typed arrays own their storage) |
-| `stream/consumers.blob` | SC2020 | Blob values have no representation in a compiled binary |
+| `module.createRequire` | SC2020 | the lowered shape is a const binding (or a proven stable top-level let/var) over createRequire(import.meta.... |
+| `module.isBuiltin` | SC2020 | the lowered call checks a string against the baked Node v24 list, including bare/node: aliases and prefix-o... |
+| `module.syncBuiltinESMExports` | SC2020 | the direct zero-argument call statement refreshes the ES module namespace copy of events.defaultMaxListener... |
+| `stream/consumers.blob` | SC2020 | collecting a stream into a Blob is not supported yet |
 | `tls.connect` | SC2020 | the lowered TLS client is https.request({ hostname, port, path, method, ca?, rejectUnauthorized? }); raw tl... |
 | `tls.createSecureContext` | SC2020 | the lowered form is createSecureContext({ cert, key }) |
-| `util.promisify` | SC2020 | the one lowered shape is a const binding over child_process.execFile: const execFileAsync = promisify(execF... |
-| `zlib.brotliCompressSync` | SC2020 | deflateSync and inflateSync are the lowered zlib surface |
-| `zlib.brotliDecompressSync` | SC2020 | deflateSync and inflateSync are the lowered zlib surface |
-| `zlib.gunzipSync` | SC2020 | deflateSync and inflateSync are the lowered zlib surface |
-| `zlib.gzipSync` | SC2020 | deflateSync and inflateSync are the lowered zlib surface |
-| `zlib.unzipSync` | SC2020 | deflateSync and inflateSync are the lowered zlib surface |
+| `util.promisify` | SC2020 | the lowered shapes are const bindings over child_process.execFile, child_process.exec, setTimeout, setImmed... |

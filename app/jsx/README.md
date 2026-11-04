@@ -4,7 +4,7 @@ scriptc accepts `.ts`, not `.tsx`, so JSX is transformed first:
 
     node app/jsx/build.mjs            # app.tsx -> app.generated.ts
     CCC_OVERRIDE_OPTIONS='+-lc++ +-framework +WebKit +-framework +Cocoa' \
-      node "$SCRIPTC" build app/jsx/app.generated.ts --backend c \
+      node "$SCRIPTC" build app/jsx/app.generated.ts --backend llvm \
         --ffi ffi/nativetron.ffi.json -o build/jsx-app
 
 `build.mjs` uses TypeScript's AST, checker, and printer while preserving type

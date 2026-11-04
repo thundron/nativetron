@@ -29,12 +29,12 @@ clang++ -std=c++17 -O2 -I "$WV_INC" -c "$ROOT/native/nativetron_core.cc" \
 echo "[2/3] renderer.ts -> build/renderer (native)"
 cd "$ROOT"
 CCC_OVERRIDE_OPTIONS="$LINK" \
-  node "$SCRIPTC" build app/renderer.ts --backend c \
+  node "$SCRIPTC" build app/renderer.ts --backend llvm \
     --ffi ffi/nativetron.ffi.json -o build/renderer
 
 echo "[3/3] main.ts -> build/main (native)"
 CCC_OVERRIDE_OPTIONS="$LINK" \
-  node "$SCRIPTC" build app/main.ts --backend c \
+  node "$SCRIPTC" build app/main.ts --backend llvm \
     --ffi ffi/associations.ffi.json -o build/main
 
 echo "OK -> $ROOT/build/main (spawns build/renderer)"
@@ -44,6 +44,6 @@ echo "OK -> $ROOT/build/main (spawns build/renderer)"
 # no FFI). Proves signals/effects work and matches the recorded expected output.
 # Not part of the default build. Run manually with:
 #
-#   node "$SCRIPTC" build framework/reactive.selftest.ts --backend c \
+#   node "$SCRIPTC" build framework/reactive.selftest.ts --backend llvm \
 #     -o build/reactive-selftest && ./build/reactive-selftest \
 #     | diff - framework/reactive.selftest.expected.txt && echo "reactive selftest OK"

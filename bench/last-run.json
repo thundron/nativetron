@@ -1,281 +1,281 @@
 {
-  "date": "2026-09-08T00:36:00.301Z",
+  "date": "2026-11-04T12:06:07.354Z",
   "rounds": {
     "warmup": 3,
     "startup": 15,
     "runtime": 5,
     "order": "alternating AB/BA"
   },
-  "electron": "44.0.0",
+  "electron": "42.11.18",
   "nativetron": {
-    "diskBytes": 573344,
+    "diskBytes": 1383344,
     "startup": {
-      "readyMedian": 229,
+      "readyMedian": 326,
       "ready": [
-        231,
-        230,
-        226,
-        217,
-        226,
-        229,
-        227,
-        222,
-        230,
-        231,
-        213,
-        229,
-        230,
-        234,
-        228
+        323,
+        318,
+        337,
+        326,
+        329,
+        326,
+        329,
+        319,
+        328,
+        323,
+        327,
+        318,
+        327,
+        302,
+        324
       ],
-      "wallMedian": 234,
+      "wallMedian": 331,
       "phases": {
         "main-entry": 3,
         "ipc-listening": 3,
-        "renderer-entry": 7,
-        "app-ready": 47,
-        "window-created": 63,
-        "browser-created": 95,
-        "webview-created": 98,
-        "ui-buffered": 98,
-        "run-enter": 98,
-        "host-ready": 165,
-        "ui-applied": 162,
-        "frame-one": 166,
-        "contentful-paint": 166
+        "renderer-entry": 8,
+        "app-ready": 63,
+        "window-created": 84,
+        "browser-created": 124,
+        "webview-created": 138,
+        "ui-buffered": 138,
+        "run-enter": 139,
+        "host-ready": 231,
+        "ui-applied": 229,
+        "frame-one": 233,
+        "contentful-paint": 232
       }
     },
     "runtime": {
-      "peakRSS": 79536,
-      "steadyRSS": 79536,
-      "serviceRSS": 77376,
-      "accountedRSS": 156992,
-      "peakCPU": 28.1,
-      "steadyCPU": 0.4,
+      "peakRSS": 103808,
+      "steadyRSS": 103808,
+      "serviceRSS": 72864,
+      "accountedRSS": 176512,
+      "peakCPU": 30.200000000000003,
+      "steadyCPU": 0.3,
       "processes": 2,
-      "footprint": 87328,
+      "footprint": 81745,
       "rows": [
         {
-          "pid": 90188,
-          "ppid": 84101,
+          "pid": 25309,
+          "ppid": 19613,
           "cpu": 0,
-          "rss": 1440,
+          "rss": 2688,
           "command": "/Users/thundron/Documents/development/axelerontech/nativetron/bench/desktop-app/build/main",
-          "footprint": 1088
+          "footprint": 2065
         },
         {
-          "pid": 90189,
-          "ppid": 90188,
-          "cpu": 0.4,
-          "rss": 78096,
+          "pid": 25310,
+          "ppid": 25309,
+          "cpu": 0.3,
+          "rss": 101024,
           "command": "/Users/thundron/Documents/development/axelerontech/nativetron/bench/desktop-app/build/renderer",
-          "footprint": 21504
+          "footprint": 28672
         },
         {
-          "pid": 90191,
+          "pid": 25311,
           "ppid": 1,
           "cpu": 0,
-          "rss": 32512,
+          "rss": 28976,
           "command": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
-          "footprint": 37888
+          "footprint": 22528
         },
         {
-          "pid": 90192,
+          "pid": 25312,
           "ppid": 1,
           "cpu": 0,
-          "rss": 29600,
+          "rss": 29456,
           "command": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
-          "footprint": 21504
+          "footprint": 22528
         },
         {
-          "pid": 90193,
+          "pid": 25314,
           "ppid": 1,
           "cpu": 0,
-          "rss": 15056,
+          "rss": 14272,
           "command": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
-          "footprint": 5344
+          "footprint": 5952
         }
       ],
       "trials": [
         {
-          "peakRSS": 80064,
-          "steadyRSS": 80064,
-          "serviceRSS": 77376,
-          "accountedRSS": 157440,
-          "peakCPU": 30.5,
-          "steadyCPU": 0.5,
+          "peakRSS": 105216,
+          "steadyRSS": 105216,
+          "serviceRSS": 73168,
+          "accountedRSS": 178384,
+          "peakCPU": 31.8,
+          "steadyCPU": 0.3,
           "processes": 2,
-          "footprint": 87297
+          "footprint": 83857
         },
         {
-          "peakRSS": 79536,
-          "steadyRSS": 79536,
-          "serviceRSS": 77168,
-          "accountedRSS": 156704,
-          "peakCPU": 25.6,
+          "peakRSS": 103808,
+          "steadyRSS": 103808,
+          "serviceRSS": 72704,
+          "accountedRSS": 176512,
+          "peakCPU": 30.200000000000003,
           "steadyCPU": 0.4,
           "processes": 2,
-          "footprint": 87328
+          "footprint": 81745
         },
         {
-          "peakRSS": 79136,
-          "steadyRSS": 79136,
-          "serviceRSS": 77488,
-          "accountedRSS": 156624,
-          "peakCPU": 28.1,
+          "peakRSS": 103376,
+          "steadyRSS": 103376,
+          "serviceRSS": 72976,
+          "accountedRSS": 176352,
+          "peakCPU": 34.1,
+          "steadyCPU": 0.3,
+          "processes": 2,
+          "footprint": 80849
+        },
+        {
+          "peakRSS": 103968,
+          "steadyRSS": 103968,
+          "serviceRSS": 72864,
+          "accountedRSS": 176832,
+          "peakCPU": 27.700000000000003,
           "steadyCPU": 0.4,
           "processes": 2,
-          "footprint": 87376
+          "footprint": 80897
         },
         {
-          "peakRSS": 79808,
-          "steadyRSS": 79808,
-          "serviceRSS": 77184,
-          "accountedRSS": 156992,
-          "peakCPU": 27.1,
-          "steadyCPU": 0.4,
+          "peakRSS": 103808,
+          "steadyRSS": 103808,
+          "serviceRSS": 72544,
+          "accountedRSS": 176352,
+          "peakCPU": 30.2,
+          "steadyCPU": 0.3,
           "processes": 2,
-          "footprint": 87344
-        },
-        {
-          "peakRSS": 79392,
-          "steadyRSS": 79392,
-          "serviceRSS": 77760,
-          "accountedRSS": 157152,
-          "peakCPU": 30.5,
-          "steadyCPU": 0.5,
-          "processes": 2,
-          "footprint": 87264
+          "footprint": 81841
         }
       ]
     }
   },
   "electronResult": {
-    "diskBytes": 300650496,
+    "diskBytes": 289021952,
     "startup": {
-      "readyMedian": 236,
+      "readyMedian": 295,
       "ready": [
-        237,
-        225,
-        237,
-        234,
-        236,
-        228,
-        238,
-        234,
-        237,
-        223,
-        229,
-        238,
-        226,
-        241,
-        244
+        302,
+        290,
+        294,
+        289,
+        303,
+        295,
+        304,
+        284,
+        302,
+        291,
+        303,
+        293,
+        304,
+        295,
+        295
       ],
-      "wallMedian": 311,
+      "wallMedian": 366,
       "phases": {
-        "main-entry": 82,
-        "app-ready": 104,
-        "window-created": 145,
-        "browser-created": 145,
-        "renderer-entry": 214,
-        "host-ready": 221,
-        "ui-applied": 221,
-        "frame-one": 227
+        "main-entry": 107,
+        "app-ready": 143,
+        "window-created": 214,
+        "browser-created": 214,
+        "renderer-entry": 273,
+        "host-ready": 281,
+        "ui-applied": 281,
+        "frame-one": 287
       }
     },
     "runtime": {
-      "peakRSS": 339184,
-      "steadyRSS": 335120,
+      "peakRSS": 374288,
+      "steadyRSS": 369664,
       "serviceRSS": 0,
-      "accountedRSS": 335120,
-      "peakCPU": 80,
+      "accountedRSS": 369664,
+      "peakCPU": 98.6,
       "steadyCPU": 0,
       "processes": 4,
-      "footprint": 126769,
+      "footprint": 95361,
       "rows": [
         {
-          "pid": 823,
-          "ppid": 84101,
+          "pid": 34656,
+          "ppid": 19613,
           "cpu": 0,
-          "rss": 136128,
+          "rss": 152128,
           "command": "/var/folders/q6/rmz2lkw969dbfsp22b7m3gv00000gn/T/nt-bench-electron/Electron.app/Contents/MacOS/Electron",
-          "footprint": 37888
+          "footprint": 44032
         },
         {
-          "pid": 824,
-          "ppid": 823,
+          "pid": 34657,
+          "ppid": 34656,
           "cpu": 0,
-          "rss": 77216,
+          "rss": 82272,
           "command": "/private/var/folders/q6/rmz2lkw969dbfsp22b7m3gv00000gn/T/nt-bench-electron/Electron.app/Contents/Frameworks/Electron Helper.app/Contents/MacOS/Electron Helper",
-          "footprint": 61440
+          "footprint": 25600
         },
         {
-          "pid": 825,
-          "ppid": 823,
+          "pid": 34658,
+          "ppid": 34656,
           "cpu": 0,
-          "rss": 37104,
+          "rss": 45296,
           "command": "/private/var/folders/q6/rmz2lkw969dbfsp22b7m3gv00000gn/T/nt-bench-electron/Electron.app/Contents/Frameworks/Electron Helper.app/Contents/MacOS/Electron Helper",
-          "footprint": 6961
+          "footprint": 7297
         },
         {
-          "pid": 826,
-          "ppid": 823,
+          "pid": 34660,
+          "ppid": 34656,
           "cpu": 0,
-          "rss": 83520,
+          "rss": 89792,
           "command": "/private/var/folders/q6/rmz2lkw969dbfsp22b7m3gv00000gn/T/nt-bench-electron/Electron.app/Contents/Frameworks/Electron Helper (Renderer).app/Contents/MacOS/Electron Helper (Renderer)",
-          "footprint": 20480
+          "footprint": 18432
         }
       ],
       "trials": [
         {
-          "peakRSS": 340368,
-          "steadyRSS": 336256,
+          "peakRSS": 374480,
+          "steadyRSS": 369888,
           "serviceRSS": 0,
-          "accountedRSS": 336256,
-          "peakCPU": 78.3,
+          "accountedRSS": 369888,
+          "peakCPU": 85.4,
           "steadyCPU": 0,
           "processes": 4,
-          "footprint": 121857
+          "footprint": 96353
         },
         {
-          "peakRSS": 341088,
-          "steadyRSS": 337648,
+          "peakRSS": 374496,
+          "steadyRSS": 369904,
           "serviceRSS": 0,
-          "accountedRSS": 337648,
-          "peakCPU": 83.39999999999999,
-          "steadyCPU": 0.4,
-          "processes": 4,
-          "footprint": 127073
-        },
-        {
-          "peakRSS": 339184,
-          "steadyRSS": 335120,
-          "serviceRSS": 0,
-          "accountedRSS": 335120,
-          "peakCPU": 80,
+          "accountedRSS": 369904,
+          "peakCPU": 101.2,
           "steadyCPU": 0,
           "processes": 4,
-          "footprint": 126737
+          "footprint": 95345
         },
         {
-          "peakRSS": 338608,
-          "steadyRSS": 334432,
+          "peakRSS": 373872,
+          "steadyRSS": 369440,
           "serviceRSS": 0,
-          "accountedRSS": 334432,
-          "peakCPU": 76.7,
+          "accountedRSS": 369440,
+          "peakCPU": 75.2,
           "steadyCPU": 0,
           "processes": 4,
-          "footprint": 131953
+          "footprint": 94353
         },
         {
-          "peakRSS": 338112,
-          "steadyRSS": 333984,
+          "peakRSS": 374288,
+          "steadyRSS": 369664,
           "serviceRSS": 0,
-          "accountedRSS": 333984,
-          "peakCPU": 87.1,
+          "accountedRSS": 369664,
+          "peakCPU": 98.6,
           "steadyCPU": 0,
           "processes": 4,
-          "footprint": 126769
+          "footprint": 99441
+        },
+        {
+          "peakRSS": 374240,
+          "steadyRSS": 369584,
+          "serviceRSS": 0,
+          "accountedRSS": 369584,
+          "peakCPU": 100.6,
+          "steadyCPU": 0,
+          "processes": 4,
+          "footprint": 95361
         }
       ]
     }
