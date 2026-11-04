@@ -1,0 +1,31 @@
+{
+  "profile_format": 1,
+  "name": "nt-bvh-f32-wide",
+  "entry": "f32-probe.ts",
+  "emission": "llvm",
+  "abi": {
+    "prefix": "f32p_",
+    "init_symbol": "f32p_init",
+    "sink_register_symbol": "f32p_sink",
+    "collect_symbol": "f32p_collect",
+    "result_reset_symbol": null
+  },
+  "exports": [
+    {
+      "export": "fill",
+      "symbol": "f32p_fill",
+      "params": [
+        "f64"
+      ],
+      "returns": "f64"
+    },
+    {
+      "export": "wide",
+      "symbol": "f32p_wide",
+      "params": [
+        "f64"
+      ],
+      "returns": "f64"
+    }
+  ]
+}

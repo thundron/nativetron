@@ -1,5 +1,6 @@
-// Adapted from house-planner/packages/render/src/gi/binned.ts; identical source runs under V8 and scriptc.
-// Float32 bounds/centroids/bin bounds exercise the renderer-facing typed-array lane.
+// Renderer-facing variant: algorithm-f64.ts with every Float64Array replaced by Float32Array, nothing else.
+// Do not edit below this header: run.mjs verifies that this body is exactly that mechanical substitution.
+// ---
 /**
  * Binned-SAH binary BVH over triangle bounds (one primitive per leaf), shared by the probe/path-tracer BVH
  * (gi/bvh.ts) and the compressed wide BVH (rt/wbvh). Typed arrays only; children always follow their parent in node

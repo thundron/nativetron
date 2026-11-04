@@ -15,6 +15,42 @@
       "export": "prepare",
       "symbol": "bvh_prepare",
       "params": [
+        "f64",
+        "f64"
+      ],
+      "returns": "f64"
+    },
+    {
+      "export": "reset",
+      "symbol": "bvh_reset",
+      "params": [
+        "f64"
+      ],
+      "returns": "f64"
+    },
+    {
+      "export": "release",
+      "symbol": "bvh_release",
+      "params": [
+        "f64",
+        "f64"
+      ],
+      "returns": "f64"
+    },
+    {
+      "export": "allocate",
+      "symbol": "bvh_allocate",
+      "params": [
+        "f64",
+        "f64"
+      ],
+      "returns": "f64"
+    },
+    {
+      "export": "bounds",
+      "symbol": "bvh_bounds",
+      "params": [
+        "f64",
         "f64"
       ],
       "returns": "f64"
@@ -22,25 +58,64 @@
     {
       "export": "build",
       "symbol": "bvh_build",
-      "params": [],
+      "params": [
+        "f64",
+        "f64"
+      ],
+      "returns": "f64"
+    },
+    {
+      "export": "deform",
+      "symbol": "bvh_deform",
+      "params": [
+        "f64",
+        "f64"
+      ],
       "returns": "f64"
     },
     {
       "export": "refit",
       "symbol": "bvh_refit",
-      "params": [],
+      "params": [
+        "f64",
+        "f64"
+      ],
       "returns": "f64"
     },
     {
-      "export": "checksum",
-      "symbol": "bvh_checksum",
-      "params": [],
+      "export": "topologyHash",
+      "symbol": "bvh_topologyHash",
+      "params": [
+        "f64",
+        "f64"
+      ],
+      "returns": "f64"
+    },
+    {
+      "export": "boundsHash",
+      "symbol": "bvh_boundsHash",
+      "params": [
+        "f64",
+        "f64"
+      ],
+      "returns": "f64"
+    },
+    {
+      "export": "inputHash",
+      "symbol": "bvh_inputHash",
+      "params": [
+        "f64",
+        "f64"
+      ],
       "returns": "f64"
     },
     {
       "export": "validate",
       "symbol": "bvh_validate",
-      "params": [],
+      "params": [
+        "f64",
+        "f64"
+      ],
       "returns": "f64"
     },
     {
@@ -50,12 +125,6 @@
         "f64",
         "f64"
       ],
-      "returns": "f64"
-    },
-    {
-      "export": "perturb",
-      "symbol": "bvh_perturb",
-      "params": [],
       "returns": "f64"
     }
   ]
