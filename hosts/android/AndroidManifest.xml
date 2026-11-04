@@ -1,7 +1,10 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="dev.nativetron.app">
-  <uses-sdk android:minSdkVersion="29" android:targetSdkVersion="35"/>
-  <application android:label="nativetron GPU" android:theme="@android:style/Theme.Material.Light" android:usesCleartextTraffic="false" android:allowBackup="false">
-    <activity android:name=".MainActivity" android:exported="true">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="dev.nativetron.app" android:versionCode="1" android:versionName="0.1">
+  <!-- No permissions, INTERNET included: the page is served from the APK bundle only. -->
+  <application android:label="nativetron GPU" android:theme="@android:style/Theme.Material.Light"
+      android:usesCleartextTraffic="false" android:allowBackup="false" android:hasCode="true"
+      android:extractNativeLibs="false" android:hasFragileUserData="false">
+    <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTask"
+        android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|uiMode|density|locale|layoutDirection|fontScale">
       <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
     </activity>
   </application>
