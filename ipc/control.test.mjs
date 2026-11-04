@@ -4,11 +4,12 @@ import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { dirname, resolve, join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
-import { encodeEngineMessage, ENGINE_EVENT, LANE_ENGINE, LANE_NATIVE } from "./engine.generated.mjs";
+import { encodeEngineMessage, ENGINE_EVENT, ENGINE_COMMAND, LANE_ENGINE, LANE_NATIVE } from "./engine.generated.mjs";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const env = { ...process.env }; delete env.SCRIPTC_TARGET;
 execFileSync("bash", [resolve(root, "ipc/build-control.sh")], { env, stdio: "inherit" });
 const frame = encodeEngineMessage(ENGINE_EVENT, LANE_ENGINE, LANE_NATIVE, 42, 7, new Uint8Array([0, 255, 19]));
+const request = encodeEngineMessage(ENGINE_COMMAND, LANE_NATIVE, LANE_ENGINE, 43981, 7, new Uint8Array([0, 255, 19]));
 const temp = mkdtempSync(join(tmpdir(), "nt-control-"));
 try {
   const source = `#include ${JSON.stringify(resolve(root, "ipc/control.generated.h"))}
@@ -28,7 +29,7 @@ int main(){
   const uint8_t payload[]={0,255,19};
   assert(nt_control_command(7,payload,sizeof(payload))==0); assert(sends==1); assert(sent.size()==19);
   assert(nt_control_receive(sent.data(),sent.size())==1);assert(receives==0);
-  auto outbound=sent; assert(nt_control_send(outbound.data(),outbound.size())==0); assert(sends==2);
+  const uint8_t outbound[]={${[...request].join(",")}}; assert(nt_control_send(outbound,sizeof(outbound))==0); assert(sends==2); assert(sent==std::vector<uint8_t>(outbound,outbound+sizeof(outbound)));
   const uint8_t incoming[]={${[...frame].join(",")}};
   assert(nt_control_receive(incoming,sizeof(incoming))==0);assert(receives==1);
   assert(received==std::vector<uint8_t>(incoming,incoming+sizeof(incoming)));
