@@ -19,6 +19,7 @@
   "sourceDirectories": [
     "app",
     "engine",
-    "framework"
+    "framework",
+    "commands"
   ]
 }

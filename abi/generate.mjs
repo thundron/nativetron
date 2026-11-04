@@ -175,6 +175,14 @@ const targets = [
     },
   },
   {
+    path: join(here, "..", "framework", "components.fixture.ts"),
+    render: (previous) => generatedRegion(previous, "event-export", renderEventExport(events)),
+  },
+  {
+    path: join(here, "..", "framework", "components-profile.json"),
+    render: (previous) => updateEventProfile(events, previous),
+  },
+  {
     path: join(here, "..", "engine", "ui.ts"),
     render: (previous) => generatedRegion(previous, "event-export", renderEventExport(events)),
   },
