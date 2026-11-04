@@ -1,7 +1,7 @@
 {
   "format": 2,
   "nativeMessage": {
-    "version": 1,
+    "version": 2,
     "kind": "event"
   },
   "primaryField": "value",
@@ -63,6 +63,13 @@
       "source": "eventInputType",
       "maximum": 32,
       "default": ""
+    },
+    {
+      "name": "scrollTop",
+      "type": "boundedNumber",
+      "source": "targetScrollTop",
+      "maximum": 1073741824,
+      "default": 0
     }
   ],
   "safeEvents": [
@@ -75,6 +82,7 @@
     "blur",
     "submit",
     "pointerdown",
-    "pointerup"
+    "pointerup",
+    "scroll"
   ]
 }

@@ -8,6 +8,13 @@ const RESERVED_MESSAGE_FIELDS = new Set(["version", "kind", "slot"]);
 const DISPATCH_SEMANTICS = ["default", "primary", "rich"];
 
 const FIELD_KINDS = {
+  boundedNumber: {
+    keys: ["name", "type", "source", "maximum", "default"],
+    valid(field) {
+      return Number.isFinite(field.maximum) && field.maximum > 0 && field.maximum <= Number.MAX_SAFE_INTEGER &&
+        Number.isFinite(field.default) && field.default >= 0 && field.default <= field.maximum;
+    },
+  },
   string: {
     keys: ["name", "type", "source", "maximum", "default"],
     valid(field) {
@@ -31,6 +38,7 @@ const FIELD_KINDS = {
 };
 
 const SOURCE_KINDS = {
+  targetScrollTop: "boundedNumber",
   targetValue: "string",
   targetChecked: "triBoolean",
   eventKey: "string",

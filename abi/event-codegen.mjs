@@ -2,6 +2,15 @@ const upperSnake = (value) => value.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toUpp
 const lowerSnake = (value) => value.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
 
 const FIELD_TYPES = {
+  boundedNumber: {
+    ts: "number", profile: "f64",
+    output(field) { return `${field.name}?: number;`; },
+    guestCheck(field) { return `!Number.isFinite(${field.name}) || ${field.name} < 0 || ${field.name} > ${field.maximum}`; },
+    callbackCheck(field) { return `typeof ${field.name} !== "number" || !Number.isFinite(${field.name}) || ${field.name} < 0 || ${field.name} > ${field.maximum}`; },
+    messageCheck(field) { return `typeof message.${field.name} !== "number" || !Number.isFinite(message.${field.name}) || message.${field.name} < 0 || message.${field.name} > ${field.maximum}`; },
+    assignment(field) { return [`  if (${field.name} !== 0) out.${field.name} = ${field.name};`]; },
+    bound(field) { return `finite number 0–${field.maximum}; default \`${field.default}\``; },
+  },
   string: {
     ts: "string",
     profile: "string",
@@ -54,6 +63,7 @@ const FIELD_TYPES = {
 };
 
 const HOST_SOURCES = {
+  targetScrollTop: (field) => `ev && ev.type === "scroll" && target && Number.isFinite(target.scrollTop) ? Math.max(0, Math.min(${field.maximum}, target.scrollTop)) : 0`,
   targetValue: (field) => `target && "value" in target ? boundedText(target.value, EVENT_${upperSnake(field.name)}_LIMIT) : ""`,
   targetChecked: () => "target && typeof target.checked === \"boolean\" ? (target.checked ? 1 : 0) : -1",
   eventKey: (field) => `ev && typeof ev.key === "string" ? boundedText(ev.key, EVENT_${upperSnake(field.name)}_LIMIT) : ""`,
@@ -156,7 +166,7 @@ export function eventTierTable(schema) {
 
 export function hostEventConstants(schema) {
   const limits = schema.fields
-    .filter((field) => field.type === "string")
+    .filter((field) => field.maximum !== undefined)
     .map((field) => `  var EVENT_${upperSnake(field.name)}_LIMIT = ${field.maximum};`);
   const safe = schema.safeEvents.map((name) => `${name}: 1`).join(", ");
   return [...limits, `  var SAFE_EVENTS = { ${safe} };`].join("\n");
@@ -220,7 +230,7 @@ function decoder(schema, tier) {
 
 export function eventTypeScriptModule(schema) {
   const constants = schema.fields
-    .filter((field) => field.type === "string")
+    .filter((field) => field.maximum !== undefined)
     .map((field) => `export const EVENT_${upperSnake(field.name)}_LIMIT = ${field.maximum};`)
     .join("\n");
   const outputFields = schema.fields.map((field) => `  ${FIELD_TYPES[field.type].output(field, schema.primaryField)}`).join("\n");
@@ -240,7 +250,7 @@ export function eventTypeScriptModule(schema) {
 
 export function nativeEventTypeScriptModule(schema) {
   const constants = schema.fields
-    .filter((field) => field.type === "string")
+    .filter((field) => field.maximum !== undefined)
     .map((field) => `const EVENT_${upperSnake(field.name)}_LIMIT = ${field.maximum};`)
     .join("\n");
   const messageFields = schema.fields.map((field) => `  ${field.name}: ${tsType(field)};`).join("\n");

@@ -24,8 +24,10 @@
   var EVENT_VALUE_LIMIT = 4096;
   var EVENT_KEY_LIMIT = 64;
   var EVENT_CODE_LIMIT = 64;
+  var EVENT_MODIFIERS_LIMIT = 15;
   var EVENT_INPUT_TYPE_LIMIT = 32;
-  var SAFE_EVENTS = { click: 1, input: 1, change: 1, keydown: 1, keyup: 1, focus: 1, blur: 1, submit: 1, pointerdown: 1, pointerup: 1 };
+  var EVENT_SCROLL_TOP_LIMIT = 1073741824;
+  var SAFE_EVENTS = { click: 1, input: 1, change: 1, keydown: 1, keyup: 1, focus: 1, blur: 1, submit: 1, pointerdown: 1, pointerup: 1, scroll: 1 };
 /* /generated:event-constants */
   var SAFE_PROPERTIES = {
     value: "string", checked: "boolean", disabled: "boolean",
@@ -112,9 +114,10 @@
     var code = ev && typeof ev.code === "string" ? boundedText(ev.code, EVENT_CODE_LIMIT) : "";
     var modifiers = ev ? (ev.altKey ? 1 : 0) | (ev.ctrlKey ? 2 : 0) | (ev.metaKey ? 4 : 0) | (ev.shiftKey ? 8 : 0) : 0;
     var inputType = ev && typeof ev.inputType === "string" ? boundedText(ev.inputType, EVENT_INPUT_TYPE_LIMIT) : "";
-    if (value === "" && checked === -1 && key === "" && code === "" && modifiers === 0 && inputType === "") { window.__nt_event(slot); return; }
-    if (checked === -1 && key === "" && code === "" && modifiers === 0 && inputType === "") { window.__nt_event_value(slot, value); return; }
-    window.__nt_event_rich(slot, value, checked, key, code, modifiers, inputType);
+    var scrollTop = ev && ev.type === "scroll" && target && Number.isFinite(target.scrollTop) ? Math.max(0, Math.min(1073741824, target.scrollTop)) : 0;
+    if (value === "" && checked === -1 && key === "" && code === "" && modifiers === 0 && inputType === "" && scrollTop === 0) { window.__nt_event(slot); return; }
+    if (checked === -1 && key === "" && code === "" && modifiers === 0 && inputType === "" && scrollTop === 0) { window.__nt_event_value(slot, value); return; }
+    window.__nt_event_rich(slot, value, checked, key, code, modifiers, inputType, scrollTop);
 /* /generated:event-projection */
   }
 

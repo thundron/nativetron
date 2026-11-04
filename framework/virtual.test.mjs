@@ -1,0 +1,10 @@
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { mkdirSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+const root = fileURLToPath(new URL("../", import.meta.url));
+const output = fileURLToPath(new URL("../build/virtual-selftest", import.meta.url));
+mkdirSync(new URL("../build/", import.meta.url), { recursive: true });
+execFileSync(process.execPath, [fileURLToPath(new URL("../../../scriptc/packages/cli/dist/main.js", import.meta.url)), "build", "framework/virtual.selftest.ts", "--backend", "llvm", "-o", output], { cwd: root, stdio: "inherit" });
+assert.equal(execFileSync(output, { encoding: "utf8" }), "4997/5013/119928/119688\n0/0\n0/5\ninvalid height refused\ninvalid offset refused\n");
+console.log("virtual range: compiled geometry, empty/shrunk collections and invalid inputs passed");

@@ -54,7 +54,8 @@
         "string",
         "string",
         "f64",
-        "string"
+        "string",
+        "f64"
       ],
       "returns": "f64"
     }

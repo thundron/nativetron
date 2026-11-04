@@ -65,7 +65,7 @@ UTF-8 bytes. Text content is inline; names are interned.
 LISTEN carries a callback slot.
 
 <!-- generated:events -->
-Schema format 2; native event message version 1, kind `event`.
+Schema format 2; native event message version 2, kind `event`.
 
 Browser dispatch is selected by generated default-value semantics:
 
@@ -73,7 +73,7 @@ Browser dispatch is selected by generated default-value semantics:
 |---|---|---|---|
 | default | `__nt_event` | `onEvent` | — |
 | primary | `__nt_event_value` | `onEventValue` | value |
-| rich | `__nt_event_rich` | `onEventRich` | value, checked, key, code, modifiers, inputType |
+| rich | `__nt_event_rich` | `onEventRich` | value, checked, key, code, modifiers, inputType, scrollTop |
 
 The rich tier has this generated field contract:
 
@@ -86,6 +86,7 @@ The rich tier has this generated field contract:
 | 4 | code | string | at most 64 UTF-16 code units; default `` |
 | 5 | modifiers | modifierBits | integer bitset 0–15; default `0` |
 | 6 | inputType | string | at most 32 UTF-16 code units; default `` |
+| 7 | scrollTop | boundedNumber | finite number 0–1073741824; default `0` |
 
 The callback shapes, tier selection, host projection, guest decoders/exports, native bridge, browser binders, bounds, and event allowlist are generated from `abi/events.json`.
 <!-- /generated:events -->
