@@ -1,0 +1,8 @@
+{
+  "commands.title": "Commands",
+  "commands.search": "Search commands",
+  "commands.empty": "No enabled commands",
+  "commands.close": "Close",
+  "items.count": "{count, plural, =0 {No items} one {# item} other {# items}}",
+  "greeting": "Hello, {name}"
+}
