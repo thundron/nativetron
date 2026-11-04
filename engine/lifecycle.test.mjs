@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createEngine, startEngine, watchViewport, ENGINE_STARTUP_QUEUE_LIMIT, ENGINE_CONTROL_QUEUE_LIMIT } from "./host.js";
-import { createOutbound, createRateWindow, prepareReactor, wasmExportNames, ENGINE_OUTBOUND_LIMIT } from "./reactor.js";
+import { createOutbound, createRateWindow, instantiateReactor, prepareReactor, wasmExportNames, ENGINE_OUTBOUND_LIMIT } from "./reactor.js";
 import { decodeEngineMessage, ENGINE_MAX_RATE, LANE_NATIVE, LANE_UI } from "../ipc/engine.generated.mjs";
-import { baseOptions, bridgedWorkerClass, fakeCanvas, fakeDocument, fixtureLog, fixtureWasm, glue, manualClock, native, pageScope, scriptedWorkerClass, settle, ui, wasmUrl } from "./fixtures/harness.mjs";
+import { baseOptions, bridgedWorkerClass, fakeCanvas, fakeDocument, fakeGpu, fixtureLog, fixtureWasm, glue, manualClock, native, pageScope, scriptedWorkerClass, settle, ui, wasmUrl } from "./fixtures/harness.mjs";
 
 const callsOf = (id) => fixtureLog().calls.filter((call) => call.id === id);
 const lastInstance = () => fixtureLog().instances;
@@ -143,7 +143,10 @@ test("engine trap discards the instance; explicit restart creates a fresh instan
   assert.match(lane.failure.message, /trap: message/);
   assert.ok(reports.some((line) => line.startsWith("ENGINE_FAILED")));
   assert.equal(lane.trySend(ui(1)).code, "failed");
-  assert.equal(first.host.apply(new Uint8Array(0), new Uint8Array(0), new Uint8Array(0)), false, "failed instance kept its GPU host");
+  assert.deepEqual(options.scope.leaks(), { windowListeners: 0, media: 0, observers: 0, frames: 0 }, "failed instance kept its GPU host watchers");
+  const memory = first.api.__memory();
+  assert.equal(first.host.apply(new Uint8Array(memory, 0, 1), new Uint8Array(memory, 8, 0), new Uint8Array(memory, 8, 0)), false);
+  assert.equal(first.host.stats.batches, 0, "failed instance's GPU host still accepts batches");
   const result = await lane.restart({ reason: "test" });
   assert.equal(result.ok, true);
   assert.equal(result.mode, "main");
@@ -518,7 +521,11 @@ test("viewport watcher stays single-armed across DPR changes and leaves nothing 
   scope.dispatch("resize"); scope.dispatch("resize");
   assert.equal(scope.leaks().frames, 1, "window resize was not coalesced");
   scope.runFrames();
+  const unchanged = sizes.length;
+  scope.resizeObservers(); scope.resizeObservers();
+  assert.equal(sizes.length, unchanged, "unchanged size was re-sent");
   canvas.clientWidth = 100; scope.resizeObservers();
+  assert.equal(sizes.length, unchanged + 1);
   scope.dispatch("resize");
   watcher.dispose();
   assert.deepEqual(scope.leaks(), { windowListeners: 0, media: 0, observers: 0, frames: 0 });
@@ -594,4 +601,64 @@ test("consumer callback exceptions are reported and never propagate into the eng
   assert.equal(messagesOf(lastInstance()).length, 2);
   assert.equal(reports.filter((line) => line === "ENGINE_CALLBACK_ERROR ui consumer broke").length, 1, "callback errors were not reported once per second");
   await lane.dispose();
+});
+
+test("reactor instance failure disposes its own GPU host and refuses further input (worker path)", async () => {
+  const scope = pageScope();
+  const failures = [];
+  const prepared = await prepareReactor({ moduleUrl: glue(), wasmUrl: wasmUrl(), prefix: "fx_" });
+  const reactor = await instantiateReactor(prepared, { canvas: fakeCanvas(), scope, report() {}, onFailure: (error) => failures.push(error) });
+  assert.equal(scope.leaks().observers, 1);
+  reactor.receive(ui(3));
+  assert.equal(failures.length, 0, "failure reported synchronously");
+  await settle();
+  assert.equal(failures.length, 1);
+  assert.equal(reactor.failed.code, "engine-failed");
+  assert.deepEqual(scope.leaks(), { windowListeners: 0, media: 0, observers: 0, frames: 0 });
+  assert.throws(() => reactor.receive(ui(1)), { code: "failed" });
+  const memory = reactor.api.__memory();
+  assert.equal(reactor.host.apply(new Uint8Array(memory, 0, 1), new Uint8Array(memory, 8, 0), new Uint8Array(memory, 8, 0)), false);
+  assert.equal(reactor.host.stats.batches, 0);
+  const again = await instantiateReactor(prepared, { canvas: fakeCanvas(), scope, report() {} });
+  assert.notEqual(again.host.handles, reactor.host.handles);
+  again.dispose(); reactor.dispose();
+});
+
+test("GPU host frame callbacks cannot reenter an active export; device loss restarts onto a new device", async () => {
+  const log = fixtureLog();
+  const gpu = fakeGpu();
+  const scope = pageScope({ navigator: { gpu } });
+  const { options, lifecycle } = baseOptions({ moduleUrl: glue("gpu"), scope });
+  const lane = await startEngine(options);
+  await settle();
+  const id = lastInstance();
+  assert.equal(gpu.devices.length, 1);
+  assert.equal(lane.gpu?.available, true);
+  assert.ok(callsOf(id).some((call) => call.name === "event" && call.args[0] === 1 && call.args[3] === 0), "capability event not delivered");
+  lane.send(ui(10));
+  await settle();
+  assert.equal(scope.leaks().frames, 1, "GPU host did not request a frame");
+  log.hooks.during = () => scope.runFrames();
+  try { lane.send(ui(6)); await settle(); } finally { log.hooks.during = undefined; }
+  assert.equal(log.calls.some((call) => call.name === "REENTERED"), false, "frame export ran inside the message export");
+  assert.equal(callsOf(id).some((call) => call.name === "frame"), false);
+  const rejected = callsOf(id).find((call) => call.name === "event" && call.args[0] === 9);
+  assert.match(rejected?.args[5] ?? "", /engine reactor reentry rejected \(frame\)/);
+  assert.equal(lane.state, "ready", "a rejected reentry must not discard the active instance");
+
+  const old = lane.reactor.host;
+  gpu.devices[0].lose();
+  await settle();
+  assert.equal(lane.state, "lost");
+  assert.ok(lifecycle.some((event) => event.state === "lost" && event.code === "device-lost"));
+  const result = await lane.restart({ reason: "device lost" });
+  await settle();
+  assert.equal(result.ok, true);
+  assert.equal(gpu.devices.length, 2);
+  assert.notEqual(lane.reactor.host, old);
+  assert.equal(old.device, null);
+  assert.equal(lane.reactor.host.device, gpu.devices[1]);
+  await lane.dispose();
+  assert.equal(gpu.devices[1].destroyed, true, "disposed lane kept its device");
+  assert.deepEqual(scope.leaks(), { windowListeners: 0, media: 0, observers: 0, frames: 0 });
 });

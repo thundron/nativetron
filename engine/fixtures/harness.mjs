@@ -184,3 +184,22 @@ export function baseOptions(extra = {}) {
   };
   return { options, reports, toUi, toNative, lifecycle, events };
 }
+
+// Minimal WebGPU double for the GPU host: devices can be lost on demand and record destruction.
+export function fakeGpu() {
+  const devices = [];
+  return {
+    devices,
+    getPreferredCanvasFormat: () => "bgra8unorm",
+    requestAdapter: async () => ({
+      features: new Set(),
+      requestDevice: async () => {
+        let lose;
+        const device = { features: new Set(), limits: { maxBufferSize: 256 }, destroyed: false, queue: {}, lost: new Promise((done) => { lose = done; }),
+          lose: (reason = "unknown") => lose({ reason, message: "fake device loss" }), destroy() { device.destroyed = true; }, addEventListener() {} };
+        devices.push(device);
+        return device;
+      },
+    }),
+  };
+}

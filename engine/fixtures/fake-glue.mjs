@@ -18,6 +18,12 @@ export async function instantiateFromBytes(bytes, host) {
     if (depth > 1) log.calls.push({ id, name: "REENTERED", depth });
   };
   const leave = (name) => { log.calls.push({ id, name: name + ":exit" }); depth--; };
+  // Raw GPU batches in reactor memory, as compiled code would emit them: opcode 1 requestDevice, opcode 47 requestFrame.
+  const present = (bytes) => {
+    new Uint8Array(memory.buffer, 0, bytes.length).set(bytes);
+    host.gpuPresent(new Uint8Array(memory.buffer, 0, bytes.length), new Uint8Array(memory.buffer, 1024, 0), new Uint8Array(memory.buffer, 2048, 0));
+  };
+  const requestDevice = () => { const bytes = new Uint8Array(21); const view = new DataView(bytes.buffer); bytes[0] = 1; view.setUint32(1, 1, true); view.setUint32(5, 0, true); view.setUint32(9, 0, true); view.setFloat64(13, 0, true); present(bytes); };
   const frame = (target, topic, payload) => encodeEngineMessage(ENGINE_RESULT, LANE_ENGINE, target, topic, topic, payload);
   return {
     __memory: () => memory.buffer,
@@ -26,6 +32,7 @@ export async function instantiateFromBytes(bytes, host) {
       try {
         if (mode === "trap-start") throw new Error("trap: start");
         if (mode === "panic-start") host.panic("fixture panic");
+        if (mode === "gpu") requestDevice();
         host.gpuReport(`FIXTURE_STARTED ${id}`);
       } finally { leave("start"); }
       return 0;
@@ -43,6 +50,7 @@ export async function instantiateFromBytes(bytes, host) {
         else if (topic === 6) log.hooks.during?.(id);
         else if (topic === 7) host.gpuReport("x".repeat(70000));
         else if (topic === 8) host.panic("message panic");
+        else if (topic === 10) present(new Uint8Array([47]));
       } finally { leave("message"); }
       return 0;
     },
