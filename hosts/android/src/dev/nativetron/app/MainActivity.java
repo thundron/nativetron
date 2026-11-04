@@ -236,6 +236,7 @@ public final class MainActivity extends Activity implements NativeControl.Listen
     if (!pageReady) {
       // The first engine→native frame proves __nt_engine_receive exists.
       pageReady = true;
+      if (selftest) web.evaluateJavascript(AssetProbe.SCRIPT, null);
       while (!pageQueue.isEmpty()) deliver(pageQueue.poll());
     }
     if (frame[1] != 5) { Log.i("nt-engine", "FRAME kind=" + frame[1]); return; }
@@ -248,8 +249,9 @@ public final class MainActivity extends Activity implements NativeControl.Listen
       main.postDelayed(() -> { if (!destroyed) control.command(TOPIC_CHANGE_COLOUR, new byte[0]); }, 250);
     } else if (text.equals("GPU_COLOUR_CHANGED") && selftestCommandSent) {
       finishSelftest("NT_ANDROID_OK");
-    } else if (text.startsWith("GPU_UNAVAILABLE") || text.startsWith("GPU_ERROR") || text.equals("GPU_READBACK_FAILED")) {
-      finishSelftest("NT_ANDROID_UNAVAILABLE " + text);
+    } else {
+      String failure = SelftestResult.failure(text);
+      if (failure != null) finishSelftest(failure);
     }
   }
 

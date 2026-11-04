@@ -14,6 +14,9 @@ public final class AssetPolicyTest {
     "ipc/engine.generated.mjs", "style/app.css", "data/table.json", "secret.bin"));
 
   public static void main(String[] args) {
+    check(SelftestResult.failure("GPU_UNAVAILABLE no adapter").startsWith("NT_ANDROID_UNAVAILABLE"), "only unavailability is blocked");
+    for (String error : new String[] { "GPU_ERROR bad shader", "GPU_ERROR device lost", "GPU_READBACK_FAILED" }) check(SelftestResult.failure(error).startsWith("NT_ANDROID_GPU_FAILED"), "GPU errors fail acceptance");
+    check(SelftestResult.failure("GPU_READBACK_OK 4096") == null, "successful reports are not failures");
     AssetPolicy.Decision page = get("/engine/page.html");
     check(page.status == 200 && "text/html".equals(page.mime) && page.body && "engine/page.html".equals(page.asset), "entry page");
     check("application/wasm".equals(get("/engine/.scriptc/ui.wasm").mime), "wasm MIME");

@@ -56,14 +56,14 @@ wait_for() {
   local deadline=$((SECONDS + TIMEOUT))
   while (( SECONDS < deadline )); do
     (( $(count "$1") >= $2 )) && return 0
-    (( $(count 'FATAL EXCEPTION|Fatal signal|NT_CONTROL_PANIC') == 0 )) || return 1
+    (( $(count 'FATAL EXCEPTION|Fatal signal|NT_CONTROL_PANIC|NT_ANDROID_ASSET_FAIL') == 0 )) || return 1
     sleep 0.5
   done
   return 1
 }
 fail() { echo "FAIL: $*" | tee -a "$OUT/summary.txt"; exit 1; }
 : > "$OUT/summary.txt"
-TERMINAL='NT_ANDROID_(OK|UNAVAILABLE|TIMEOUT|CONTROL_FAILED|RENDERER_FAILED)'
+TERMINAL='NT_ANDROID_(OK|UNAVAILABLE|TIMEOUT|CONTROL_FAILED|RENDERER_FAILED|GPU_FAILED)'
 
 # 1. cold launch selftest
 adb shell am start -W -n "$ACTIVITY" --ez nt.selftest true >/dev/null
@@ -73,6 +73,9 @@ RESULT="$(grep -oE "$TERMINAL.*" "$LOG" | head -1 | tr -d '\r')"
 echo "selftest: $RESULT" | tee -a "$OUT/summary.txt"
 case "$RESULT" in NT_ANDROID_OK*) GPU=1 ;; NT_ANDROID_UNAVAILABLE*) GPU=0 ;; *) fail "$RESULT" ;; esac
 (( $(count 'NT_ANDROID_COMMAND_SENT 1') >= GPU )) || fail "native command frame never reached the page"
+
+wait_for 'NT_ANDROID_ASSET_OK' 1 || fail "real WebView asset/MIME/offline probe failed"
+echo "assets: MIME, isolation headers and offline refusals verified" | tee -a "$OUT/summary.txt"
 
 # 2. background and resume
 adb shell input keyevent KEYCODE_HOME
@@ -102,6 +105,7 @@ wait_for "$TERMINAL" 2 || fail "no relaunch selftest marker"
 SECOND="$(grep -oE "$TERMINAL.*" "$LOG" | sed -n 2p | tr -d '\r')"
 echo "relaunch: $SECOND" | tee -a "$OUT/summary.txt"
 [[ "$SECOND" == "${RESULT%% *}"* ]] || fail "relaunch result differs: $SECOND"
+wait_for 'NT_ANDROID_ASSET_OK' 2 || fail "relaunch asset probe did not pass"
 adb shell am start -n "$ACTIVITY" --ez nt.finish true >/dev/null
 wait_for 'NT_ANDROID_DISPOSED' 2 || fail "relaunched activity was not disposed"
 
