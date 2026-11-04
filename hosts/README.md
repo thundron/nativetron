@@ -1,37 +1,40 @@
 # Platform hosts
 
-Offline shells use the same packaged in-page UI and GPU engine reactors. They contain no native GPU implementation and no renderer dependency. Platform build scripts consume the single allowlisted `build/engine-assets` bundle.
-
-Host implementation and device verification are tracked per platform; a successful cross-build is not evidence of WebGPU execution.
+Offline shells run independently compiled UI and GPU engine wasm **inside the page**. Native code never runs the GPU engine or carries geometry/per-frame GPU commands. All hosts consume the single generated `engine/assets.json` allowlist and packaged `build/engine-assets` bundle, with correct JavaScript/wasm MIME, bounded generated control IPC and external-navigation/resource refusal. Packaging records sizes and SHA-256 hashes. A successful cross-build is not execution evidence.
 
 ## iOS
 
-`hosts/ios/build.sh sim` builds with XcodeGen, installs and launches on an available iOS 18.6 simulator. `NT_IOS_SIMULATOR` selects a simulator explicitly. The script refuses iOS 26 simulators on macOS 27 because of their WebContent JIT PAC crash. Device builds require `NT_IOS_TEAM` and `NT_IOS_DEVICE`; the two prohibited GEWISS teams are rejected before any build or signing action.
+See [build and acceptance instructions](ios/README.md). UIKit/WKWebView serves `app://local` through a streaming scheme handler, with allowlisted regular files, MIME, COOP/COEP/nosniff, traversal/symlink refusals and cancelled-task ownership. The **actual scriptc static control archive** is linked into both simulator and device builds; the Swift adapter copies read-only callbacks, queues delivery outside the callback, and owns collection/disposal on one thread. No outbound library FFI, promises or timers.
 
-WKWebView serves `app://local` through WKURLSchemeHandler with JavaScript/wasm MIME types and COOP/COEP headers. The platform message handler validates the generated binary envelope and logs engine reports; console and uncaught JavaScript failures go to the device log. Navigation stays within the bundle origin. A weak message-handler proxy avoids a controller/WebView retain cycle.
+```sh
+hosts/ios/test.sh                     # both SDK typechecks and real compiled-library harness
+hosts/ios/accept.sh sim               # iOS 18.6 simulator: assets, control, lifecycle and teardown
+hosts/ios/build.sh device-compile     # unsigned iphoneos compile/link; not installable
+```
 
-Verified: built, installed and launched on the iOS 18.6 simulator under macOS 27.0.1. Device logs show `ENGINE_MODE main (worker WebGPU, OffscreenCanvas or rAF absent)` and `GPU_UNAVAILABLE navigator.gpu unavailable`. No physical iOS 26 device was available; iOS WebGPU rendering is untested.
+Physical builds require an authorised own `NT_IOS_TEAM` and explicit `NT_IOS_DEVICE`. Prohibited identities are rejected before any toolchain action. On macOS 27 the selector refuses the crashing iOS 26 simulator; use physical iOS 26 for WebGPU or iOS 18.6 for honest unavailable-GPU fallback evidence. The current simulator passes two page/control cycles, real asset-response probes, background/foreground and release; `navigator.gpu` is absent. COOP/COEP response headers do not make its custom origin cross-origin isolated. **Physical iOS 26 GPU execution remains unverified.**
 
 ## Android
 
-`hosts/android/build.sh` uses aapt2, javac, d8, zipalign and apksigner, not Gradle. `--install` installs and launches through adb. The debug signing key is separate from Apple identities and is not a release signing configuration.
+See [build and acceptance instructions](android/README.md). Bare SDK/NDK tooling (no Gradle) packages a real scriptc Android control archive behind JNI. The Java/C adapters use bounded copied queues and one library-owner thread, validate full frames, and close/reopen safely. Virtual HTTPS assets are intercepted offline; file/content access, permissions, external navigation and network loads are refused. The APK requests no permissions. Readback data stays in the in-page engine.
 
-The WebView serves bundled assets on `https://appassets.androidplatform.net`, intercepts non-bundle requests with an offline response, disables file/content access and mixed content, and declares no INTERNET permission (indeed no permissions). The generated Java message bridge validates control frames. The native options menu sends the same change-colour command as desktop. Console output goes to logcat; WebView inspection is opt-in via the activity's `debug` intent extra.
+```sh
+hosts/android/test.sh
+hosts/android/build.sh               # production-style signed APK, no test intents/inspection
+hosts/android/build.sh --debuggable
+NT_ANDROID_SERIAL=<serial> hosts/android/run.sh
+```
 
-Verified: signed APK builds with Android SDK platform 35/build tools 37.0.0; apksigner verification passes and aapt2 reports no requested permissions. No Android device is connected; runtime, worker and WebGPU behaviour are untested here. The house-planner S24 proof of concept is not nativetron acceptance evidence.
+The runner never chooses a device or starts an emulator implicitly. An explicitly selected emulator also requires `NT_ANDROID_ALLOW_EMULATOR=1`. It tests native command delivery, pause/resume, disposal/reopen and real WebView MIME/headers/offline probes. GPU errors fail; only unavailable WebGPU yields host-only exit 3. The Android 36 arm64 16-KiB-page emulator with WebView 156.0.8078.47 passes host/control/assets/lifecycle but has **no WebGPU adapter**. This is not physical-device GPU evidence. A physical Android device remains unavailable.
 
 ## Windows
 
-`WEBVIEW2_SDK=/path/to/extracted/sdk hosts/windows/build.sh` cross-builds with Zig's MinGW toolchain. Tested with Microsoft.Web.WebView2 SDK 1.0.4314.35 and Zig 0.17.0. The SDK is build input only and is not vendored; webview/webview loads the installed WebView2 runtime. A small EventToken header supplies the documented 64-bit WinRT ABI declaration absent from Zig's MinGW headers.
+See [WebView2 build and acceptance instructions](windows/README.md). `WEBVIEW2_SDK=/path/to/sdk hosts/windows/build.sh --check` cross-links an x64 PE using Zig and the SDK as build input only. No WebView2Loader DLL, renderer or GPU runtime is shipped.
 
-Place `engine-windows.exe` alongside `engine-assets/`, both produced under `build/`. The host maps the asset directory to a virtual HTTPS origin, uses WebView2's MIME handling, rejects external resource requests, and installs a native colour-change menu. `engine-windows.exe --selftest` waits for real readback and native-menu completion, returning failure on timeout. No extra WebView2Loader DLL or GPU runtime is shipped. Optional COOP/COEP header injection is not implemented for the Windows virtual-host mapping.
+The host serves `https://nativetron.localhost/` directly from WebResourceRequested for page/worker requests, rather than virtual-folder mapping. Generated allowlists, link/real-path checks, MIME, optional COOP/COEP, CSP and offline interception are enforced. Native menu commands preserve the generated envelope. Window DPI/minimise, renderer recovery, event-token teardown and bounded self-test exit codes are implemented. Cmd/Ctrl+R changes colour; Cmd/Ctrl+K remains available to the command palette.
 
-Verified: cross-link produces an x86-64 PE32+ executable. There is no Windows machine or Wine installation; launch, MIME behaviour, native menu, worker support and GPU acceptance remain untested. A cross-build is not claimed as a running Windows demo.
+Portable policy/runner/PE checks and the cross-build pass on the integration Mac. **Windows runtime execution remains blocked**: no Windows machine/VM/Wine is available. Run `hosts/windows/acceptance.ps1 -Package build` on Windows with WebView2/WebGPU to verify actual worker interception, isolation, menu, DPI, lifecycle and GPU behaviour. WebView2's own browser-level background services are not claimed to be a network sandbox; application page/worker requests are blocked outside the bundle origin.
 
-## Checks
+## Evidence
 
-```sh
-node --test hosts/verify.mjs ipc/platform-codec.test.mjs
-```
-
-Swift and C++ generated codecs are checked against the JS wire format. Java is compiled against android.jar during APK construction; it has not been executed on an Android runtime here. Mobile hosts run both UI and engine as wasm; this work does not demonstrate an additional scriptc-native static-library client.
+[Completion ledger](../docs/HOUSE-PLANNER-EXECUTION.md) and `build/acceptance/report.json` distinguish passed implementations/builds, host-only unavailable-GPU tests, and unavailable hardware. GPU on Chrome/macOS 27 is separate evidence from the required macOS 26/physical mobile/Windows matrix. Never substitute a mock, cross-build or another application's proof of concept for runtime acceptance.
