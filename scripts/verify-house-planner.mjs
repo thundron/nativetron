@@ -2,7 +2,7 @@
 // Serialized acceptance on the integration host. No device is selected or emulator started here.
 // Exit 0 all passed, 1 failed, 2 explicit external blockers. See docs/HOUSE-PLANNER-EXECUTION.md.
 import { spawn, execFileSync } from "node:child_process";
-import { mkdirSync, writeFileSync, readFileSync, openSync, closeSync, existsSync, readdirSync } from "node:fs";
+import { mkdirSync, copyFileSync, writeFileSync, readFileSync, openSync, closeSync, existsSync, readdirSync } from "node:fs";
 import { dirname, resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
@@ -31,7 +31,14 @@ let active;
 const save = () => writeFileSync(join(output, "report.json"), JSON.stringify(report, null, 2) + "\n");
 function add(id, status, detail = {}) { const entry = { id, status, ...detail }; const existing = report.checks.findIndex(check => check.id === id); if (existing >= 0) report.checks[existing] = entry; else report.checks.push(entry); console.log(`${status.toUpperCase()} ${id}${detail.reason ? `: ${detail.reason}` : ""}`); save(); return entry; }
 const blocked = (id, reason) => add(id, "blocked", { reason });
-function artifact(path) { if (existsSync(path)) { const bytes = readFileSync(path); report.artifacts.push({ path, bytes: bytes.length, sha256: hash(bytes) }); save(); } }
+function artifact(path, retainedName) {
+  if (!existsSync(path)) return;
+  if (retainedName) { const retained = join(output, "artifacts", retainedName); mkdirSync(dirname(retained), { recursive: true }); copyFileSync(path, retained); path = retained; }
+  const bytes = readFileSync(path), entry = { path, bytes: bytes.length, sha256: hash(bytes) };
+  const index = report.artifacts.findIndex(item => item.path === path);
+  if (index < 0) report.artifacts.push(entry); else report.artifacts[index] = entry;
+  save();
+}
 async function run(id, command, args = [], { timeout = 240000, blockedCodes = {} } = {}) {
   const path = join(output, `${id.replaceAll(/[^a-zA-Z0-9_-]/g, "_")}.log`);
   const log = openSync(path, "w"), started = Date.now();
@@ -98,7 +105,7 @@ try {
       delete env.NT_IOS_SKIP_ENGINE;
       await shell("android-host-tests", ["hosts/android/test.sh"], { timeout: 600000 });
       await shell("android-production-build", ["hosts/android/build.sh"], { timeout: 600000 });
-      artifact(join(root, "build/android/nativetron.apk"));
+      artifact(join(root, "build/android/nativetron.apk"), "nativetron-production.apk");
       if (env.NT_ANDROID_SERIAL) {
         await shell("android-debug-build", ["hosts/android/build.sh", "--debuggable"], { timeout: 600000 });
         await shell("android-runtime", ["hosts/android/run.sh"], { timeout: 360000, blockedCodes: { 3: "host/control/lifecycle verified on selected Android runtime; WebGPU unavailable" } });
