@@ -302,10 +302,18 @@ Not implemented: render bundles, external textures, MAP_WRITE `mapAsync`, textur
 
 ## Measurements
 
-| workload | transport | direct JS |
-|---|---|---|
-| setScissor operations/ms | 25,000 | 50,000 |
-| 500-op decode/calls | 0.020 ms | 0.010 ms |
-| 16 MiB writeBuffer | 0.230 ms | 0.230 ms |
+Recorded 2026-11-04T23:07:34.653Z, protocol 3, Chrome 154.0.8037.98, Apple M4 Max/macOS 27.0.1. The selected adapter is apple/metal-3, **not a fallback adapter**.
 
-Chrome 154.0.8037.98 headless, Apple M4 Max/macOS arm64, 101 paired/interleaved trials after 20 warmups. COOP/COEP enables the higher-resolution timer. The decoder benchmark replays real WebGPU calls, excluding command encoding and encoder/pass creation; it is not end-to-end engine time. Uploads use the same reactor memory, same queue and same destination; allocation and filling are excluded on both sides. These are CPU API-call times: queue completion is awaited between pairs but is outside the timed samples. `gpu/browser-test.mjs` prints fresh numbers; `NT_RECORD_GPU=1` records `gpu/last-run.json`. Recent 500-op medians ranged from 0.020 to 0.030 ms. These figures predate protocol version 2. The browser gate also verifies presented triangle/background pixels, forces linear-memory growth after a frame has begun encoding, and checks real device loss and line-numbered shader diagnostics. The demo draws compute-generated vertex positions from the storage buffer and verified all 1,024 readback words and reported a compute timestamp of 7,916 ns in the initial run; GPU timestamps vary between runs.
+| phase | transport/compiled | direct JS |
+|---|---|---|
+| guest encode 500 ops + one no-op callback | 0.01750 ms | — |
+| decoder into no-op handlers (optimisable lower bound) | 0.00688 ms | — |
+| 500-op decode/validation/CPU API recording | 0.01500 ms | 0.00437 ms |
+| 16 MiB writeBuffer CPU call | 0.255 ms | 0.250 ms |
+| 16 MiB post-call queue completion wait | 1.635 ms | 1.590 ms |
+
+`last-run.json` retains all 101 raw paired trials, 20 warmups, rotating CPU phase/alternating upload order, p10/p90/min/max, module/profile/source hashes and correctness records. CPU samples average eight repetitions, normalised to 500 operations. Encoding includes the export, sink selection/flush and one opaque no-op host import, preventing dead-store elimination; it does not call WebGPU. Decode/call and direct timings exclude pass creation/end/finish and are **not submitted**, so they measure CPU recording, not GPU execution. No-op decoding is only a lower bound because the sink can be optimised away.
+
+Upload lanes use the same 16 MiB current guest-memory range and destination; allocation/filling are excluded. The queue is drained before each lane. CPU timing ends when writeBuffer returns; the separately measured wait includes an explicit empty submit and browser scheduling, **not GPU-only timestamp time**. GPU copies back and verifies the first 4,096 and last four bytes before/after the run. Compiled benchmark batches are decoded and checked outside timing. Uploads stay direct from linear memory; readbacks use the guest-owned copy protocol above.
+
+Run `NT_RECORD_GPU=1 node gpu/browser-test.mjs` only after builds/agents stop. The browser gate also checks presented triangle/background pixels, 1,024 computed readback words, optional timestamps, growth during frame encoding, real loss and line-numbered shader diagnostics. These are transport microbenchmarks, not end-to-end engine/frame performance. Previous protocol-1/2 figures are superseded, not comparable samples.

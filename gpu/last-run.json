@@ -1,17 +1,3881 @@
 {
-  "date": "2026-11-04T19:32:26.366Z",
+  "hashes": {
+    ".scriptc/demo.wasm": "b9ae2e7206b0eb3ef323da2832e1eb87ed03b61a758995feee56c79eddc31d55",
+    "profile.json": "f789a4a8474c00478340190e20107cee475ada8464b26810dcf516eaf041f983",
+    "measure.js": "f6cb63a5d20fde79bdade0ecfc7f8bf6f53bd6b86e1856aa85323761b8cc55c6",
+    "ops.json": "89299e93118a1801f9570bed28158e001a033ce460f032d347f0bccdf15611a8"
+  },
+  "date": "2026-11-04T23:07:34.653Z",
   "platform": "darwin",
   "arch": "arm64",
   "cpu": "Apple M4 Max",
   "browser": "Chrome/154.0.8037.98",
+  "adapter": {
+    "vendor": "apple",
+    "architecture": "metal-3",
+    "device": "",
+    "description": "",
+    "isFallbackAdapter": false
+  },
+  "version": 2,
+  "protocol": {
+    "version": 3,
+    "identity": 3154268101
+  },
   "trials": 101,
   "warmups": 20,
+  "repeats": 8,
   "pairedInterleaved": true,
   "opsPerBatch": 500,
-  "decode500Ms": 0.019999980926513672,
-  "direct500Ms": 0.009999990463256836,
-  "opsPerMs": 25000.023841880648,
-  "upload16MiBMs": 0.23000001907348633,
-  "directUpload16MiBMs": 0.23000001907348633,
-  "memoryGrew": true
+  "uploadBytes": 16777216,
+  "guestEncode500Ms": 0.017499998211860657,
+  "decodeOnly500Ms": 0.0068750083446502686,
+  "decode500Ms": 0.015000000596046448,
+  "direct500Ms": 0.004374995827674866,
+  "opsPerMs": 33333.33200878572,
+  "upload16MiBMs": 0.2549999952316284,
+  "directUpload16MiBMs": 0.25,
+  "memoryGrew": true,
+  "method": {
+    "unit": "milliseconds",
+    "guestEncode": "compiled encoder + sink selection/flush + one opaque no-op host import per 500 ops; no GPU calls",
+    "decodeOnly": "protocol/operand decoder into no-op handlers; optimisable lower bound, not general handler cost",
+    "decode": "decode + handle/state/operand validation + CPU WebGPU recording calls",
+    "direct": "same 500 CPU WebGPU recording calls; no decode; both exclude pass creation/end/finish and are not submitted",
+    "uploads": "same 16 MiB current guest-memory range and GPU buffer, alternating lane order; drain queue before each lane; cpuMs ends when writeBuffer returns; completionWaitMs/wallMs include explicit empty submit, browser scheduling and queue completion, not GPU-only timestamp time",
+    "repeats": "CPU metrics average 8 repetitions per sample; raw values are normalised to 500 ops",
+    "excluded": "wasm instantiation, byte-pattern generation, validation readback and pass creation/end/finish"
+  },
+  "correctness": {
+    "guestBatchesDecodedExactly": 2,
+    "uploadFirst4096AndLast4Checked": 2,
+    "noBorrowedBufferMutation": true
+  },
+  "statistics": {
+    "guestEncode": {
+      "median": 0.017499998211860657,
+      "p10": 0.012500002980232239,
+      "p90": 0.02250000834465027,
+      "min": 0.010624989867210388,
+      "max": 0.024999991059303284
+    },
+    "decodeOnly": {
+      "median": 0.0068750083446502686,
+      "p10": 0.0062499940395355225,
+      "p90": 0.008125007152557373,
+      "min": 0.00562499463558197,
+      "max": 0.009375005960464478
+    },
+    "decode": {
+      "median": 0.015000000596046448,
+      "p10": 0.013125002384185791,
+      "p90": 0.016249999403953552,
+      "min": 0.011875003576278687,
+      "max": 0.01812499761581421
+    },
+    "direct": {
+      "median": 0.004374995827674866,
+      "p10": 0.0037499964237213135,
+      "p90": 0.006250008940696716,
+      "min": 0.002499997615814209,
+      "max": 0.009374991059303284
+    },
+    "transportUpload-cpuMs": {
+      "median": 0.2549999952316284,
+      "p10": 0.23000001907348633,
+      "p90": 0.2749999761581421,
+      "min": 0.22499990463256836,
+      "max": 0.3400000333786011
+    },
+    "transportUpload-completionWaitMs": {
+      "median": 1.6349999904632568,
+      "p10": 1.4049999713897705,
+      "p90": 1.8949999809265137,
+      "min": 1.2300000190734863,
+      "max": 2.3899999856948853
+    },
+    "transportUpload-wallMs": {
+      "median": 1.875,
+      "p10": 1.6449999809265137,
+      "p90": 2.1600000858306885,
+      "min": 1.4600000381469727,
+      "max": 2.665000081062317
+    },
+    "directUpload-cpuMs": {
+      "median": 0.25,
+      "p10": 0.23000001907348633,
+      "p90": 0.26999998092651367,
+      "min": 0.21999990940093994,
+      "max": 0.29499995708465576
+    },
+    "directUpload-completionWaitMs": {
+      "median": 1.590000033378601,
+      "p10": 1.4199999570846558,
+      "p90": 1.8650000095367432,
+      "min": 1.2300000190734863,
+      "max": 1.9450000524520874
+    },
+    "directUpload-wallMs": {
+      "median": 1.834999918937683,
+      "p10": 1.6749999523162842,
+      "p90": 2.109999895095825,
+      "min": 1.4499999284744263,
+      "max": 2.1950000524520874
+    }
+  },
+  "warmupSamples": [
+    {
+      "trial": -20,
+      "order": [
+        "guestEncode",
+        "decodeOnly",
+        "decode",
+        "direct"
+      ],
+      "cpu": {
+        "guestEncode": 0.06624999642372131,
+        "decodeOnly": 0.06624999642372131,
+        "decode": 0.13062500953674316,
+        "direct": 0.03312496840953827
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.3700000047683716,
+          "completionWaitMs": 2.6200000047683716,
+          "wallMs": 2.990000009536743
+        },
+        "direct": {
+          "cpuMs": 0.3450000286102295,
+          "completionWaitMs": 2.2950000762939453,
+          "wallMs": 2.640000104904175
+        }
+      }
+    },
+    {
+      "trial": -19,
+      "order": [
+        "decodeOnly",
+        "decode",
+        "direct",
+        "guestEncode"
+      ],
+      "cpu": {
+        "decodeOnly": 0.04437500238418579,
+        "decode": 0.06187500059604645,
+        "direct": 0.018125012516975403,
+        "guestEncode": 0.03312499821186066
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.31499993801116943,
+          "completionWaitMs": 2.540000081062317,
+          "wallMs": 2.8550000190734863
+        },
+        "transport": {
+          "cpuMs": 0.33000004291534424,
+          "completionWaitMs": 2.274999976158142,
+          "wallMs": 2.6050000190734863
+        }
+      }
+    },
+    {
+      "trial": -18,
+      "order": [
+        "decode",
+        "direct",
+        "guestEncode",
+        "decodeOnly"
+      ],
+      "cpu": {
+        "decode": 0.05937500298023224,
+        "direct": 0.015625,
+        "guestEncode": 0.02875000238418579,
+        "decodeOnly": 0.032499998807907104
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.32499992847442627,
+          "completionWaitMs": 2.2450000047683716,
+          "wallMs": 2.569999933242798
+        },
+        "direct": {
+          "cpuMs": 0.33500003814697266,
+          "completionWaitMs": 2.299999952316284,
+          "wallMs": 2.634999990463257
+        }
+      }
+    },
+    {
+      "trial": -17,
+      "order": [
+        "direct",
+        "guestEncode",
+        "decodeOnly",
+        "decode"
+      ],
+      "cpu": {
+        "direct": 0.012500002980232239,
+        "guestEncode": 0.02875000238418579,
+        "decodeOnly": 0.032499998807907104,
+        "decode": 0.058750003576278687
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.309999942779541,
+          "completionWaitMs": 2.3200000524520874,
+          "wallMs": 2.6299999952316284
+        },
+        "transport": {
+          "cpuMs": 0.34499990940093994,
+          "completionWaitMs": 2.2950000762939453,
+          "wallMs": 2.6399999856948853
+        }
+      }
+    },
+    {
+      "trial": -16,
+      "order": [
+        "guestEncode",
+        "decodeOnly",
+        "decode",
+        "direct"
+      ],
+      "cpu": {
+        "guestEncode": 0.025624990463256836,
+        "decodeOnly": 0.02875000238418579,
+        "decode": 0.06062500178813934,
+        "direct": 0.011250004172325134
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.29499995708465576,
+          "completionWaitMs": 2.1449999809265137,
+          "wallMs": 2.4399999380111694
+        },
+        "direct": {
+          "cpuMs": 0.2849999666213989,
+          "completionWaitMs": 2.055000066757202,
+          "wallMs": 2.340000033378601
+        }
+      }
+    },
+    {
+      "trial": -15,
+      "order": [
+        "decodeOnly",
+        "decode",
+        "direct",
+        "guestEncode"
+      ],
+      "cpu": {
+        "decodeOnly": 0.030000001192092896,
+        "decode": 0.04125000536441803,
+        "direct": 0.01124998927116394,
+        "guestEncode": 0.02562500536441803
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.28999996185302734,
+          "completionWaitMs": 2.0700000524520874,
+          "wallMs": 2.3600000143051147
+        },
+        "transport": {
+          "cpuMs": 0.2749999761581421,
+          "completionWaitMs": 1.965000033378601,
+          "wallMs": 2.240000009536743
+        }
+      }
+    },
+    {
+      "trial": -14,
+      "order": [
+        "decode",
+        "direct",
+        "guestEncode",
+        "decodeOnly"
+      ],
+      "cpu": {
+        "decode": 0.04125000536441803,
+        "direct": 0.010625004768371582,
+        "guestEncode": 0.014375001192092896,
+        "decodeOnly": 0.02687498927116394
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.2799999713897705,
+          "completionWaitMs": 1.9600000381469727,
+          "wallMs": 2.240000009536743
+        },
+        "direct": {
+          "cpuMs": 0.27500009536743164,
+          "completionWaitMs": 2.034999966621399,
+          "wallMs": 2.3100000619888306
+        }
+      }
+    },
+    {
+      "trial": -13,
+      "order": [
+        "direct",
+        "guestEncode",
+        "decodeOnly",
+        "decode"
+      ],
+      "cpu": {
+        "direct": 0.009375005960464478,
+        "guestEncode": 0.024999991059303284,
+        "decodeOnly": 0.026250004768371582,
+        "decode": 0.036875009536743164
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.26499998569488525,
+          "completionWaitMs": 1.915000081062317,
+          "wallMs": 2.180000066757202
+        },
+        "transport": {
+          "cpuMs": 0.25999999046325684,
+          "completionWaitMs": 1.600000023841858,
+          "wallMs": 1.8600000143051147
+        }
+      }
+    },
+    {
+      "trial": -12,
+      "order": [
+        "guestEncode",
+        "decodeOnly",
+        "decode",
+        "direct"
+      ],
+      "cpu": {
+        "guestEncode": 0.01874999701976776,
+        "decodeOnly": 0.02875000238418579,
+        "decode": 0.03437499701976776,
+        "direct": 0.009375005960464478
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.2549999952316284,
+          "completionWaitMs": 2.0100001096725464,
+          "wallMs": 2.265000104904175
+        },
+        "direct": {
+          "cpuMs": 0.25,
+          "completionWaitMs": 2.2699999809265137,
+          "wallMs": 2.5199999809265137
+        }
+      }
+    },
+    {
+      "trial": -11,
+      "order": [
+        "decodeOnly",
+        "decode",
+        "direct",
+        "guestEncode"
+      ],
+      "cpu": {
+        "decodeOnly": 0.008750006556510925,
+        "decode": 0.016874998807907104,
+        "direct": 0.009375005960464478,
+        "guestEncode": 0.02374999225139618
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.2549999952316284,
+          "completionWaitMs": 1.8299999237060547,
+          "wallMs": 2.084999918937683
+        },
+        "transport": {
+          "cpuMs": 0.309999942779541,
+          "completionWaitMs": 1.5600000619888306,
+          "wallMs": 1.8700000047683716
+        }
+      }
+    },
+    {
+      "trial": -10,
+      "order": [
+        "decode",
+        "direct",
+        "guestEncode",
+        "decodeOnly"
+      ],
+      "cpu": {
+        "decode": 0.016249999403953552,
+        "direct": 0.009375005960464478,
+        "guestEncode": 0.013750001788139343,
+        "decodeOnly": 0.00812499225139618
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.2549999952316284,
+          "completionWaitMs": 1.9649999141693115,
+          "wallMs": 2.21999990940094
+        },
+        "direct": {
+          "cpuMs": 0.2849999666213989,
+          "completionWaitMs": 1.5800000429153442,
+          "wallMs": 1.8650000095367432
+        }
+      }
+    },
+    {
+      "trial": -9,
+      "order": [
+        "direct",
+        "guestEncode",
+        "decodeOnly",
+        "decode"
+      ],
+      "cpu": {
+        "direct": 0.011250004172325134,
+        "guestEncode": 0.01374998688697815,
+        "decodeOnly": 0.008125007152557373,
+        "decode": 0.01812499761581421
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.25999999046325684,
+          "completionWaitMs": 2.25,
+          "wallMs": 2.509999990463257
+        },
+        "transport": {
+          "cpuMs": 0.26499998569488525,
+          "completionWaitMs": 1.540000081062317,
+          "wallMs": 1.8050000667572021
+        }
+      }
+    },
+    {
+      "trial": -8,
+      "order": [
+        "guestEncode",
+        "decodeOnly",
+        "decode",
+        "direct"
+      ],
+      "cpu": {
+        "guestEncode": 0.019374996423721313,
+        "decodeOnly": 0.010625004768371582,
+        "decode": 0.016249999403953552,
+        "direct": 0.01000000536441803
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.28000009059906006,
+          "completionWaitMs": 1.6449999809265137,
+          "wallMs": 1.9250000715255737
+        },
+        "direct": {
+          "cpuMs": 0.25,
+          "completionWaitMs": 1.5800000429153442,
+          "wallMs": 1.8300000429153442
+        }
+      }
+    },
+    {
+      "trial": -7,
+      "order": [
+        "decodeOnly",
+        "decode",
+        "direct",
+        "guestEncode"
+      ],
+      "cpu": {
+        "decodeOnly": 0.007499992847442627,
+        "decode": 0.015625,
+        "direct": 0.008750006556510925,
+        "guestEncode": 0.012500002980232239
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.24000000953674316,
+          "completionWaitMs": 1.850000023841858,
+          "wallMs": 2.090000033378601
+        },
+        "transport": {
+          "cpuMs": 0.25,
+          "completionWaitMs": 1.6850000619888306,
+          "wallMs": 1.9350000619888306
+        }
+      }
+    },
+    {
+      "trial": -6,
+      "order": [
+        "decode",
+        "direct",
+        "guestEncode",
+        "decodeOnly"
+      ],
+      "cpu": {
+        "decode": 0.017499983310699463,
+        "direct": 0.01000000536441803,
+        "guestEncode": 0.02124999463558197,
+        "decodeOnly": 0.008125007152557373
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.24000000953674316,
+          "completionWaitMs": 1.7799999713897705,
+          "wallMs": 2.0199999809265137
+        },
+        "direct": {
+          "cpuMs": 0.24000000953674316,
+          "completionWaitMs": 1.4299999475479126,
+          "wallMs": 1.6699999570846558
+        }
+      }
+    },
+    {
+      "trial": -5,
+      "order": [
+        "direct",
+        "guestEncode",
+        "decodeOnly",
+        "decode"
+      ],
+      "cpu": {
+        "direct": 0.010625004768371582,
+        "guestEncode": 0.019374996423721313,
+        "decodeOnly": 0.007499992847442627,
+        "decode": 0.015625
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.24000000953674316,
+          "completionWaitMs": 1.8650000095367432,
+          "wallMs": 2.1050000190734863
+        },
+        "transport": {
+          "cpuMs": 0.25999999046325684,
+          "completionWaitMs": 1.625,
+          "wallMs": 1.8849999904632568
+        }
+      }
+    },
+    {
+      "trial": -4,
+      "order": [
+        "guestEncode",
+        "decodeOnly",
+        "decode",
+        "direct"
+      ],
+      "cpu": {
+        "guestEncode": 0.024375006556510925,
+        "decodeOnly": 0.007499992847442627,
+        "decode": 0.016874998807907104,
+        "direct": 0.008125007152557373
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.25,
+          "completionWaitMs": 1.784999966621399,
+          "wallMs": 2.034999966621399
+        },
+        "direct": {
+          "cpuMs": 0.24000000953674316,
+          "completionWaitMs": 1.524999976158142,
+          "wallMs": 1.7649999856948853
+        }
+      }
+    },
+    {
+      "trial": -3,
+      "order": [
+        "decodeOnly",
+        "decode",
+        "direct",
+        "guestEncode"
+      ],
+      "cpu": {
+        "decodeOnly": 0.007499992847442627,
+        "decode": 0.017499998211860657,
+        "direct": 0.008750006556510925,
+        "guestEncode": 0.015625
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.26499998569488525,
+          "completionWaitMs": 1.774999976158142,
+          "wallMs": 2.0399999618530273
+        },
+        "transport": {
+          "cpuMs": 0.25,
+          "completionWaitMs": 1.5550000667572021,
+          "wallMs": 1.8050000667572021
+        }
+      }
+    },
+    {
+      "trial": -2,
+      "order": [
+        "decode",
+        "direct",
+        "guestEncode",
+        "decodeOnly"
+      ],
+      "cpu": {
+        "decode": 0.016249999403953552,
+        "direct": 0.01000000536441803,
+        "guestEncode": 0.02437499165534973,
+        "decodeOnly": 0.008750006556510925
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.2749999761581421,
+          "completionWaitMs": 1.9350000619888306,
+          "wallMs": 2.2100000381469727
+        },
+        "direct": {
+          "cpuMs": 0.2549999952316284,
+          "completionWaitMs": 1.9100000858306885,
+          "wallMs": 2.165000081062317
+        }
+      }
+    },
+    {
+      "trial": -1,
+      "order": [
+        "direct",
+        "guestEncode",
+        "decodeOnly",
+        "decode"
+      ],
+      "cpu": {
+        "direct": 0.009999990463256836,
+        "guestEncode": 0.0168750137090683,
+        "decodeOnly": 0.00812499225139618,
+        "decode": 0.01812499761581421
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.25,
+          "completionWaitMs": 1.7799999713897705,
+          "wallMs": 2.0299999713897705
+        },
+        "transport": {
+          "cpuMs": 0.24000000953674316,
+          "completionWaitMs": 1.5,
+          "wallMs": 1.7400000095367432
+        }
+      }
+    }
+  ],
+  "raw": [
+    {
+      "trial": 0,
+      "order": [
+        "guestEncode",
+        "decodeOnly",
+        "decode",
+        "direct"
+      ],
+      "cpu": {
+        "guestEncode": 0.016249999403953552,
+        "decodeOnly": 0.006874993443489075,
+        "decode": 0.015000000596046448,
+        "direct": 0.00812499225139618
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.2549999952316284,
+          "completionWaitMs": 1.850000023841858,
+          "wallMs": 2.1050000190734863
+        },
+        "direct": {
+          "cpuMs": 0.24500000476837158,
+          "completionWaitMs": 1.475000023841858,
+          "wallMs": 1.7200000286102295
+        }
+      }
+    },
+    {
+      "trial": 1,
+      "order": [
+        "decodeOnly",
+        "decode",
+        "direct",
+        "guestEncode"
+      ],
+      "cpu": {
+        "decodeOnly": 0.00812499225139618,
+        "decode": 0.015000015497207642,
+        "direct": 0.009374991059303284,
+        "guestEncode": 0.02000001072883606
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.24500000476837158,
+          "completionWaitMs": 1.9049999713897705,
+          "wallMs": 2.149999976158142
+        },
+        "transport": {
+          "cpuMs": 0.26999998092651367,
+          "completionWaitMs": 1.8650000095367432,
+          "wallMs": 2.134999990463257
+        }
+      }
+    },
+    {
+      "trial": 2,
+      "order": [
+        "decode",
+        "direct",
+        "guestEncode",
+        "decodeOnly"
+      ],
+      "cpu": {
+        "decode": 0.015000000596046448,
+        "direct": 0.007500007748603821,
+        "guestEncode": 0.012500002980232239,
+        "decodeOnly": 0.0062499940395355225
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.24500000476837158,
+          "completionWaitMs": 1.9649999141693115,
+          "wallMs": 2.209999918937683
+        },
+        "direct": {
+          "cpuMs": 0.2849999666213989,
+          "completionWaitMs": 1.5399999618530273,
+          "wallMs": 1.8249999284744263
+        }
+      }
+    },
+    {
+      "trial": 3,
+      "order": [
+        "direct",
+        "guestEncode",
+        "decodeOnly",
+        "decode"
+      ],
+      "cpu": {
+        "direct": 0.00812499225139618,
+        "guestEncode": 0.014375001192092896,
+        "decodeOnly": 0.008125007152557373,
+        "decode": 0.013125002384185791
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.2250000238418579,
+          "completionWaitMs": 1.774999976158142,
+          "wallMs": 2
+        },
+        "transport": {
+          "cpuMs": 0.2349998950958252,
+          "completionWaitMs": 1.4500000476837158,
+          "wallMs": 1.684999942779541
+        }
+      }
+    },
+    {
+      "trial": 4,
+      "order": [
+        "guestEncode",
+        "decodeOnly",
+        "decode",
+        "direct"
+      ],
+      "cpu": {
+        "guestEncode": 0.01874999701976776,
+        "decodeOnly": 0.0068750083446502686,
+        "decode": 0.01374998688697815,
+        "direct": 0.00812499225139618
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.24000000953674316,
+          "completionWaitMs": 1.8049999475479126,
+          "wallMs": 2.0449999570846558
+        },
+        "direct": {
+          "cpuMs": 0.29499995708465576,
+          "completionWaitMs": 1.4900000095367432,
+          "wallMs": 1.784999966621399
+        }
+      }
+    },
+    {
+      "trial": 5,
+      "order": [
+        "decodeOnly",
+        "decode",
+        "direct",
+        "guestEncode"
+      ],
+      "cpu": {
+        "decodeOnly": 0.006874993443489075,
+        "decode": 0.013750001788139343,
+        "direct": 0.008750006556510925,
+        "guestEncode": 0.01812499761581421
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.24500000476837158,
+          "completionWaitMs": 1.774999976158142,
+          "wallMs": 2.0199999809265137
+        },
+        "transport": {
+          "cpuMs": 0.23000001907348633,
+          "completionWaitMs": 1.399999976158142,
+          "wallMs": 1.6299999952316284
+        }
+      }
+    },
+    {
+      "trial": 6,
+      "order": [
+        "decode",
+        "direct",
+        "guestEncode",
+        "decodeOnly"
+      ],
+      "cpu": {
+        "decode": 0.016249999403953552,
+        "direct": 0.009374991059303284,
+        "guestEncode": 0.02000001072883606,
+        "decodeOnly": 0.007499992847442627
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.26499998569488525,
+          "completionWaitMs": 1.8849999904632568,
+          "wallMs": 2.149999976158142
+        },
+        "direct": {
+          "cpuMs": 0.27500009536743164,
+          "completionWaitMs": 1.5099999904632568,
+          "wallMs": 1.7850000858306885
+        }
+      }
+    },
+    {
+      "trial": 7,
+      "order": [
+        "direct",
+        "guestEncode",
+        "decodeOnly",
+        "decode"
+      ],
+      "cpu": {
+        "direct": 0.008749991655349731,
+        "guestEncode": 0.015625,
+        "decodeOnly": 0.0068750083446502686,
+        "decode": 0.015000000596046448
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.23000001907348633,
+          "completionWaitMs": 1.7050000429153442,
+          "wallMs": 1.9350000619888306
+        },
+        "transport": {
+          "cpuMs": 0.3400000333786011,
+          "completionWaitMs": 1.534999966621399,
+          "wallMs": 1.875
+        }
+      }
+    },
+    {
+      "trial": 8,
+      "order": [
+        "guestEncode",
+        "decodeOnly",
+        "decode",
+        "direct"
+      ],
+      "cpu": {
+        "guestEncode": 0.015000000596046448,
+        "decodeOnly": 0.007500007748603821,
+        "decode": 0.013750001788139343,
+        "direct": 0.006874993443489075
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.23500001430511475,
+          "completionWaitMs": 1.7450000047683716,
+          "wallMs": 1.9800000190734863
+        },
+        "direct": {
+          "cpuMs": 0.2349998950958252,
+          "completionWaitMs": 1.5600000619888306,
+          "wallMs": 1.7949999570846558
+        }
+      }
+    },
+    {
+      "trial": 9,
+      "order": [
+        "decodeOnly",
+        "decode",
+        "direct",
+        "guestEncode"
+      ],
+      "cpu": {
+        "decodeOnly": 0.006874993443489075,
+        "decode": 0.014375001192092896,
+        "direct": 0.008749991655349731,
+        "guestEncode": 0.017499998211860657
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.23500001430511475,
+          "completionWaitMs": 1.8650000095367432,
+          "wallMs": 2.100000023841858
+        },
+        "transport": {
+          "cpuMs": 0.26999998092651367,
+          "completionWaitMs": 1.5099999904632568,
+          "wallMs": 1.7799999713897705
+        }
+      }
+    },
+    {
+      "trial": 10,
+      "order": [
+        "decode",
+        "direct",
+        "guestEncode",
+        "decodeOnly"
+      ],
+      "cpu": {
+        "decode": 0.015625014901161194,
+        "direct": 0.004999995231628418,
+        "guestEncode": 0.01812499761581421,
+        "decodeOnly": 0.0062499940395355225
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.23500001430511475,
+          "completionWaitMs": 1.399999976158142,
+          "wallMs": 1.6349999904632568
+        },
+        "direct": {
+          "cpuMs": 0.23500001430511475,
+          "completionWaitMs": 1.3949999809265137,
+          "wallMs": 1.6299999952316284
+        }
+      }
+    },
+    {
+      "trial": 11,
+      "order": [
+        "direct",
+        "guestEncode",
+        "decodeOnly",
+        "decode"
+      ],
+      "cpu": {
+        "direct": 0.005000010132789612,
+        "guestEncode": 0.013124987483024597,
+        "decodeOnly": 0.0068750083446502686,
+        "decode": 0.014375001192092896
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.24000000953674316,
+          "completionWaitMs": 1.909999966621399,
+          "wallMs": 2.149999976158142
+        },
+        "transport": {
+          "cpuMs": 0.26499998569488525,
+          "completionWaitMs": 1.434999942779541,
+          "wallMs": 1.6999999284744263
+        }
+      }
+    },
+    {
+      "trial": 12,
+      "order": [
+        "guestEncode",
+        "decodeOnly",
+        "decode",
+        "direct"
+      ],
+      "cpu": {
+        "guestEncode": 0.017499998211860657,
+        "decodeOnly": 0.006874993443489075,
+        "decode": 0.014375001192092896,
+        "direct": 0.004374995827674866
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.23000001907348633,
+          "completionWaitMs": 1.6799999475479126,
+          "wallMs": 1.909999966621399
+        },
+        "direct": {
+          "cpuMs": 0.2399998903274536,
+          "completionWaitMs": 1.4300000667572021,
+          "wallMs": 1.6699999570846558
+        }
+      }
+    },
+    {
+      "trial": 13,
+      "order": [
+        "decodeOnly",
+        "decode",
+        "direct",
+        "guestEncode"
+      ],
+      "cpu": {
+        "decodeOnly": 0.006874993443489075,
+        "decode": 0.014375001192092896,
+        "direct": 0.00437501072883606,
+        "guestEncode": 0.022499993443489075
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.22999989986419678,
+          "completionWaitMs": 1.8600000143051147,
+          "wallMs": 2.0899999141693115
+        },
+        "transport": {
+          "cpuMs": 0.24500000476837158,
+          "completionWaitMs": 1.4649999141693115,
+          "wallMs": 1.709999918937683
+        }
+      }
+    },
+    {
+      "trial": 14,
+      "order": [
+        "decode",
+        "direct",
+        "guestEncode",
+        "decodeOnly"
+      ],
+      "cpu": {
+        "decode": 0.016249999403953552,
+        "direct": 0.004374995827674866,
+        "guestEncode": 0.015625,
+        "decodeOnly": 0.006874993443489075
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.23500001430511475,
+          "completionWaitMs": 2.0399999618530273,
+          "wallMs": 2.274999976158142
+        },
+        "direct": {
+          "cpuMs": 0.2749999761581421,
+          "completionWaitMs": 1.4299999475479126,
+          "wallMs": 1.7049999237060547
+        }
+      }
+    },
+    {
+      "trial": 15,
+      "order": [
+        "direct",
+        "guestEncode",
+        "decodeOnly",
+        "decode"
+      ],
+      "cpu": {
+        "direct": 0.0037499964237213135,
+        "guestEncode": 0.020624995231628418,
+        "decodeOnly": 0.006874993443489075,
+        "decode": 0.015625
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.23000001907348633,
+          "completionWaitMs": 1.7350000143051147,
+          "wallMs": 1.965000033378601
+        },
+        "transport": {
+          "cpuMs": 0.23500001430511475,
+          "completionWaitMs": 1.3600000143051147,
+          "wallMs": 1.5950000286102295
+        }
+      }
+    },
+    {
+      "trial": 16,
+      "order": [
+        "guestEncode",
+        "decodeOnly",
+        "decode",
+        "direct"
+      ],
+      "cpu": {
+        "guestEncode": 0.013750001788139343,
+        "decodeOnly": 0.006874993443489075,
+        "decode": 0.015625,
+        "direct": 0.0031249970197677612
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.22499990463256836,
+          "completionWaitMs": 1.7699999809265137,
+          "wallMs": 1.994999885559082
+        },
+        "direct": {
+          "cpuMs": 0.2549999952316284,
+          "completionWaitMs": 1.3899999856948853,
+          "wallMs": 1.6449999809265137
+        }
+      }
+    },
+    {
+      "trial": 17,
+      "order": [
+        "decodeOnly",
+        "decode",
+        "direct",
+        "guestEncode"
+      ],
+      "cpu": {
+        "decodeOnly": 0.006874993443489075,
+        "decode": 0.013125002384185791,
+        "direct": 0.004999995231628418,
+        "guestEncode": 0.013125002384185791
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.23000001907348633,
+          "completionWaitMs": 1.600000023841858,
+          "wallMs": 1.8300000429153442
+        },
+        "transport": {
+          "cpuMs": 0.2250000238418579,
+          "completionWaitMs": 1.3550000190734863,
+          "wallMs": 1.5800000429153442
+        }
+      }
+    },
+    {
+      "trial": 18,
+      "order": [
+        "decode",
+        "direct",
+        "guestEncode",
+        "decodeOnly"
+      ],
+      "cpu": {
+        "decode": 0.014375001192092896,
+        "direct": 0.0031249970197677612,
+        "guestEncode": 0.016874998807907104,
+        "decodeOnly": 0.006250008940696716
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.2250000238418579,
+          "completionWaitMs": 1.6349999904632568,
+          "wallMs": 1.8600000143051147
+        },
+        "direct": {
+          "cpuMs": 0.2200000286102295,
+          "completionWaitMs": 1.350000023841858,
+          "wallMs": 1.5700000524520874
+        }
+      }
+    },
+    {
+      "trial": 19,
+      "order": [
+        "direct",
+        "guestEncode",
+        "decodeOnly",
+        "decode"
+      ],
+      "cpu": {
+        "direct": 0.004374995827674866,
+        "guestEncode": 0.015000000596046448,
+        "decodeOnly": 0.0068750083446502686,
+        "decode": 0.013750001788139343
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.2200000286102295,
+          "completionWaitMs": 1.6749999523162842,
+          "wallMs": 1.8949999809265137
+        },
+        "transport": {
+          "cpuMs": 0.2250000238418579,
+          "completionWaitMs": 1.4149999618530273,
+          "wallMs": 1.6399999856948853
+        }
+      }
+    },
+    {
+      "trial": 20,
+      "order": [
+        "guestEncode",
+        "decodeOnly",
+        "decode",
+        "direct"
+      ],
+      "cpu": {
+        "guestEncode": 0.018750011920928955,
+        "decodeOnly": 0.0062499940395355225,
+        "decode": 0.013125002384185791,
+        "direct": 0.0037499964237213135
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.23000001907348633,
+          "completionWaitMs": 1.375,
+          "wallMs": 1.6050000190734863
+        },
+        "direct": {
+          "cpuMs": 0.21999990940093994,
+          "completionWaitMs": 1.2300000190734863,
+          "wallMs": 1.4499999284744263
+        }
+      }
+    },
+    {
+      "trial": 21,
+      "order": [
+        "decodeOnly",
+        "decode",
+        "direct",
+        "guestEncode"
+      ],
+      "cpu": {
+        "decodeOnly": 0.007500007748603821,
+        "decode": 0.011875003576278687,
+        "direct": 0.004374995827674866,
+        "guestEncode": 0.01874999701976776
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.2250000238418579,
+          "completionWaitMs": 1.5299999713897705,
+          "wallMs": 1.7549999952316284
+        },
+        "transport": {
+          "cpuMs": 0.23000001907348633,
+          "completionWaitMs": 1.46999990940094,
+          "wallMs": 1.6999999284744263
+        }
+      }
+    },
+    {
+      "trial": 22,
+      "order": [
+        "decode",
+        "direct",
+        "guestEncode",
+        "decodeOnly"
+      ],
+      "cpu": {
+        "decode": 0.014375001192092896,
+        "direct": 0.004374995827674866,
+        "guestEncode": 0.015625,
+        "decodeOnly": 0.00562499463558197
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.2250000238418579,
+          "completionWaitMs": 1.4199999570846558,
+          "wallMs": 1.6449999809265137
+        },
+        "direct": {
+          "cpuMs": 0.26999998092651367,
+          "completionWaitMs": 1.4149999618530273,
+          "wallMs": 1.684999942779541
+        }
+      }
+    },
+    {
+      "trial": 23,
+      "order": [
+        "direct",
+        "guestEncode",
+        "decodeOnly",
+        "decode"
+      ],
+      "cpu": {
+        "direct": 0.0037500113248825073,
+        "guestEncode": 0.021874994039535522,
+        "decodeOnly": 0.006874993443489075,
+        "decode": 0.014375001192092896
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.2250000238418579,
+          "completionWaitMs": 1.4600000381469727,
+          "wallMs": 1.6850000619888306
+        },
+        "transport": {
+          "cpuMs": 0.23000001907348633,
+          "completionWaitMs": 1.2300000190734863,
+          "wallMs": 1.4600000381469727
+        }
+      }
+    },
+    {
+      "trial": 24,
+      "order": [
+        "guestEncode",
+        "decodeOnly",
+        "decode",
+        "direct"
+      ],
+      "cpu": {
+        "guestEncode": 0.012500002980232239,
+        "decodeOnly": 0.00562499463558197,
+        "decode": 0.013750001788139343,
+        "direct": 0.004999995231628418
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.24500000476837158,
+          "completionWaitMs": 1.600000023841858,
+          "wallMs": 1.8450000286102295
+        },
+        "direct": {
+          "cpuMs": 0.25,
+          "completionWaitMs": 1.4600000381469727,
+          "wallMs": 1.7100000381469727
+        }
+      }
+    },
+    {
+      "trial": 25,
+      "order": [
+        "decodeOnly",
+        "decode",
+        "direct",
+        "guestEncode"
+      ],
+      "cpu": {
+        "decodeOnly": 0.006874993443489075,
+        "decode": 0.014375001192092896,
+        "direct": 0.004999995231628418,
+        "guestEncode": 0.01124998927116394
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.2200000286102295,
+          "completionWaitMs": 1.600000023841858,
+          "wallMs": 1.8200000524520874
+        },
+        "transport": {
+          "cpuMs": 0.3250000476837158,
+          "completionWaitMs": 1.3200000524520874,
+          "wallMs": 1.6450001001358032
+        }
+      }
+    },
+    {
+      "trial": 26,
+      "order": [
+        "decode",
+        "direct",
+        "guestEncode",
+        "decodeOnly"
+      ],
+      "cpu": {
+        "decode": 0.013750001788139343,
+        "direct": 0.004374995827674866,
+        "guestEncode": 0.017499998211860657,
+        "decodeOnly": 0.0062499940395355225
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.2349998950958252,
+          "completionWaitMs": 1.9900000095367432,
+          "wallMs": 2.2249999046325684
+        },
+        "direct": {
+          "cpuMs": 0.26499998569488525,
+          "completionWaitMs": 1.3250000476837158,
+          "wallMs": 1.590000033378601
+        }
+      }
+    },
+    {
+      "trial": 27,
+      "order": [
+        "direct",
+        "guestEncode",
+        "decodeOnly",
+        "decode"
+      ],
+      "cpu": {
+        "direct": 0.0031249970197677612,
+        "guestEncode": 0.011875003576278687,
+        "decodeOnly": 0.00562499463558197,
+        "decode": 0.013750001788139343
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.2200000286102295,
+          "completionWaitMs": 1.8149999380111694,
+          "wallMs": 2.034999966621399
+        },
+        "transport": {
+          "cpuMs": 0.26499998569488525,
+          "completionWaitMs": 1.3650000095367432,
+          "wallMs": 1.6299999952316284
+        }
+      }
+    },
+    {
+      "trial": 28,
+      "order": [
+        "guestEncode",
+        "decodeOnly",
+        "decode",
+        "direct"
+      ],
+      "cpu": {
+        "guestEncode": 0.017499998211860657,
+        "decodeOnly": 0.0062499940395355225,
+        "decode": 0.012500002980232239,
+        "direct": 0.0037500113248825073
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.2549999952316284,
+          "completionWaitMs": 1.5950000286102295,
+          "wallMs": 1.850000023841858
+        },
+        "direct": {
+          "cpuMs": 0.28999996185302734,
+          "completionWaitMs": 1.375,
+          "wallMs": 1.6649999618530273
+        }
+      }
+    },
+    {
+      "trial": 29,
+      "order": [
+        "decodeOnly",
+        "decode",
+        "direct",
+        "guestEncode"
+      ],
+      "cpu": {
+        "decodeOnly": 0.008125007152557373,
+        "decode": 0.013125002384185791,
+        "direct": 0.004374995827674866,
+        "guestEncode": 0.012500002980232239
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.23500001430511475,
+          "completionWaitMs": 1.375,
+          "wallMs": 1.6100000143051147
+        },
+        "transport": {
+          "cpuMs": 0.23500001430511475,
+          "completionWaitMs": 1.375,
+          "wallMs": 1.6100000143051147
+        }
+      }
+    },
+    {
+      "trial": 30,
+      "order": [
+        "decode",
+        "direct",
+        "guestEncode",
+        "decodeOnly"
+      ],
+      "cpu": {
+        "decode": 0.013125002384185791,
+        "direct": 0.00437501072883606,
+        "guestEncode": 0.017499998211860657,
+        "decodeOnly": 0.0062499940395355225
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.22499990463256836,
+          "completionWaitMs": 1.4600000381469727,
+          "wallMs": 1.684999942779541
+        },
+        "direct": {
+          "cpuMs": 0.23500001430511475,
+          "completionWaitMs": 1.8450000286102295,
+          "wallMs": 2.0800000429153442
+        }
+      }
+    },
+    {
+      "trial": 31,
+      "order": [
+        "direct",
+        "guestEncode",
+        "decodeOnly",
+        "decode"
+      ],
+      "cpu": {
+        "direct": 0.004999995231628418,
+        "guestEncode": 0.024375006556510925,
+        "decodeOnly": 0.0062499940395355225,
+        "decode": 0.012500002980232239
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.24499988555908203,
+          "completionWaitMs": 1.665000081062317,
+          "wallMs": 1.909999966621399
+        },
+        "transport": {
+          "cpuMs": 0.33500003814697266,
+          "completionWaitMs": 1.2350000143051147,
+          "wallMs": 1.5700000524520874
+        }
+      }
+    },
+    {
+      "trial": 32,
+      "order": [
+        "guestEncode",
+        "decodeOnly",
+        "decode",
+        "direct"
+      ],
+      "cpu": {
+        "guestEncode": 0.01874999701976776,
+        "decodeOnly": 0.0062499940395355225,
+        "decode": 0.014375001192092896,
+        "direct": 0.003125011920928955
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.2250000238418579,
+          "completionWaitMs": 1.7999999523162842,
+          "wallMs": 2.024999976158142
+        },
+        "direct": {
+          "cpuMs": 0.2700001001358032,
+          "completionWaitMs": 1.409999966621399,
+          "wallMs": 1.6800000667572021
+        }
+      }
+    },
+    {
+      "trial": 33,
+      "order": [
+        "decodeOnly",
+        "decode",
+        "direct",
+        "guestEncode"
+      ],
+      "cpu": {
+        "decodeOnly": 0.006874993443489075,
+        "decode": 0.013125002384185791,
+        "direct": 0.00437501072883606,
+        "guestEncode": 0.014375001192092896
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.26999998092651367,
+          "completionWaitMs": 1.7450000047683716,
+          "wallMs": 2.0149999856948853
+        },
+        "transport": {
+          "cpuMs": 0.25,
+          "completionWaitMs": 1.4200000762939453,
+          "wallMs": 1.6700000762939453
+        }
+      }
+    },
+    {
+      "trial": 34,
+      "order": [
+        "decode",
+        "direct",
+        "guestEncode",
+        "decodeOnly"
+      ],
+      "cpu": {
+        "decode": 0.013125002384185791,
+        "direct": 0.004999995231628418,
+        "guestEncode": 0.02000001072883606,
+        "decodeOnly": 0.006874993443489075
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.25999999046325684,
+          "completionWaitMs": 1.6600000858306885,
+          "wallMs": 1.9200000762939453
+        },
+        "direct": {
+          "cpuMs": 0.23000001907348633,
+          "completionWaitMs": 1.4199999570846558,
+          "wallMs": 1.649999976158142
+        }
+      }
+    },
+    {
+      "trial": 35,
+      "order": [
+        "direct",
+        "guestEncode",
+        "decodeOnly",
+        "decode"
+      ],
+      "cpu": {
+        "direct": 0.004374995827674866,
+        "guestEncode": 0.010624989867210388,
+        "decodeOnly": 0.006250008940696716,
+        "decode": 0.013750001788139343
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.25,
+          "completionWaitMs": 1.8550000190734863,
+          "wallMs": 2.1050000190734863
+        },
+        "transport": {
+          "cpuMs": 0.26499998569488525,
+          "completionWaitMs": 1.6699999570846558,
+          "wallMs": 1.934999942779541
+        }
+      }
+    },
+    {
+      "trial": 36,
+      "order": [
+        "guestEncode",
+        "decodeOnly",
+        "decode",
+        "direct"
+      ],
+      "cpu": {
+        "guestEncode": 0.015000000596046448,
+        "decodeOnly": 0.008125007152557373,
+        "decode": 0.015000000596046448,
+        "direct": 0.004999995231628418
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.25999999046325684,
+          "completionWaitMs": 1.7549999952316284,
+          "wallMs": 2.0149999856948853
+        },
+        "direct": {
+          "cpuMs": 0.25,
+          "completionWaitMs": 1.5700000524520874,
+          "wallMs": 1.8200000524520874
+        }
+      }
+    },
+    {
+      "trial": 37,
+      "order": [
+        "decodeOnly",
+        "decode",
+        "direct",
+        "guestEncode"
+      ],
+      "cpu": {
+        "decodeOnly": 0.007499992847442627,
+        "decode": 0.015625014901161194,
+        "direct": 0.0031249970197677612,
+        "guestEncode": 0.013125002384185791
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.26999998092651367,
+          "completionWaitMs": 1.7400000095367432,
+          "wallMs": 2.009999990463257
+        },
+        "transport": {
+          "cpuMs": 0.2799999713897705,
+          "completionWaitMs": 1.590000033378601,
+          "wallMs": 1.8700000047683716
+        }
+      }
+    },
+    {
+      "trial": 38,
+      "order": [
+        "decode",
+        "direct",
+        "guestEncode",
+        "decodeOnly"
+      ],
+      "cpu": {
+        "decode": 0.015000000596046448,
+        "direct": 0.00437501072883606,
+        "guestEncode": 0.023124992847442627,
+        "decodeOnly": 0.0068750083446502686
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.26499998569488525,
+          "completionWaitMs": 1.8600000143051147,
+          "wallMs": 2.125
+        },
+        "direct": {
+          "cpuMs": 0.2850000858306885,
+          "completionWaitMs": 1.4800000190734863,
+          "wallMs": 1.7650001049041748
+        }
+      }
+    },
+    {
+      "trial": 39,
+      "order": [
+        "direct",
+        "guestEncode",
+        "decodeOnly",
+        "decode"
+      ],
+      "cpu": {
+        "direct": 0.004374995827674866,
+        "guestEncode": 0.015625,
+        "decodeOnly": 0.0062499940395355225,
+        "decode": 0.01374998688697815
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.26499998569488525,
+          "completionWaitMs": 1.875,
+          "wallMs": 2.1399999856948853
+        },
+        "transport": {
+          "cpuMs": 0.2549999952316284,
+          "completionWaitMs": 1.524999976158142,
+          "wallMs": 1.7799999713897705
+        }
+      }
+    },
+    {
+      "trial": 40,
+      "order": [
+        "guestEncode",
+        "decodeOnly",
+        "decode",
+        "direct"
+      ],
+      "cpu": {
+        "guestEncode": 0.022499993443489075,
+        "decodeOnly": 0.009375005960464478,
+        "decode": 0.016874998807907104,
+        "direct": 0.004374995827674866
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.2549999952316284,
+          "completionWaitMs": 1.8300000429153442,
+          "wallMs": 2.0850000381469727
+        },
+        "direct": {
+          "cpuMs": 0.25,
+          "completionWaitMs": 1.4900000095367432,
+          "wallMs": 1.7400000095367432
+        }
+      }
+    },
+    {
+      "trial": 41,
+      "order": [
+        "decodeOnly",
+        "decode",
+        "direct",
+        "guestEncode"
+      ],
+      "cpu": {
+        "decodeOnly": 0.007500007748603821,
+        "decode": 0.014375001192092896,
+        "direct": 0.004374995827674866,
+        "guestEncode": 0.020625010132789612
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.25,
+          "completionWaitMs": 1.9450000524520874,
+          "wallMs": 2.1950000524520874
+        },
+        "transport": {
+          "cpuMs": 0.27500009536743164,
+          "completionWaitMs": 1.4950000047683716,
+          "wallMs": 1.7700001001358032
+        }
+      }
+    },
+    {
+      "trial": 42,
+      "order": [
+        "decode",
+        "direct",
+        "guestEncode",
+        "decodeOnly"
+      ],
+      "cpu": {
+        "decode": 0.016249999403953552,
+        "direct": 0.004999995231628418,
+        "guestEncode": 0.02312500774860382,
+        "decodeOnly": 0.006874993443489075
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.2549999952316284,
+          "completionWaitMs": 1.7699999809265137,
+          "wallMs": 2.024999976158142
+        },
+        "direct": {
+          "cpuMs": 0.25500011444091797,
+          "completionWaitMs": 1.5749999284744263,
+          "wallMs": 1.8300000429153442
+        }
+      }
+    },
+    {
+      "trial": 43,
+      "order": [
+        "direct",
+        "guestEncode",
+        "decodeOnly",
+        "decode"
+      ],
+      "cpu": {
+        "direct": 0.004999995231628418,
+        "guestEncode": 0.024999991059303284,
+        "decodeOnly": 0.009375005960464478,
+        "decode": 0.016249999403953552
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.26999998092651367,
+          "completionWaitMs": 1.8149999380111694,
+          "wallMs": 2.084999918937683
+        },
+        "transport": {
+          "cpuMs": 0.26499998569488525,
+          "completionWaitMs": 1.9249999523162842,
+          "wallMs": 2.1899999380111694
+        }
+      }
+    },
+    {
+      "trial": 44,
+      "order": [
+        "guestEncode",
+        "decodeOnly",
+        "decode",
+        "direct"
+      ],
+      "cpu": {
+        "guestEncode": 0.019374996423721313,
+        "decodeOnly": 0.007499992847442627,
+        "decode": 0.015000000596046448,
+        "direct": 0.004374995827674866
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.26999998092651367,
+          "completionWaitMs": 1.8900001049041748,
+          "wallMs": 2.1600000858306885
+        },
+        "direct": {
+          "cpuMs": 0.2549999952316284,
+          "completionWaitMs": 1.6299999952316284,
+          "wallMs": 1.8849999904632568
+        }
+      }
+    },
+    {
+      "trial": 45,
+      "order": [
+        "decodeOnly",
+        "decode",
+        "direct",
+        "guestEncode"
+      ],
+      "cpu": {
+        "decodeOnly": 0.0068750083446502686,
+        "decode": 0.015000000596046448,
+        "direct": 0.004374995827674866,
+        "guestEncode": 0.02250000834465027
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.25999999046325684,
+          "completionWaitMs": 1.8550000190734863,
+          "wallMs": 2.115000009536743
+        },
+        "transport": {
+          "cpuMs": 0.26499998569488525,
+          "completionWaitMs": 1.4700000286102295,
+          "wallMs": 1.7350000143051147
+        }
+      }
+    },
+    {
+      "trial": 46,
+      "order": [
+        "decode",
+        "direct",
+        "guestEncode",
+        "decodeOnly"
+      ],
+      "cpu": {
+        "decode": 0.015000000596046448,
+        "direct": 0.004999995231628418,
+        "guestEncode": 0.014375001192092896,
+        "decodeOnly": 0.006250008940696716
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.25,
+          "completionWaitMs": 1.8100000619888306,
+          "wallMs": 2.0600000619888306
+        },
+        "direct": {
+          "cpuMs": 0.25,
+          "completionWaitMs": 1.5149999856948853,
+          "wallMs": 1.7649999856948853
+        }
+      }
+    },
+    {
+      "trial": 47,
+      "order": [
+        "direct",
+        "guestEncode",
+        "decodeOnly",
+        "decode"
+      ],
+      "cpu": {
+        "direct": 0.0037500113248825073,
+        "guestEncode": 0.021874994039535522,
+        "decodeOnly": 0.007500007748603821,
+        "decode": 0.015625
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.26499998569488525,
+          "completionWaitMs": 1.590000033378601,
+          "wallMs": 1.8550000190734863
+        },
+        "transport": {
+          "cpuMs": 0.26999998092651367,
+          "completionWaitMs": 1.4700000286102295,
+          "wallMs": 1.7400000095367432
+        }
+      }
+    },
+    {
+      "trial": 48,
+      "order": [
+        "guestEncode",
+        "decodeOnly",
+        "decode",
+        "direct"
+      ],
+      "cpu": {
+        "guestEncode": 0.012500002980232239,
+        "decodeOnly": 0.007500007748603821,
+        "decode": 0.015625,
+        "direct": 0.004999995231628418
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.2549999952316284,
+          "completionWaitMs": 1.665000081062317,
+          "wallMs": 1.9200000762939453
+        },
+        "direct": {
+          "cpuMs": 0.24000000953674316,
+          "completionWaitMs": 1.3700000047683716,
+          "wallMs": 1.6100000143051147
+        }
+      }
+    },
+    {
+      "trial": 49,
+      "order": [
+        "decodeOnly",
+        "decode",
+        "direct",
+        "guestEncode"
+      ],
+      "cpu": {
+        "decodeOnly": 0.007500007748603821,
+        "decode": 0.015000000596046448,
+        "direct": 0.0037499964237213135,
+        "guestEncode": 0.011875003576278687
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.24000000953674316,
+          "completionWaitMs": 1.6100000143051147,
+          "wallMs": 1.850000023841858
+        },
+        "transport": {
+          "cpuMs": 0.25,
+          "completionWaitMs": 1.5,
+          "wallMs": 1.75
+        }
+      }
+    },
+    {
+      "trial": 50,
+      "order": [
+        "decode",
+        "direct",
+        "guestEncode",
+        "decodeOnly"
+      ],
+      "cpu": {
+        "decode": 0.014999985694885254,
+        "direct": 0.0037499964237213135,
+        "guestEncode": 0.015000000596046448,
+        "decodeOnly": 0.006874993443489075
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.2600001096725464,
+          "completionWaitMs": 1.7699999809265137,
+          "wallMs": 2.03000009059906
+        },
+        "direct": {
+          "cpuMs": 0.24000000953674316,
+          "completionWaitMs": 1.4600000381469727,
+          "wallMs": 1.7000000476837158
+        }
+      }
+    },
+    {
+      "trial": 51,
+      "order": [
+        "direct",
+        "guestEncode",
+        "decodeOnly",
+        "decode"
+      ],
+      "cpu": {
+        "direct": 0.004999995231628418,
+        "guestEncode": 0.01812499761581421,
+        "decodeOnly": 0.007500007748603821,
+        "decode": 0.013750001788139343
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.24000000953674316,
+          "completionWaitMs": 1.8000000715255737,
+          "wallMs": 2.040000081062317
+        },
+        "transport": {
+          "cpuMs": 0.2749999761581421,
+          "completionWaitMs": 1.4850000143051147,
+          "wallMs": 1.7599999904632568
+        }
+      }
+    },
+    {
+      "trial": 52,
+      "order": [
+        "guestEncode",
+        "decodeOnly",
+        "decode",
+        "direct"
+      ],
+      "cpu": {
+        "guestEncode": 0.015000000596046448,
+        "decodeOnly": 0.007500007748603821,
+        "decode": 0.013750001788139343,
+        "direct": 0.004374995827674866
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.2700001001358032,
+          "completionWaitMs": 1.8299999237060547,
+          "wallMs": 2.100000023841858
+        },
+        "direct": {
+          "cpuMs": 0.24000000953674316,
+          "completionWaitMs": 1.5399999618530273,
+          "wallMs": 1.7799999713897705
+        }
+      }
+    },
+    {
+      "trial": 53,
+      "order": [
+        "decodeOnly",
+        "decode",
+        "direct",
+        "guestEncode"
+      ],
+      "cpu": {
+        "decodeOnly": 0.006874993443489075,
+        "decode": 0.015000000596046448,
+        "direct": 0.004374995827674866,
+        "guestEncode": 0.021874994039535522
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.25,
+          "completionWaitMs": 1.7450000047683716,
+          "wallMs": 1.9950000047683716
+        },
+        "transport": {
+          "cpuMs": 0.25999999046325684,
+          "completionWaitMs": 1.4800000190734863,
+          "wallMs": 1.7400000095367432
+        }
+      }
+    },
+    {
+      "trial": 54,
+      "order": [
+        "decode",
+        "direct",
+        "guestEncode",
+        "decodeOnly"
+      ],
+      "cpu": {
+        "decode": 0.016874998807907104,
+        "direct": 0.0037499964237213135,
+        "guestEncode": 0.023124992847442627,
+        "decodeOnly": 0.0068750083446502686
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.26499998569488525,
+          "completionWaitMs": 1.815000057220459,
+          "wallMs": 2.0800000429153442
+        },
+        "direct": {
+          "cpuMs": 0.24500000476837158,
+          "completionWaitMs": 1.4800000190734863,
+          "wallMs": 1.725000023841858
+        }
+      }
+    },
+    {
+      "trial": 55,
+      "order": [
+        "direct",
+        "guestEncode",
+        "decodeOnly",
+        "decode"
+      ],
+      "cpu": {
+        "direct": 0.0037499964237213135,
+        "guestEncode": 0.020625010132789612,
+        "decodeOnly": 0.007499992847442627,
+        "decode": 0.015000000596046448
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.25999999046325684,
+          "completionWaitMs": 1.7999999523162842,
+          "wallMs": 2.059999942779541
+        },
+        "transport": {
+          "cpuMs": 0.26999998092651367,
+          "completionWaitMs": 1.4950000047683716,
+          "wallMs": 1.7649999856948853
+        }
+      }
+    },
+    {
+      "trial": 56,
+      "order": [
+        "guestEncode",
+        "decodeOnly",
+        "decode",
+        "direct"
+      ],
+      "cpu": {
+        "guestEncode": 0.02124999463558197,
+        "decodeOnly": 0.005625009536743164,
+        "decode": 0.013750001788139343,
+        "direct": 0.004999995231628418
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.26999998092651367,
+          "completionWaitMs": 1.96999990940094,
+          "wallMs": 2.2399998903274536
+        },
+        "direct": {
+          "cpuMs": 0.24000000953674316,
+          "completionWaitMs": 1.5399999618530273,
+          "wallMs": 1.7799999713897705
+        }
+      }
+    },
+    {
+      "trial": 57,
+      "order": [
+        "decodeOnly",
+        "decode",
+        "direct",
+        "guestEncode"
+      ],
+      "cpu": {
+        "decodeOnly": 0.009375005960464478,
+        "decode": 0.015625,
+        "direct": 0.00437501072883606,
+        "guestEncode": 0.012499988079071045
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.25999999046325684,
+          "completionWaitMs": 1.8849999904632568,
+          "wallMs": 2.1449999809265137
+        },
+        "transport": {
+          "cpuMs": 0.25999999046325684,
+          "completionWaitMs": 1.4499999284744263,
+          "wallMs": 1.709999918937683
+        }
+      }
+    },
+    {
+      "trial": 58,
+      "order": [
+        "decode",
+        "direct",
+        "guestEncode",
+        "decodeOnly"
+      ],
+      "cpu": {
+        "decode": 0.013124987483024597,
+        "direct": 0.00437501072883606,
+        "guestEncode": 0.014375001192092896,
+        "decodeOnly": 0.006874993443489075
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.25,
+          "completionWaitMs": 1.8650000095367432,
+          "wallMs": 2.115000009536743
+        },
+        "direct": {
+          "cpuMs": 0.26499998569488525,
+          "completionWaitMs": 1.5449999570846558,
+          "wallMs": 1.809999942779541
+        }
+      }
+    },
+    {
+      "trial": 59,
+      "order": [
+        "direct",
+        "guestEncode",
+        "decodeOnly",
+        "decode"
+      ],
+      "cpu": {
+        "direct": 0.004374995827674866,
+        "guestEncode": 0.013750001788139343,
+        "decodeOnly": 0.007499992847442627,
+        "decode": 0.015000000596046448
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.2749999761581421,
+          "completionWaitMs": 1.8700000047683716,
+          "wallMs": 2.1449999809265137
+        },
+        "transport": {
+          "cpuMs": 0.25999999046325684,
+          "completionWaitMs": 1.4950000047683716,
+          "wallMs": 1.7549999952316284
+        }
+      }
+    },
+    {
+      "trial": 60,
+      "order": [
+        "guestEncode",
+        "decodeOnly",
+        "decode",
+        "direct"
+      ],
+      "cpu": {
+        "guestEncode": 0.016249999403953552,
+        "decodeOnly": 0.007500007748603821,
+        "decode": 0.013125002384185791,
+        "direct": 0.004999995231628418
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.2549999952316284,
+          "completionWaitMs": 1.909999966621399,
+          "wallMs": 2.1649999618530273
+        },
+        "direct": {
+          "cpuMs": 0.2650001049041748,
+          "completionWaitMs": 1.5449999570846558,
+          "wallMs": 1.8100000619888306
+        }
+      }
+    },
+    {
+      "trial": 61,
+      "order": [
+        "decodeOnly",
+        "decode",
+        "direct",
+        "guestEncode"
+      ],
+      "cpu": {
+        "decodeOnly": 0.007499992847442627,
+        "decode": 0.013750001788139343,
+        "direct": 0.004374995827674866,
+        "guestEncode": 0.012500002980232239
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.25,
+          "completionWaitMs": 1.7699999809265137,
+          "wallMs": 2.0199999809265137
+        },
+        "transport": {
+          "cpuMs": 0.26999998092651367,
+          "completionWaitMs": 1.7100000381469727,
+          "wallMs": 1.9800000190734863
+        }
+      }
+    },
+    {
+      "trial": 62,
+      "order": [
+        "decode",
+        "direct",
+        "guestEncode",
+        "decodeOnly"
+      ],
+      "cpu": {
+        "decode": 0.016249999403953552,
+        "direct": 0.0031249970197677612,
+        "guestEncode": 0.020624995231628418,
+        "decodeOnly": 0.006874993443489075
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.25,
+          "completionWaitMs": 1.809999942779541,
+          "wallMs": 2.059999942779541
+        },
+        "direct": {
+          "cpuMs": 0.23500001430511475,
+          "completionWaitMs": 1.4800000190734863,
+          "wallMs": 1.715000033378601
+        }
+      }
+    },
+    {
+      "trial": 63,
+      "order": [
+        "direct",
+        "guestEncode",
+        "decodeOnly",
+        "decode"
+      ],
+      "cpu": {
+        "direct": 0.004374995827674866,
+        "guestEncode": 0.015625,
+        "decodeOnly": 0.008125007152557373,
+        "decode": 0.016249999403953552
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.2549999952316284,
+          "completionWaitMs": 1.9049999713897705,
+          "wallMs": 2.159999966621399
+        },
+        "transport": {
+          "cpuMs": 0.25999999046325684,
+          "completionWaitMs": 1.440000057220459,
+          "wallMs": 1.7000000476837158
+        }
+      }
+    },
+    {
+      "trial": 64,
+      "order": [
+        "guestEncode",
+        "decodeOnly",
+        "decode",
+        "direct"
+      ],
+      "cpu": {
+        "guestEncode": 0.02374999225139618,
+        "decodeOnly": 0.0068750083446502686,
+        "decode": 0.015625,
+        "direct": 0.004374995827674866
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.2549999952316284,
+          "completionWaitMs": 1.78000009059906,
+          "wallMs": 2.0350000858306885
+        },
+        "direct": {
+          "cpuMs": 0.25,
+          "completionWaitMs": 1.649999976158142,
+          "wallMs": 1.899999976158142
+        }
+      }
+    },
+    {
+      "trial": 65,
+      "order": [
+        "decodeOnly",
+        "decode",
+        "direct",
+        "guestEncode"
+      ],
+      "cpu": {
+        "decodeOnly": 0.007500007748603821,
+        "decode": 0.011875003576278687,
+        "direct": 0.004999995231628418,
+        "guestEncode": 0.017499998211860657
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.24500000476837158,
+          "completionWaitMs": 1.4549999237060547,
+          "wallMs": 1.6999999284744263
+        },
+        "transport": {
+          "cpuMs": 0.25999999046325684,
+          "completionWaitMs": 1.6699999570846558,
+          "wallMs": 1.9299999475479126
+        }
+      }
+    },
+    {
+      "trial": 66,
+      "order": [
+        "decode",
+        "direct",
+        "guestEncode",
+        "decodeOnly"
+      ],
+      "cpu": {
+        "decode": 0.015000000596046448,
+        "direct": 0.004999995231628418,
+        "guestEncode": 0.022499993443489075,
+        "decodeOnly": 0.0068750083446502686
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.27500009536743164,
+          "completionWaitMs": 2.3899999856948853,
+          "wallMs": 2.665000081062317
+        },
+        "direct": {
+          "cpuMs": 0.25,
+          "completionWaitMs": 1.5149999856948853,
+          "wallMs": 1.7649999856948853
+        }
+      }
+    },
+    {
+      "trial": 67,
+      "order": [
+        "direct",
+        "guestEncode",
+        "decodeOnly",
+        "decode"
+      ],
+      "cpu": {
+        "direct": 0.0037500113248825073,
+        "guestEncode": 0.017499998211860657,
+        "decodeOnly": 0.0062499940395355225,
+        "decode": 0.015625
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.24500000476837158,
+          "completionWaitMs": 1.8399999141693115,
+          "wallMs": 2.084999918937683
+        },
+        "transport": {
+          "cpuMs": 0.2749999761581421,
+          "completionWaitMs": 1.5800000429153442,
+          "wallMs": 1.8550000190734863
+        }
+      }
+    },
+    {
+      "trial": 68,
+      "order": [
+        "guestEncode",
+        "decodeOnly",
+        "decode",
+        "direct"
+      ],
+      "cpu": {
+        "guestEncode": 0.017499998211860657,
+        "decodeOnly": 0.008749991655349731,
+        "decode": 0.016249999403953552,
+        "direct": 0.004374995827674866
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.2549999952316284,
+          "completionWaitMs": 1.7300000190734863,
+          "wallMs": 1.9850000143051147
+        },
+        "direct": {
+          "cpuMs": 0.25999999046325684,
+          "completionWaitMs": 1.5749999284744263,
+          "wallMs": 1.834999918937683
+        }
+      }
+    },
+    {
+      "trial": 69,
+      "order": [
+        "decodeOnly",
+        "decode",
+        "direct",
+        "guestEncode"
+      ],
+      "cpu": {
+        "decodeOnly": 0.007500007748603821,
+        "decode": 0.014375001192092896,
+        "direct": 0.004374995827674866,
+        "guestEncode": 0.020624995231628418
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.24500000476837158,
+          "completionWaitMs": 1.8000000715255737,
+          "wallMs": 2.0450000762939453
+        },
+        "transport": {
+          "cpuMs": 0.25,
+          "completionWaitMs": 1.4600000381469727,
+          "wallMs": 1.7100000381469727
+        }
+      }
+    },
+    {
+      "trial": 70,
+      "order": [
+        "decode",
+        "direct",
+        "guestEncode",
+        "decodeOnly"
+      ],
+      "cpu": {
+        "decode": 0.015000000596046448,
+        "direct": 0.004374995827674866,
+        "guestEncode": 0.020625010132789612,
+        "decodeOnly": 0.006874993443489075
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.25,
+          "completionWaitMs": 1.6950000524520874,
+          "wallMs": 1.9450000524520874
+        },
+        "direct": {
+          "cpuMs": 0.24000000953674316,
+          "completionWaitMs": 1.465000033378601,
+          "wallMs": 1.7050000429153442
+        }
+      }
+    },
+    {
+      "trial": 71,
+      "order": [
+        "direct",
+        "guestEncode",
+        "decodeOnly",
+        "decode"
+      ],
+      "cpu": {
+        "direct": 0.006250008940696716,
+        "guestEncode": 0.022499993443489075,
+        "decodeOnly": 0.008125007152557373,
+        "decode": 0.015000000596046448
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.24500000476837158,
+          "completionWaitMs": 1.8600000143051147,
+          "wallMs": 2.1050000190734863
+        },
+        "transport": {
+          "cpuMs": 0.2549999952316284,
+          "completionWaitMs": 1.4450000524520874,
+          "wallMs": 1.7000000476837158
+        }
+      }
+    },
+    {
+      "trial": 72,
+      "order": [
+        "guestEncode",
+        "decodeOnly",
+        "decode",
+        "direct"
+      ],
+      "cpu": {
+        "guestEncode": 0.013125002384185791,
+        "decodeOnly": 0.006874993443489075,
+        "decode": 0.015625,
+        "direct": 0.004374995827674866
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.2549999952316284,
+          "completionWaitMs": 1.784999966621399,
+          "wallMs": 2.0399999618530273
+        },
+        "direct": {
+          "cpuMs": 0.25999999046325684,
+          "completionWaitMs": 1.5299999713897705,
+          "wallMs": 1.7899999618530273
+        }
+      }
+    },
+    {
+      "trial": 73,
+      "order": [
+        "decodeOnly",
+        "decode",
+        "direct",
+        "guestEncode"
+      ],
+      "cpu": {
+        "decodeOnly": 0.007500007748603821,
+        "decode": 0.014375001192092896,
+        "direct": 0.00562499463558197,
+        "guestEncode": 0.02250000834465027
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.25,
+          "completionWaitMs": 1.7649999856948853,
+          "wallMs": 2.0149999856948853
+        },
+        "transport": {
+          "cpuMs": 0.26499998569488525,
+          "completionWaitMs": 1.5199999809265137,
+          "wallMs": 1.784999966621399
+        }
+      }
+    },
+    {
+      "trial": 74,
+      "order": [
+        "decode",
+        "direct",
+        "guestEncode",
+        "decodeOnly"
+      ],
+      "cpu": {
+        "decode": 0.015000000596046448,
+        "direct": 0.004374995827674866,
+        "guestEncode": 0.02000001072883606,
+        "decodeOnly": 0.006874993443489075
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.25999999046325684,
+          "completionWaitMs": 1.7649999856948853,
+          "wallMs": 2.024999976158142
+        },
+        "direct": {
+          "cpuMs": 0.25,
+          "completionWaitMs": 1.590000033378601,
+          "wallMs": 1.840000033378601
+        }
+      }
+    },
+    {
+      "trial": 75,
+      "order": [
+        "direct",
+        "guestEncode",
+        "decodeOnly",
+        "decode"
+      ],
+      "cpu": {
+        "direct": 0.004374995827674866,
+        "guestEncode": 0.013125002384185791,
+        "decodeOnly": 0.007500007748603821,
+        "decode": 0.015000000596046448
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.25,
+          "completionWaitMs": 1.8700000047683716,
+          "wallMs": 2.1200000047683716
+        },
+        "transport": {
+          "cpuMs": 0.2999999523162842,
+          "completionWaitMs": 1.5449999570846558,
+          "wallMs": 1.84499990940094
+        }
+      }
+    },
+    {
+      "trial": 76,
+      "order": [
+        "guestEncode",
+        "decodeOnly",
+        "decode",
+        "direct"
+      ],
+      "cpu": {
+        "guestEncode": 0.021875008940696716,
+        "decodeOnly": 0.008125007152557373,
+        "decode": 0.01624998450279236,
+        "direct": 0.00562499463558197
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.25999999046325684,
+          "completionWaitMs": 1.8550000190734863,
+          "wallMs": 2.115000009536743
+        },
+        "direct": {
+          "cpuMs": 0.25,
+          "completionWaitMs": 1.4600000381469727,
+          "wallMs": 1.7100000381469727
+        }
+      }
+    },
+    {
+      "trial": 77,
+      "order": [
+        "decodeOnly",
+        "decode",
+        "direct",
+        "guestEncode"
+      ],
+      "cpu": {
+        "decodeOnly": 0.00812499225139618,
+        "decode": 0.015625,
+        "direct": 0.00437501072883606,
+        "guestEncode": 0.022499993443489075
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.24000000953674316,
+          "completionWaitMs": 1.7750000953674316,
+          "wallMs": 2.015000104904175
+        },
+        "transport": {
+          "cpuMs": 0.26499998569488525,
+          "completionWaitMs": 1.5149999856948853,
+          "wallMs": 1.7799999713897705
+        }
+      }
+    },
+    {
+      "trial": 78,
+      "order": [
+        "decode",
+        "direct",
+        "guestEncode",
+        "decodeOnly"
+      ],
+      "cpu": {
+        "decode": 0.014375001192092896,
+        "direct": 0.0037499964237213135,
+        "guestEncode": 0.015625,
+        "decodeOnly": 0.006874993443489075
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.2549999952316284,
+          "completionWaitMs": 1.7350000143051147,
+          "wallMs": 1.9900000095367432
+        },
+        "direct": {
+          "cpuMs": 0.2549999952316284,
+          "completionWaitMs": 1.4199999570846558,
+          "wallMs": 1.6749999523162842
+        }
+      }
+    },
+    {
+      "trial": 79,
+      "order": [
+        "direct",
+        "guestEncode",
+        "decodeOnly",
+        "decode"
+      ],
+      "cpu": {
+        "direct": 0.0037499964237213135,
+        "guestEncode": 0.013750001788139343,
+        "decodeOnly": 0.006874993443489075,
+        "decode": 0.014375001192092896
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.24500000476837158,
+          "completionWaitMs": 1.6899999380111694,
+          "wallMs": 1.934999942779541
+        },
+        "transport": {
+          "cpuMs": 0.25,
+          "completionWaitMs": 1.465000033378601,
+          "wallMs": 1.715000033378601
+        }
+      }
+    },
+    {
+      "trial": 80,
+      "order": [
+        "guestEncode",
+        "decodeOnly",
+        "decode",
+        "direct"
+      ],
+      "cpu": {
+        "guestEncode": 0.02250000834465027,
+        "decodeOnly": 0.007499992847442627,
+        "decode": 0.015000000596046448,
+        "direct": 0.004999995231628418
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.24000000953674316,
+          "completionWaitMs": 1.7149999141693115,
+          "wallMs": 1.9549999237060547
+        },
+        "direct": {
+          "cpuMs": 0.2749999761581421,
+          "completionWaitMs": 1.4550000429153442,
+          "wallMs": 1.7300000190734863
+        }
+      }
+    },
+    {
+      "trial": 81,
+      "order": [
+        "decodeOnly",
+        "decode",
+        "direct",
+        "guestEncode"
+      ],
+      "cpu": {
+        "decodeOnly": 0.007499992847442627,
+        "decode": 0.014375001192092896,
+        "direct": 0.0037499964237213135,
+        "guestEncode": 0.013750001788139343
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.25999999046325684,
+          "completionWaitMs": 1.7300000190734863,
+          "wallMs": 1.9900000095367432
+        },
+        "transport": {
+          "cpuMs": 0.2549999952316284,
+          "completionWaitMs": 1.4950000047683716,
+          "wallMs": 1.75
+        }
+      }
+    },
+    {
+      "trial": 82,
+      "order": [
+        "decode",
+        "direct",
+        "guestEncode",
+        "decodeOnly"
+      ],
+      "cpu": {
+        "decode": 0.015000015497207642,
+        "direct": 0.004999995231628418,
+        "guestEncode": 0.013750001788139343,
+        "decodeOnly": 0.007499992847442627
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.2549999952316284,
+          "completionWaitMs": 1.8399999141693115,
+          "wallMs": 2.09499990940094
+        },
+        "direct": {
+          "cpuMs": 0.25999999046325684,
+          "completionWaitMs": 1.4800000190734863,
+          "wallMs": 1.7400000095367432
+        }
+      }
+    },
+    {
+      "trial": 83,
+      "order": [
+        "direct",
+        "guestEncode",
+        "decodeOnly",
+        "decode"
+      ],
+      "cpu": {
+        "direct": 0.00562499463558197,
+        "guestEncode": 0.019374996423721313,
+        "decodeOnly": 0.0068750083446502686,
+        "decode": 0.015000000596046448
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.25,
+          "completionWaitMs": 1.715000033378601,
+          "wallMs": 1.965000033378601
+        },
+        "transport": {
+          "cpuMs": 0.26999998092651367,
+          "completionWaitMs": 1.5550000667572021,
+          "wallMs": 1.8250000476837158
+        }
+      }
+    },
+    {
+      "trial": 84,
+      "order": [
+        "guestEncode",
+        "decodeOnly",
+        "decode",
+        "direct"
+      ],
+      "cpu": {
+        "guestEncode": 0.02374999225139618,
+        "decodeOnly": 0.008125007152557373,
+        "decode": 0.014375001192092896,
+        "direct": 0.0037499964237213135
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.26999998092651367,
+          "completionWaitMs": 2.0600000619888306,
+          "wallMs": 2.3300000429153442
+        },
+        "direct": {
+          "cpuMs": 0.26999998092651367,
+          "completionWaitMs": 1.5799999237060547,
+          "wallMs": 1.8499999046325684
+        }
+      }
+    },
+    {
+      "trial": 85,
+      "order": [
+        "decodeOnly",
+        "decode",
+        "direct",
+        "guestEncode"
+      ],
+      "cpu": {
+        "decodeOnly": 0.007500007748603821,
+        "decode": 0.014375001192092896,
+        "direct": 0.005625009536743164,
+        "guestEncode": 0.020624995231628418
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.2600001096725464,
+          "completionWaitMs": 1.8399999141693115,
+          "wallMs": 2.100000023841858
+        },
+        "transport": {
+          "cpuMs": 0.2549999952316284,
+          "completionWaitMs": 1.4049999713897705,
+          "wallMs": 1.659999966621399
+        }
+      }
+    },
+    {
+      "trial": 86,
+      "order": [
+        "decode",
+        "direct",
+        "guestEncode",
+        "decodeOnly"
+      ],
+      "cpu": {
+        "decode": 0.015625,
+        "direct": 0.00437501072883606,
+        "guestEncode": 0.016874998807907104,
+        "decodeOnly": 0.006874993443489075
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.24000000953674316,
+          "completionWaitMs": 1.6850000619888306,
+          "wallMs": 1.9250000715255737
+        },
+        "direct": {
+          "cpuMs": 0.24000000953674316,
+          "completionWaitMs": 1.4850000143051147,
+          "wallMs": 1.725000023841858
+        }
+      }
+    },
+    {
+      "trial": 87,
+      "order": [
+        "direct",
+        "guestEncode",
+        "decodeOnly",
+        "decode"
+      ],
+      "cpu": {
+        "direct": 0.004374995827674866,
+        "guestEncode": 0.015625,
+        "decodeOnly": 0.007499992847442627,
+        "decode": 0.016874998807907104
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.2349998950958252,
+          "completionWaitMs": 1.875,
+          "wallMs": 2.109999895095825
+        },
+        "transport": {
+          "cpuMs": 0.26999998092651367,
+          "completionWaitMs": 2.024999976158142,
+          "wallMs": 2.2949999570846558
+        }
+      }
+    },
+    {
+      "trial": 88,
+      "order": [
+        "guestEncode",
+        "decodeOnly",
+        "decode",
+        "direct"
+      ],
+      "cpu": {
+        "guestEncode": 0.012500002980232239,
+        "decodeOnly": 0.0068750083446502686,
+        "decode": 0.015000000596046448,
+        "direct": 0.004374995827674866
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.25500011444091797,
+          "completionWaitMs": 1.7549999952316284,
+          "wallMs": 2.0100001096725464
+        },
+        "direct": {
+          "cpuMs": 0.25,
+          "completionWaitMs": 1.4900000095367432,
+          "wallMs": 1.7400000095367432
+        }
+      }
+    },
+    {
+      "trial": 89,
+      "order": [
+        "decodeOnly",
+        "decode",
+        "direct",
+        "guestEncode"
+      ],
+      "cpu": {
+        "decodeOnly": 0.007499992847442627,
+        "decode": 0.015000000596046448,
+        "direct": 0.002500012516975403,
+        "guestEncode": 0.021874994039535522
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.24500000476837158,
+          "completionWaitMs": 1.784999966621399,
+          "wallMs": 2.0299999713897705
+        },
+        "transport": {
+          "cpuMs": 0.2549999952316284,
+          "completionWaitMs": 1.5299999713897705,
+          "wallMs": 1.784999966621399
+        }
+      }
+    },
+    {
+      "trial": 90,
+      "order": [
+        "decode",
+        "direct",
+        "guestEncode",
+        "decodeOnly"
+      ],
+      "cpu": {
+        "decode": 0.013750001788139343,
+        "direct": 0.002499997615814209,
+        "guestEncode": 0.013125002384185791,
+        "decodeOnly": 0.006874993443489075
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.2850000858306885,
+          "completionWaitMs": 2.0149999856948853,
+          "wallMs": 2.3000000715255737
+        },
+        "direct": {
+          "cpuMs": 0.26999998092651367,
+          "completionWaitMs": 1.4399999380111694,
+          "wallMs": 1.709999918937683
+        }
+      }
+    },
+    {
+      "trial": 91,
+      "order": [
+        "direct",
+        "guestEncode",
+        "decodeOnly",
+        "decode"
+      ],
+      "cpu": {
+        "direct": 0.005000010132789612,
+        "guestEncode": 0.022499993443489075,
+        "decodeOnly": 0.006250008940696716,
+        "decode": 0.01374998688697815
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.24000000953674316,
+          "completionWaitMs": 1.75,
+          "wallMs": 1.9900000095367432
+        },
+        "transport": {
+          "cpuMs": 0.27500009536743164,
+          "completionWaitMs": 1.4499999284744263,
+          "wallMs": 1.725000023841858
+        }
+      }
+    },
+    {
+      "trial": 92,
+      "order": [
+        "guestEncode",
+        "decodeOnly",
+        "decode",
+        "direct"
+      ],
+      "cpu": {
+        "guestEncode": 0.016874998807907104,
+        "decodeOnly": 0.008750006556510925,
+        "decode": 0.016249999403953552,
+        "direct": 0.00562499463558197
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.2799999713897705,
+          "completionWaitMs": 1.725000023841858,
+          "wallMs": 2.0049999952316284
+        },
+        "direct": {
+          "cpuMs": 0.24500000476837158,
+          "completionWaitMs": 1.4850000143051147,
+          "wallMs": 1.7300000190734863
+        }
+      }
+    },
+    {
+      "trial": 93,
+      "order": [
+        "decodeOnly",
+        "decode",
+        "direct",
+        "guestEncode"
+      ],
+      "cpu": {
+        "decodeOnly": 0.007499992847442627,
+        "decode": 0.015000000596046448,
+        "direct": 0.0037499964237213135,
+        "guestEncode": 0.014375001192092896
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.24500000476837158,
+          "completionWaitMs": 1.7200000286102295,
+          "wallMs": 1.965000033378601
+        },
+        "transport": {
+          "cpuMs": 0.24500000476837158,
+          "completionWaitMs": 1.4600000381469727,
+          "wallMs": 1.7050000429153442
+        }
+      }
+    },
+    {
+      "trial": 94,
+      "order": [
+        "decode",
+        "direct",
+        "guestEncode",
+        "decodeOnly"
+      ],
+      "cpu": {
+        "decode": 0.014375001192092896,
+        "direct": 0.00437501072883606,
+        "guestEncode": 0.020624995231628418,
+        "decodeOnly": 0.006874993443489075
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.2549999952316284,
+          "completionWaitMs": 1.725000023841858,
+          "wallMs": 1.9800000190734863
+        },
+        "direct": {
+          "cpuMs": 0.24500000476837158,
+          "completionWaitMs": 1.434999942779541,
+          "wallMs": 1.6799999475479126
+        }
+      }
+    },
+    {
+      "trial": 95,
+      "order": [
+        "direct",
+        "guestEncode",
+        "decodeOnly",
+        "decode"
+      ],
+      "cpu": {
+        "direct": 0.0062499940395355225,
+        "guestEncode": 0.019999995827674866,
+        "decodeOnly": 0.008750006556510925,
+        "decode": 0.01812499761581421
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.23500001430511475,
+          "completionWaitMs": 1.8899999856948853,
+          "wallMs": 2.125
+        },
+        "transport": {
+          "cpuMs": 0.2549999952316284,
+          "completionWaitMs": 1.4299999475479126,
+          "wallMs": 1.684999942779541
+        }
+      }
+    },
+    {
+      "trial": 96,
+      "order": [
+        "guestEncode",
+        "decodeOnly",
+        "decode",
+        "direct"
+      ],
+      "cpu": {
+        "guestEncode": 0.02312500774860382,
+        "decodeOnly": 0.00812499225139618,
+        "decode": 0.014375001192092896,
+        "direct": 0.00437501072883606
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.25999999046325684,
+          "completionWaitMs": 1.8550000190734863,
+          "wallMs": 2.115000009536743
+        },
+        "direct": {
+          "cpuMs": 0.25,
+          "completionWaitMs": 1.5549999475479126,
+          "wallMs": 1.8049999475479126
+        }
+      }
+    },
+    {
+      "trial": 97,
+      "order": [
+        "decodeOnly",
+        "decode",
+        "direct",
+        "guestEncode"
+      ],
+      "cpu": {
+        "decodeOnly": 0.007500007748603821,
+        "decode": 0.014375001192092896,
+        "direct": 0.004999995231628418,
+        "guestEncode": 0.013750001788139343
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.24000000953674316,
+          "completionWaitMs": 1.8450000286102295,
+          "wallMs": 2.0850000381469727
+        },
+        "transport": {
+          "cpuMs": 0.25,
+          "completionWaitMs": 1.5149999856948853,
+          "wallMs": 1.7649999856948853
+        }
+      }
+    },
+    {
+      "trial": 98,
+      "order": [
+        "decode",
+        "direct",
+        "guestEncode",
+        "decodeOnly"
+      ],
+      "cpu": {
+        "decode": 0.015625,
+        "direct": 0.0037499964237213135,
+        "guestEncode": 0.02250000834465027,
+        "decodeOnly": 0.00812499225139618
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.25999999046325684,
+          "completionWaitMs": 1.815000057220459,
+          "wallMs": 2.075000047683716
+        },
+        "direct": {
+          "cpuMs": 0.25,
+          "completionWaitMs": 1.6349999904632568,
+          "wallMs": 1.8849999904632568
+        }
+      }
+    },
+    {
+      "trial": 99,
+      "order": [
+        "direct",
+        "guestEncode",
+        "decodeOnly",
+        "decode"
+      ],
+      "cpu": {
+        "direct": 0.00437501072883606,
+        "guestEncode": 0.013125002384185791,
+        "decodeOnly": 0.007499992847442627,
+        "decode": 0.015000000596046448
+      },
+      "uploadOrder": [
+        "direct",
+        "transport"
+      ],
+      "uploads": {
+        "direct": {
+          "cpuMs": 0.2549999952316284,
+          "completionWaitMs": 1.7549999952316284,
+          "wallMs": 2.009999990463257
+        },
+        "transport": {
+          "cpuMs": 0.2549999952316284,
+          "completionWaitMs": 1.534999966621399,
+          "wallMs": 1.7899999618530273
+        }
+      }
+    },
+    {
+      "trial": 100,
+      "order": [
+        "guestEncode",
+        "decodeOnly",
+        "decode",
+        "direct"
+      ],
+      "cpu": {
+        "guestEncode": 0.02312500774860382,
+        "decodeOnly": 0.009375005960464478,
+        "decode": 0.014375001192092896,
+        "direct": 0.004374995827674866
+      },
+      "uploadOrder": [
+        "transport",
+        "direct"
+      ],
+      "uploads": {
+        "transport": {
+          "cpuMs": 0.24000000953674316,
+          "completionWaitMs": 1.8949999809265137,
+          "wallMs": 2.134999990463257
+        },
+        "direct": {
+          "cpuMs": 0.24500000476837158,
+          "completionWaitMs": 1.5149999856948853,
+          "wallMs": 1.7599999904632568
+        }
+      }
+    }
+  ]
 }

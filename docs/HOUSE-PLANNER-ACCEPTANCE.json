@@ -1,0 +1,689 @@
+{
+  "version": 2,
+  "revision": "64c9e65d5bd7c53d8361638f1e6c8618713180e5",
+  "started": "2026-11-04T23:04:57.136Z",
+  "scope": "full",
+  "measured": true,
+  "environment": {
+    "node": "v24.22.1",
+    "icu": "78.3",
+    "platform": "darwin",
+    "os": "27.0.0",
+    "cpu": "Apple M4 Max",
+    "scriptc": "scriptc/packages/cli/dist/main.js"
+  },
+  "readonly": [
+    {
+      "directory": "scriptc",
+      "revision": "76dc1100ef9a45ad91ca52760534c611d13eb1d3",
+      "status": "",
+      "refsSha256": "482d0e53f00448b53d28fc4787bf26c128d21e5d3e7a656199e2a422491362dc"
+    },
+    {
+      "directory": "house-planner",
+      "revision": "119c91962b958319e24c5771d565e3e5115b2208",
+      "status": "",
+      "refsSha256": "b89943142c9374ea72daf9e16e3ec780267bd1511696e5c9954432526fdce105"
+    }
+  ],
+  "checks": [
+    {
+      "id": "drift-abi-generate.mjs",
+      "status": "passed",
+      "command": [
+        "/private/tmp/node-v24.22.1-darwin-arm64/bin/node",
+        "abi/generate.mjs",
+        "--check"
+      ],
+      "exitCode": 0,
+      "durationMs": 35,
+      "log": "nativetron/build/acceptance/drift-abi-generate_mjs.log"
+    },
+    {
+      "id": "drift-canvas-generate.mjs",
+      "status": "passed",
+      "command": [
+        "/private/tmp/node-v24.22.1-darwin-arm64/bin/node",
+        "canvas/generate.mjs",
+        "--check"
+      ],
+      "exitCode": 0,
+      "durationMs": 31,
+      "log": "nativetron/build/acceptance/drift-canvas-generate_mjs.log"
+    },
+    {
+      "id": "drift-gpu-generate.mjs",
+      "status": "passed",
+      "command": [
+        "/private/tmp/node-v24.22.1-darwin-arm64/bin/node",
+        "gpu/generate.mjs",
+        "--check"
+      ],
+      "exitCode": 0,
+      "durationMs": 30,
+      "log": "nativetron/build/acceptance/drift-gpu-generate_mjs.log"
+    },
+    {
+      "id": "drift-ipc-generate.mjs",
+      "status": "passed",
+      "command": [
+        "/private/tmp/node-v24.22.1-darwin-arm64/bin/node",
+        "ipc/generate.mjs",
+        "--check"
+      ],
+      "exitCode": 0,
+      "durationMs": 27,
+      "log": "nativetron/build/acceptance/drift-ipc-generate_mjs.log"
+    },
+    {
+      "id": "drift-ipc-generate-engine.mjs",
+      "status": "passed",
+      "command": [
+        "/private/tmp/node-v24.22.1-darwin-arm64/bin/node",
+        "ipc/generate-engine.mjs",
+        "--check"
+      ],
+      "exitCode": 0,
+      "durationMs": 28,
+      "log": "nativetron/build/acceptance/drift-ipc-generate-engine_mjs.log"
+    },
+    {
+      "id": "drift-ipc-generate-control.mjs",
+      "status": "passed",
+      "command": [
+        "/private/tmp/node-v24.22.1-darwin-arm64/bin/node",
+        "ipc/generate-control.mjs",
+        "--check"
+      ],
+      "exitCode": 0,
+      "durationMs": 30,
+      "log": "nativetron/build/acceptance/drift-ipc-generate-control_mjs.log"
+    },
+    {
+      "id": "drift-engine-generate-assets.mjs",
+      "status": "passed",
+      "command": [
+        "/private/tmp/node-v24.22.1-darwin-arm64/bin/node",
+        "engine/generate-assets.mjs",
+        "--check"
+      ],
+      "exitCode": 0,
+      "durationMs": 25,
+      "log": "nativetron/build/acceptance/drift-engine-generate-assets_mjs.log"
+    },
+    {
+      "id": "drift-i18n-generate.mjs",
+      "status": "passed",
+      "command": [
+        "/private/tmp/node-v24.22.1-darwin-arm64/bin/node",
+        "i18n/generate.mjs",
+        "--check"
+      ],
+      "exitCode": 0,
+      "durationMs": 71,
+      "log": "nativetron/build/acceptance/drift-i18n-generate_mjs.log"
+    },
+    {
+      "id": "drift-commands-generate.mjs",
+      "status": "passed",
+      "command": [
+        "/private/tmp/node-v24.22.1-darwin-arm64/bin/node",
+        "commands/generate.mjs",
+        "--check"
+      ],
+      "exitCode": 0,
+      "durationMs": 28,
+      "log": "nativetron/build/acceptance/drift-commands-generate_mjs.log"
+    },
+    {
+      "id": "drift-desktop-generate.mjs",
+      "status": "passed",
+      "command": [
+        "/private/tmp/node-v24.22.1-darwin-arm64/bin/node",
+        "desktop/generate.mjs",
+        "--check"
+      ],
+      "exitCode": 0,
+      "durationMs": 28,
+      "log": "nativetron/build/acceptance/drift-desktop-generate_mjs.log"
+    },
+    {
+      "id": "drift-compat-generate.mjs",
+      "status": "passed",
+      "command": [
+        "/private/tmp/node-v24.22.1-darwin-arm64/bin/node",
+        "compat/generate.mjs",
+        "--check"
+      ],
+      "exitCode": 0,
+      "durationMs": 37,
+      "log": "nativetron/build/acceptance/drift-compat-generate_mjs.log"
+    },
+    {
+      "id": "focused-contracts",
+      "status": "passed",
+      "command": [
+        "/private/tmp/node-v24.22.1-darwin-arm64/bin/node",
+        "--test",
+        "--test-reporter=tap",
+        "--test-concurrency=1",
+        "abi/event-contract.test.mjs",
+        "host/dom-host.test.mjs",
+        "host/resize.test.mjs",
+        "gpu/verify.mjs",
+        "gpu/request-errors.test.mjs",
+        "gpu/measure.test.mjs",
+        "gpu/encode.test.mjs",
+        "engine/assets.test.mjs",
+        "engine/assets-native.test.mjs",
+        "engine/lane.test.mjs",
+        "engine/lifecycle.test.mjs",
+        "ipc/codec.test.mjs",
+        "ipc/engine.test.mjs",
+        "ipc/control.test.mjs",
+        "ipc/platform-codec.test.mjs",
+        "i18n/i18n.test.mjs",
+        "i18n/compiled.test.mjs",
+        "commands/commands.test.mjs",
+        "hosts/verify.mjs",
+        "hosts/ios/verify.mjs",
+        "hosts/android/test/bundle-manifest.test.mjs",
+        "hosts/android/test/asset-probe.test.mjs",
+        "security/transport.test.mjs",
+        "packaging/package.test.mjs"
+      ],
+      "exitCode": 0,
+      "durationMs": 9243,
+      "log": "nativetron/build/acceptance/focused-contracts.log",
+      "nodeTests": {
+        "tests": 113,
+        "pass": 113,
+        "fail": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "id": "components-browser",
+      "status": "passed",
+      "command": [
+        "/private/tmp/node-v24.22.1-darwin-arm64/bin/node",
+        "framework/components.test.mjs"
+      ],
+      "exitCode": 0,
+      "durationMs": 1832,
+      "log": "nativetron/build/acceptance/components-browser.log"
+    },
+    {
+      "id": "commands-browser",
+      "status": "passed",
+      "command": [
+        "/private/tmp/node-v24.22.1-darwin-arm64/bin/node",
+        "commands/palette.test.mjs"
+      ],
+      "exitCode": 0,
+      "durationMs": 3044,
+      "log": "nativetron/build/acceptance/commands-browser.log"
+    },
+    {
+      "id": "virtual-browser",
+      "status": "passed",
+      "command": [
+        "/private/tmp/node-v24.22.1-darwin-arm64/bin/node",
+        "framework/virtual.test.mjs"
+      ],
+      "exitCode": 0,
+      "durationMs": 8183,
+      "log": "nativetron/build/acceptance/virtual-browser.log"
+    },
+    {
+      "id": "web-build",
+      "status": "passed",
+      "command": [
+        "bash",
+        "web/build-web.sh"
+      ],
+      "exitCode": 0,
+      "durationMs": 803,
+      "log": "nativetron/build/acceptance/web-build.log"
+    },
+    {
+      "id": "web-wasm-conformance",
+      "status": "passed",
+      "command": [
+        "/private/tmp/node-v24.22.1-darwin-arm64/bin/node",
+        "web/verify.mjs"
+      ],
+      "exitCode": 0,
+      "durationMs": 35,
+      "log": "nativetron/build/acceptance/web-wasm-conformance.log"
+    },
+    {
+      "id": "gpu-engine-build",
+      "status": "passed",
+      "command": [
+        "bash",
+        "engine/build.sh"
+      ],
+      "exitCode": 0,
+      "durationMs": 5150,
+      "log": "nativetron/build/acceptance/gpu-engine-build.log"
+    },
+    {
+      "id": "gpu-conformance-main-worker",
+      "status": "passed",
+      "command": [
+        "/private/tmp/node-v24.22.1-darwin-arm64/bin/node",
+        "gpu/conformance-test.mjs"
+      ],
+      "exitCode": 0,
+      "durationMs": 1478,
+      "log": "nativetron/build/acceptance/gpu-conformance-main-worker.log"
+    },
+    {
+      "id": "gpu-demo",
+      "status": "passed",
+      "command": [
+        "/private/tmp/node-v24.22.1-darwin-arm64/bin/node",
+        "gpu/browser-test.mjs"
+      ],
+      "exitCode": 0,
+      "durationMs": 2264,
+      "log": "nativetron/build/acceptance/gpu-demo.log"
+    },
+    {
+      "id": "engine-browser",
+      "status": "passed",
+      "command": [
+        "/private/tmp/node-v24.22.1-darwin-arm64/bin/node",
+        "engine/browser-test.mjs"
+      ],
+      "exitCode": 0,
+      "durationMs": 2947,
+      "log": "nativetron/build/acceptance/engine-browser.log"
+    },
+    {
+      "id": "engine-lifecycle-browser",
+      "status": "passed",
+      "command": [
+        "/private/tmp/node-v24.22.1-darwin-arm64/bin/node",
+        "engine/lifecycle.browser-test.mjs"
+      ],
+      "exitCode": 0,
+      "durationMs": 1184,
+      "log": "nativetron/build/acceptance/engine-lifecycle-browser.log"
+    },
+    {
+      "id": "native-build",
+      "status": "passed",
+      "command": [
+        "bash",
+        "build.sh"
+      ],
+      "exitCode": 0,
+      "durationMs": 2334,
+      "log": "nativetron/build/acceptance/native-build.log"
+    },
+    {
+      "id": "native-click",
+      "status": "passed",
+      "command": [
+        "./build/main"
+      ],
+      "exitCode": 0,
+      "durationMs": 1108,
+      "log": "nativetron/build/acceptance/native-click.log"
+    },
+    {
+      "id": "native-lifecycle-stress",
+      "status": "passed",
+      "command": [
+        "/private/tmp/node-v24.22.1-darwin-arm64/bin/node",
+        "stress/lifecycle.test.mjs"
+      ],
+      "exitCode": 0,
+      "durationMs": 34216,
+      "log": "nativetron/build/acceptance/native-lifecycle-stress.log"
+    },
+    {
+      "id": "node-addon-build",
+      "status": "passed",
+      "command": [
+        "npm",
+        "--prefix",
+        "node",
+        "run",
+        "build"
+      ],
+      "exitCode": 0,
+      "durationMs": 367,
+      "log": "nativetron/build/acceptance/node-addon-build.log"
+    },
+    {
+      "id": "node-native-react-bindings",
+      "status": "passed",
+      "command": [
+        "/private/tmp/node-v24.22.1-darwin-arm64/bin/node",
+        "node/test.mjs"
+      ],
+      "exitCode": 0,
+      "durationMs": 1972,
+      "log": "nativetron/build/acceptance/node-native-react-bindings.log"
+    },
+    {
+      "id": "macos27-engine-menu-runtime",
+      "status": "passed",
+      "command": [
+        "./build/engine-desktop"
+      ],
+      "exitCode": 0,
+      "durationMs": 875,
+      "log": "nativetron/build/acceptance/macos27-engine-menu-runtime.log"
+    },
+    {
+      "id": "ios-host-tests",
+      "status": "passed",
+      "command": [
+        "bash",
+        "hosts/ios/test.sh"
+      ],
+      "exitCode": 0,
+      "durationMs": 7807,
+      "log": "nativetron/build/acceptance/ios-host-tests.log"
+    },
+    {
+      "id": "ios18-simulator-runtime",
+      "status": "blocked",
+      "command": [
+        "bash",
+        "hosts/ios/accept.sh",
+        "sim"
+      ],
+      "exitCode": 3,
+      "durationMs": 22089,
+      "log": "nativetron/build/acceptance/ios18-simulator-runtime.log",
+      "reason": "iOS 18.6 simulator host/control/assets/lifecycle verified; navigator.gpu unavailable, not iOS 26 WebGPU acceptance"
+    },
+    {
+      "id": "ios18-host-control-lifecycle",
+      "status": "passed",
+      "evidence": "nativetron/build/ios-evidence/20261104T230622Z-sim/summary.json",
+      "control": "commands=2 received=6 refused=0 captured=8 dropped=0 collections=0",
+      "gpu": "gpu-unavailable"
+    },
+    {
+      "id": "ios26-unsigned-device-build",
+      "status": "passed",
+      "command": [
+        "bash",
+        "hosts/ios/build.sh",
+        "device-compile"
+      ],
+      "exitCode": 0,
+      "durationMs": 2014,
+      "log": "nativetron/build/acceptance/ios26-unsigned-device-build.log"
+    },
+    {
+      "id": "android-host-tests",
+      "status": "passed",
+      "command": [
+        "bash",
+        "hosts/android/test.sh"
+      ],
+      "exitCode": 0,
+      "durationMs": 1361,
+      "log": "nativetron/build/acceptance/android-host-tests.log"
+    },
+    {
+      "id": "android-production-build",
+      "status": "passed",
+      "command": [
+        "bash",
+        "hosts/android/build.sh"
+      ],
+      "exitCode": 0,
+      "durationMs": 4976,
+      "log": "nativetron/build/acceptance/android-production-build.log"
+    },
+    {
+      "id": "android-debug-build",
+      "status": "passed",
+      "command": [
+        "bash",
+        "hosts/android/build.sh",
+        "--debuggable"
+      ],
+      "exitCode": 0,
+      "durationMs": 4515,
+      "log": "nativetron/build/acceptance/android-debug-build.log"
+    },
+    {
+      "id": "android-runtime",
+      "status": "blocked",
+      "command": [
+        "bash",
+        "hosts/android/run.sh"
+      ],
+      "exitCode": 3,
+      "durationMs": 7771,
+      "log": "nativetron/build/acceptance/android-runtime.log",
+      "reason": "host/control/lifecycle verified on selected Android runtime; WebGPU unavailable"
+    },
+    {
+      "id": "windows-cross-build",
+      "status": "passed",
+      "command": [
+        "bash",
+        "hosts/windows/build.sh",
+        "--check"
+      ],
+      "exitCode": 0,
+      "durationMs": 9603,
+      "log": "nativetron/build/acceptance/windows-cross-build.log"
+    },
+    {
+      "id": "windows-portable-tests",
+      "status": "passed",
+      "command": [
+        "/private/tmp/node-v24.22.1-darwin-arm64/bin/node",
+        "--test",
+        "--test-reporter=tap",
+        "hosts/windows/verify.test.mjs"
+      ],
+      "exitCode": 0,
+      "durationMs": 5782,
+      "log": "nativetron/build/acceptance/windows-portable-tests.log",
+      "nodeTests": {
+        "tests": 8,
+        "pass": 8,
+        "fail": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "id": "macos26-runtime",
+      "status": "blocked",
+      "reason": "no macOS 26 hardware available; current macOS 27 evidence is separate"
+    },
+    {
+      "id": "ios26-physical-device",
+      "status": "blocked",
+      "reason": "no physical iOS 26 device/authorised signing identity; unsigned link and iOS 18.6 fallback are not physical WebGPU evidence"
+    },
+    {
+      "id": "android-physical-device",
+      "status": "blocked",
+      "reason": "emulator acceptance, if supplied, is not physical-device WebGPU evidence; no physical device attached"
+    },
+    {
+      "id": "windows-runtime",
+      "status": "blocked",
+      "reason": "no Windows machine/VM/Wine; execute hosts/windows/acceptance.ps1 on Windows with WebView2/WebGPU"
+    },
+    {
+      "id": "bvh-build",
+      "status": "passed",
+      "command": [
+        "bash",
+        "bench/engine-bvh/build.sh"
+      ],
+      "exitCode": 0,
+      "durationMs": 2765,
+      "log": "nativetron/build/acceptance/bvh-build.log"
+    },
+    {
+      "id": "bvh-smoke",
+      "status": "passed",
+      "command": [
+        "/private/tmp/node-v24.22.1-darwin-arm64/bin/node",
+        "bench/engine-bvh/run.mjs"
+      ],
+      "exitCode": 0,
+      "durationMs": 1051,
+      "log": "nativetron/build/acceptance/bvh-smoke.log"
+    },
+    {
+      "id": "bvh-compiler-inspection",
+      "status": "passed",
+      "command": [
+        "/private/tmp/node-v24.22.1-darwin-arm64/bin/node",
+        "bench/engine-bvh/inspect.mjs"
+      ],
+      "exitCode": 0,
+      "durationMs": 81,
+      "log": "nativetron/build/acceptance/bvh-compiler-inspection.log"
+    },
+    {
+      "id": "readonly-scriptc",
+      "status": "passed",
+      "before": {
+        "directory": "scriptc",
+        "revision": "76dc1100ef9a45ad91ca52760534c611d13eb1d3",
+        "status": "",
+        "refsSha256": "482d0e53f00448b53d28fc4787bf26c128d21e5d3e7a656199e2a422491362dc"
+      },
+      "after": {
+        "directory": "scriptc",
+        "revision": "76dc1100ef9a45ad91ca52760534c611d13eb1d3",
+        "status": "",
+        "refsSha256": "482d0e53f00448b53d28fc4787bf26c128d21e5d3e7a656199e2a422491362dc"
+      }
+    },
+    {
+      "id": "readonly-house-planner",
+      "status": "passed",
+      "before": {
+        "directory": "house-planner",
+        "revision": "119c91962b958319e24c5771d565e3e5115b2208",
+        "status": "",
+        "refsSha256": "b89943142c9374ea72daf9e16e3ec780267bd1511696e5c9954432526fdce105"
+      },
+      "after": {
+        "directory": "house-planner",
+        "revision": "119c91962b958319e24c5771d565e3e5115b2208",
+        "status": "",
+        "refsSha256": "b89943142c9374ea72daf9e16e3ec780267bd1511696e5c9954432526fdce105"
+      }
+    },
+    {
+      "id": "record-gpu",
+      "status": "passed",
+      "command": [
+        "/private/tmp/node-v24.22.1-darwin-arm64/bin/node",
+        "gpu/browser-test.mjs"
+      ],
+      "exitCode": 0,
+      "durationMs": 3034,
+      "log": "nativetron/build/acceptance/record-gpu.log"
+    },
+    {
+      "id": "record-bvh",
+      "status": "passed",
+      "command": [
+        "/private/tmp/node-v24.22.1-darwin-arm64/bin/node",
+        "bench/engine-bvh/run.mjs",
+        "--final"
+      ],
+      "exitCode": 0,
+      "durationMs": 82833,
+      "log": "nativetron/build/acceptance/record-bvh.log"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "nativetron/build/ios-evidence/20261104T230622Z-sim/summary.json",
+      "bytes": 3597,
+      "sha256": "5487ee5033cbbd6e348bbb3a753d912ad3dd685fc6b724d5bdb7e121a1c02714"
+    },
+    {
+      "path": "nativetron/build/acceptance/artifacts/nativetron-production.apk",
+      "bytes": 1054246,
+      "sha256": "3dabbb5d91c41490f0158d9b74c2f293985f83f78aa69157ebf5d1019189d4e8"
+    },
+    {
+      "path": "nativetron/build/engine-windows.exe",
+      "bytes": 1049088,
+      "sha256": "97fb72399e956bd4f61cb0b24693f6e2cdf2652404f08107e22e303676d887a6"
+    },
+    {
+      "path": "nativetron/build/engine-assets/asset-manifest.json",
+      "bytes": 2860,
+      "sha256": "0f54f4958b4717f6524d0c9a5bec73cbe5c08399476bb1ab31bc1bc96740d931"
+    },
+    {
+      "path": "nativetron/gpu/last-run.json",
+      "bytes": 93774,
+      "sha256": "7fcf12a29523826fdb76581c628a3129819a6655abb49e711e4e97dfbd23b1be"
+    },
+    {
+      "path": "nativetron/bench/engine-bvh/last-run.json",
+      "bytes": 407284,
+      "sha256": "633951899e6e1e4d2b3d7995bec3e316c4e43232fe8f5d9622a1ff5404872e0d"
+    }
+  ],
+  "finished": "2026-11-04T23:08:57.974Z",
+  "summary": {
+    "passed": 43,
+    "failed": 0,
+    "blocked": 6
+  },
+  "measurementStarted": "2026-11-04T23:07:31.945Z",
+  "scopeNote": "Build and host-only fallback success is not physical WebGPU/Windows runtime acceptance. Later commits contain datasets/docs only.",
+  "osProductVersion": "27.0.1",
+  "temporaryTestTool": {
+    "name": "PowerShell",
+    "version": "7.6.9",
+    "runtimeDependency": false
+  },
+  "benchmarks": {
+    "gpu": {
+      "file": "gpu/last-run.json",
+      "rawTrials": 101,
+      "warmups": 20,
+      "adapter": {
+        "vendor": "apple",
+        "architecture": "metal-3",
+        "device": "",
+        "description": "",
+        "isFallbackAdapter": false
+      }
+    },
+    "bvh": {
+      "file": "bench/engine-bvh/last-run.json",
+      "cases": 28,
+      "trials": 21,
+      "warmups": 5,
+      "lanes": [
+        "v8",
+        "release",
+        "speed"
+      ]
+    }
+  },
+  "worktreeHygiene": {
+    "ephemeralAgents": 9,
+    "remainingTemporaryWorktrees": 0,
+    "obsoleteBuildTreesRemoved": [
+      "build/ios"
+    ]
+  }
+}

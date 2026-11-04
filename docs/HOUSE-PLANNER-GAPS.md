@@ -1,6 +1,6 @@
 # House-planner integration gaps
 
-I inspected scriptc `internal` at `76dc1100ef9a45ad91ca52760534c611d13eb1d3` (0.4.8) and house-planner at `119c919` (study §7.6, `gi/binned.ts`, `rt/wbvh/`). Both checkouts were read only, and no files or refs were changed. The benchmark code is a local copy, not a runtime dependency. Line references below are to that scriptc revision. The binary facts come from `bench/engine-bvh/inspect.mjs`, which uses a dependency-free opcode census, run on reactors built locally with `SCRIPTC=…/scriptc/packages/cli/dist/main.js`.
+I inspected scriptc `internal` at `76dc1100ef9a45ad91ca52760534c611d13eb1d3` (0.4.8) and house-planner at `119c919` (study §7.6, `gi/binned.ts`, `rt/wbvh/`). Source and refs in both checkouts were read only and unchanged. Existing ignored scriptc mobile runtime-pack outputs were built for linking, as permitted by the brief. The benchmark code is a local copy, not a runtime dependency. Line references below are to that scriptc revision. The binary facts come from `bench/engine-bvh/inspect.mjs`, which uses a dependency-free opcode census, run on reactors built locally with `SCRIPTC=…/scriptc/packages/cli/dist/main.js`.
 
 Every effort figure below is a planning range, not measured implementation effort. Nothing in this report claims a SIMD, threading or f32 speedup.
 
@@ -95,16 +95,28 @@ Every trial is paired and lane-rotated, and all raw and warmup samples are retai
 
 Smoke evidence: the default smoke run (sizes 1–4,096) and a 50,000-triangle smoke run pass every gate in every lane. Smoke mode prints no timings and writes nothing.
 
-**Pending:** final timings. The exclusive run happens after integration (`NT_BVH_EXCLUSIVE=1 node bench/engine-bvh/run.mjs --final`), and this section should then be replaced with its medians, paired ratios and spread.
+**Final recording:** 2026-11-04T23:08:57.812Z, Apple M4 Max (16 logical CPUs), official Node v24.22.1/ICU 78.3; 4,096 and 50,000 triangles, 16 bins, 28 cases, 21 paired trials plus 5 warmups. Every validation/provenance/hash/deformation gate passed in every lane. All raw/warmup values, per-trial lane orders, p95/min/max and paired ratio ranges are in `bench/engine-bvh/last-run.json`. There were no modifying agents, builds, browsers from other tests, simulators or emulators running during recording; ordinary OS activity is not controlled. Load-average history is retained (6.90/5.41/4.90 before, 3.04/4.52/4.61 after), not hidden.
 
-`last-run.json` still holds the previous revision's result, recorded at 2026-11-04T19:01Z under these conditions:
+50k medians (milliseconds; ratios are per-trial wasm/V8 medians, **lower is better**, not ratios of the displayed medians):
 
-- one Float32 variant
-- the uniform distribution only
-- release lane only
-- unchanged-geometry refit
+| distribution | storage | build ms V8 / release / speed | paired build ratio release / speed | changed refit ms V8 / release / speed |
+|---|---|---|---|---|
+| architectural | f64 | 39.92 / 51.49 / 50.37 | 1.29 / 1.26 | 0.82 / 0.87 / 0.80 |
+| architectural | f32 | 41.22 / 54.32 / 50.78 | 1.32 / 1.24 | 0.74 / 0.86 / 0.82 |
+| uniform-soup | f64 | 60.36 / 78.24 / 78.53 | 1.30 / 1.31 | 0.77 / 0.90 / 0.87 |
+| uniform-soup | f32 | 60.44 / 80.63 / 79.01 | 1.33 / 1.30 | 0.74 / 0.92 / 0.89 |
+| coincident-centroids | f64 | 4.60 / 8.92 / 9.44 | 1.95 / 2.07 | 0.54 / 0.69 / 0.65 |
+| coincident-centroids | f32 | 4.83 / 10.64 / 9.53 | 2.19 / 1.98 | 0.53 / 0.68 / 0.65 |
+| geometric-clusters | f64 | 71.15 / 87.46 / 87.14 | 1.23 / 1.23 | 0.73 / 0.88 / 0.87 |
+| geometric-clusters | f32 | 72.31 / 90.93 / 86.55 | 1.26 / 1.21 | 0.70 / 0.91 / 0.88 |
+| long-slivers | f64 | 64.90 / 82.86 / 82.98 | 1.28 / 1.29 | 0.87 / 1.00 / 0.97 |
+| long-slivers | f32 | 66.33 / 86.32 / 83.75 | 1.30 / 1.25 | 0.86 / 1.04 / 0.99 |
+| far-offset-mm | f64 | 35.20 / 45.28 / 43.80 | 1.28 / 1.25 | 0.66 / 0.75 / 0.69 |
+| far-offset-mm | f32 | 35.27 / 47.79 / 44.09 | 1.35 / 1.25 | 0.62 / 0.76 / 0.73 |
+| planar-duplicates | f64 | 18.92 / 25.62 / 24.45 | 1.35 / 1.29 | 0.62 / 0.77 / 0.70 |
+| planar-duplicates | f32 | 19.69 / 27.32 / 24.53 | 1.39 / 1.26 | 0.61 / 0.76 / 0.71 |
 
-Its V8/wasm medians were 85.12/99.56 ms for build and 1.13/1.48 ms for refit at 50k triangles on an Apple M4 Max. Those numbers are superseded and are not evidence for the new variants, distributions or postures.
+Neither posture beats V8 consistently; speed is not uniformly faster than release. Float32 storage does not establish a Float32 arithmetic or SIMD speedup. The two variants can choose different valid trees; exact hashes are compared **within** a variant across lanes, with cross-variant quality/topology differences recorded separately. Release/speed modules are release 324,742 bytes / speed 380,093 bytes and each ends at 103.56 MiB linear memory after the complete matrix. SIMD/shared memory are not enabled. The old single-variant, single-distribution, unchanged-refit results are superseded and no longer presented as current evidence.
 
 Scope limits:
 
@@ -114,17 +126,12 @@ Scope limits:
 
 ## Framework/platform delivery and remaining scope
 
-This summary is conservative. The iOS, Android, Windows, engine, GPU, i18n, commands and virtualisation streams are still being integrated (see `docs/HOUSE-PLANNER-EXECUTION.md`), and the integrator's final ledger supersedes this section.
+All P1–P5 implementation/investigation streams are integrated. [The execution ledger](HOUSE-PLANNER-EXECUTION.md) and [serialized acceptance](HOUSE-PLANNER-ACCEPTANCE.json) are the authoritative evidence: **43 passed checks, zero failed, six explicit blocked gates**.
 
-- Baseline `5c48621` provides a generated WebGPU command surface with transport measurements in `gpu/README.md`, an in-page engine reactor lane with generated bounded control IPC, platform host shells, and English-first i18n, commands and fixed-row virtualisation. The respective READMEs describe what was exercised at that baseline.
-- Runtime verification on Android devices, Windows, physical iOS devices and iOS WebGPU is not claimed here. A cross-build or mock is not runtime evidence.
-- The GPU surface is deliberately not a complete WebGPU binding; its schema and its limits are owned by the GPU stream.
+- P1: generated GPU protocol 3, common full render/compute descriptors, negotiation, terminal request ownership, safe handles, read-only callback buffers, guest-owned readback delivery and demand-driven frames; real Chrome main/worker conformance. See the GPU README for deliberately unsupported WebGPU API areas.
+- P2: independently compiled UI/engine reactors in the page, Worker/OffscreenCanvas preference and main fallback, bounded full-envelope routing, preflight/cancellation/restart/shutdown, no synchronous reentry, offline generated asset policies. Chrome lifecycle and macOS 27 WKWebView/native-menu execution pass.
+- P3: actual iOS/Android static control archives and complete host/build/acceptance paths; Windows virtual HTTPS response/isolation/offline/lifecycle host and runtime runner. Simulator/emulator assets/control/lifecycle pass, but neither supplies WebGPU. Cross-builds are not GPU runtime evidence.
+- P4: three reactive catalogues, bounded plural/formatting hooks and static key checks; command/palette keyboard/shortcut/focus ownership; fixed-row keyed lists/tables with true observed resize, scroll-to-index, edit/focus preservation and stress evidence. Native formatter providers remain embedding-owned; no bundled native ICU binding is claimed.
+- P5: this read-only compiler study and the correctness-gated recorded BVH matrix; compiler SIMD/thread/f32 changes are **not** implemented or authorised under this brief.
 
-Open questions:
-
-- Which render targets, features and formats does the first engine milestone need?
-- Should an unavailable WebGPU disable 3D editing or offer a separately scoped fallback?
-- Which physical devices form the acceptance matrix?
-- For SIMD, should work begin with reactor feature plumbing (above) or with profiling the scalar BVH loops once final timings exist?
-
-scriptc integration-history changes were not performed under this read-only brief.
+Remaining external acceptance is explicit: macOS 26 hardware, physical iOS 26 with authorised signing, physical Android WebGPU and Windows/WebView2 execution. Application product choices (fallback UX, app-specific assets/rendering requirements and device coverage) remain application-owned, not hidden framework substitutions. No house-planner or scriptc source files/refs were changed. scriptc integration-history changes were not performed.
