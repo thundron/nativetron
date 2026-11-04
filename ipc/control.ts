@@ -5,7 +5,7 @@ declare function controlReceive(bytes: Uint8Array): void;
 
 export function command(topic: number, payload: Uint8Array): number {
   if (!Number.isInteger(topic) || topic < 0 || topic > 4294967295 || payload.length > ENGINE_MAX_PAYLOAD) return 1;
-  controlSend(encodeEngineMessage(ENGINE_COMMAND, ENGINE_MAX_PAYLOAD, LANE_NATIVE, LANE_ENGINE, 0, topic, payload));
+  controlSend(encodeEngineMessage(ENGINE_COMMAND, LANE_NATIVE, LANE_ENGINE, 0, topic, payload));
   return 0;
 }
 
