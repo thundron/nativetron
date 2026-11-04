@@ -1,0 +1,14 @@
+<!doctype html><html><head><meta charset="utf-8"></head><body><div id="nt-root"></div>
+<script>window.__nt_send = () => {}; window.panics = [];</script><script src="../host/dom-host.js"></script>
+<script type="module">
+import { instantiateFromBytes } from "./.scriptc/virtual.fixture.mjs";
+import { bindEventCallbacks } from "../host/event.generated.mjs";
+let api;
+bindEventCallbacks(window, () => api, "nt");
+api = await instantiateFromBytes(await (await fetch("./.scriptc/virtual.fixture.wasm")).arrayBuffer(), {
+  present: bytes => window.__nt.applyBin(bytes),
+  panic: message => { window.panics.push(message); throw new Error(message); },
+});
+api.nt_start();
+window.fixture = api;
+</script></body></html>

@@ -1,0 +1,211 @@
+{
+  "profile_format": 1,
+  "name": "nt-virtual-fixture",
+  "entry": "virtual.fixture.ts",
+  "emission": "llvm",
+  "abi": {
+    "prefix": "nt_",
+    "init_symbol": "nt_init",
+    "sink_register_symbol": "nt_set_panic_sink",
+    "collect_symbol": "nt_collect",
+    "result_reset_symbol": null,
+    "callback_register_symbol": "nt_set_callback"
+  },
+  "callbacks": [
+    {
+      "name": "present",
+      "params": [
+        "bytes"
+      ],
+      "returns": "void"
+    }
+  ],
+  "exports": [
+    {
+      "export": "start",
+      "symbol": "nt_start",
+      "params": [],
+      "returns": "f64"
+    },
+    {
+      "export": "dispose",
+      "symbol": "nt_dispose",
+      "params": [],
+      "returns": "f64"
+    },
+    {
+      "export": "statsLists",
+      "symbol": "nt_statsLists",
+      "params": [],
+      "returns": "f64"
+    },
+    {
+      "export": "statsRows",
+      "symbol": "nt_statsRows",
+      "params": [],
+      "returns": "f64"
+    },
+    {
+      "export": "scrollValueA",
+      "symbol": "nt_scrollValueA",
+      "params": [],
+      "returns": "f64"
+    },
+    {
+      "export": "scrollValueB",
+      "symbol": "nt_scrollValueB",
+      "params": [],
+      "returns": "f64"
+    },
+    {
+      "export": "activeValueA",
+      "symbol": "nt_activeValueA",
+      "params": [],
+      "returns": "f64"
+    },
+    {
+      "export": "setCountA",
+      "symbol": "nt_setCountA",
+      "params": [
+        "f64"
+      ],
+      "returns": "f64"
+    },
+    {
+      "export": "setViewA",
+      "symbol": "nt_setViewA",
+      "params": [
+        "f64"
+      ],
+      "returns": "f64"
+    },
+    {
+      "export": "setActiveA",
+      "symbol": "nt_setActiveA",
+      "params": [
+        "f64"
+      ],
+      "returns": "f64"
+    },
+    {
+      "export": "setShiftA",
+      "symbol": "nt_setShiftA",
+      "params": [
+        "f64"
+      ],
+      "returns": "f64"
+    },
+    {
+      "export": "setCountC",
+      "symbol": "nt_setCountC",
+      "params": [
+        "f64"
+      ],
+      "returns": "f64"
+    },
+    {
+      "export": "setViewC",
+      "symbol": "nt_setViewC",
+      "params": [
+        "f64"
+      ],
+      "returns": "f64"
+    },
+    {
+      "export": "bumpTable",
+      "symbol": "nt_bumpTable",
+      "params": [],
+      "returns": "f64"
+    },
+    {
+      "export": "editLabel",
+      "symbol": "nt_editLabel",
+      "params": [
+        "f64",
+        "string"
+      ],
+      "returns": "f64"
+    },
+    {
+      "export": "reverseB",
+      "symbol": "nt_reverseB",
+      "params": [],
+      "returns": "f64"
+    },
+    {
+      "export": "rotateB",
+      "symbol": "nt_rotateB",
+      "params": [],
+      "returns": "f64"
+    },
+    {
+      "export": "resetB",
+      "symbol": "nt_resetB",
+      "params": [],
+      "returns": "f64"
+    },
+    {
+      "export": "setCountB",
+      "symbol": "nt_setCountB",
+      "params": [
+        "f64"
+      ],
+      "returns": "f64"
+    },
+    {
+      "export": "duplicateB",
+      "symbol": "nt_duplicateB",
+      "params": [
+        "f64",
+        "f64"
+      ],
+      "returns": "f64"
+    },
+    {
+      "export": "invalidCountA",
+      "symbol": "nt_invalidCountA",
+      "params": [],
+      "returns": "f64"
+    },
+    {
+      "export": "cycle",
+      "symbol": "nt_cycle",
+      "params": [
+        "f64"
+      ],
+      "returns": "f64"
+    },
+    {
+      "export": "onEvent",
+      "symbol": "nt_on_event",
+      "params": [
+        "f64"
+      ],
+      "returns": "f64"
+    },
+    {
+      "export": "onEventValue",
+      "symbol": "nt_on_event_value",
+      "params": [
+        "f64",
+        "string"
+      ],
+      "returns": "f64"
+    },
+    {
+      "export": "onEventRich",
+      "symbol": "nt_on_event_rich",
+      "params": [
+        "f64",
+        "string",
+        "f64",
+        "string",
+        "string",
+        "f64",
+        "string",
+        "f64"
+      ],
+      "returns": "f64"
+    }
+  ]
+}
