@@ -1,0 +1,31 @@
+{
+  "profile_format": 1,
+  "name": "nt-i18n-fixture",
+  "entry": "fixture.ts",
+  "emission": "llvm",
+  "abi": {
+    "prefix": "nt_i18n_",
+    "init_symbol": "nt_i18n_init",
+    "sink_register_symbol": "nt_i18n_set_panic_sink",
+    "collect_symbol": "nt_i18n_collect",
+    "result_reset_symbol": null,
+    "callback_register_symbol": "nt_i18n_set_callback"
+  },
+  "callbacks": [
+    { "name": "rendered", "params": ["string"], "returns": "void" },
+    { "name": "reply", "params": ["string"], "returns": "void" },
+    { "name": "localeFormatBegin", "params": ["f64", "string", "string", "f64", "f64"], "returns": "f64" },
+    { "name": "localeFormatByte", "params": ["f64"], "returns": "f64" }
+  ],
+  "exports": [
+    { "export": "start", "symbol": "nt_i18n_start", "params": [], "returns": "f64" },
+    { "export": "stopRendering", "symbol": "nt_i18n_stop_rendering", "params": [], "returns": "f64" },
+    { "export": "switchLocale", "symbol": "nt_i18n_switch_locale", "params": ["string"], "returns": "f64" },
+    { "export": "setCount", "symbol": "nt_i18n_set_count", "params": ["f64"], "returns": "f64" },
+    { "export": "plural", "symbol": "nt_i18n_plural", "params": ["f64"], "returns": "f64" },
+    { "export": "itemCount", "symbol": "nt_i18n_item_count", "params": ["f64"], "returns": "f64" },
+    { "export": "lookup", "symbol": "nt_i18n_lookup", "params": ["string"], "returns": "f64" },
+    { "export": "wrongArgument", "symbol": "nt_i18n_wrong_argument", "params": [], "returns": "f64" },
+    { "export": "format", "symbol": "nt_i18n_format", "params": ["f64", "string", "f64"], "returns": "f64" }
+  ]
+}

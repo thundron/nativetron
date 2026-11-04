@@ -1,0 +1,8 @@
+{
+  "commands.title": "Commandes",
+  "commands.search": "Rechercher des commandes",
+  "commands.empty": "Aucune commande activée",
+  "commands.close": "Fermer",
+  "items.count": "{count, plural, =0 {Aucun élément} one {# élément} many {# d’éléments} other {# éléments}}",
+  "greeting": "Bonjour, {name}"
+}

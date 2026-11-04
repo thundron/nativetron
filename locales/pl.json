@@ -1,0 +1,8 @@
+{
+  "commands.title": "Polecenia",
+  "commands.search": "Szukaj poleceń",
+  "commands.empty": "Brak włączonych poleceń",
+  "commands.close": "Zamknij",
+  "items.count": "{count, plural, =0 {Brak elementów} one {# element} few {# elementy} many {# elementów} other {# elementu}}",
+  "greeting": "Witaj, {name}"
+}

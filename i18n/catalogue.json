@@ -1,25 +1,27 @@
 {
-  "version": 1,
+  "version": 2,
+  "sourceLocale": "en",
   "locales": [
-    {
-      "tag": "en",
-      "pluralRule": "english-cardinal"
+    { "tag": "en", "catalogue": "locales/en.json", "pluralRule": "english-cardinal" },
+    { "tag": "fr", "catalogue": "locales/fr.json", "pluralRule": "french-cardinal" },
+    { "tag": "pl", "catalogue": "locales/pl.json", "pluralRule": "polish-cardinal" }
+  ],
+  "pluralRules": {
+    "english-cardinal": { "one": "i = 1 and v = 0" },
+    "french-cardinal": {
+      "one": "i = 0,1",
+      "many": "e = 0 and i != 0 and i % 1000000 = 0 and v = 0 or e != 0..5"
+    },
+    "polish-cardinal": {
+      "one": "i = 1 and v = 0",
+      "few": "v = 0 and i % 10 = 2..4 and i % 100 != 12..14",
+      "many": "v = 0 and i != 1 and i % 10 = 0..1 or v = 0 and i % 10 = 5..9 or v = 0 and i % 100 = 12..14"
     }
-  ],
-  "units": [
-    "millimeter",
-    "centimeter",
-    "meter",
-    "kilometer",
-    "inch",
-    "foot",
-    "liter"
-  ],
+  },
+  "pluralFractionDigits": 3,
+  "units": ["millimeter", "centimeter", "meter", "kilometer", "inch", "foot", "liter"],
   "maxFormattedBytes": 512,
-  "sourceDirectories": [
-    "app",
-    "engine",
-    "framework",
-    "commands"
-  ]
+  "sourceDirectories": ["app", "engine", "framework", "commands"],
+  "keyProperties": ["labelKey"],
+  "dynamicKeyFiles": ["commands/index.ts"]
 }
