@@ -135,3 +135,7 @@ All P1–P5 implementation/investigation streams are integrated. [The execution 
 - P5: this read-only compiler study and the correctness-gated recorded BVH matrix; compiler SIMD/thread/f32 changes are **not** implemented or authorised under this brief.
 
 Remaining external acceptance is explicit: macOS 26 hardware, physical iOS 26 with authorised signing, physical Android WebGPU and Windows/WebView2 execution. Application product choices (fallback UX, app-specific assets/rendering requirements and device coverage) remain application-owned, not hidden framework substitutions. No house-planner or scriptc source files/refs were changed. scriptc integration-history changes were not performed.
+
+## Subsequent evidence
+
+Physical Android acceptance is now available on the S24 Ultra: [device record](ANDROID-S24-ACCEPTANCE.json). It verifies the worker GPU lane and lifecycle without SharedArrayBuffer; WebView response headers alone did not enable cross-origin isolation. The earlier blocked-device matrix remains a dated historical record. The real-scene Bresso tracer measurement is recorded independently in house-planner's `bench/scriptc-bvh/shared-run.json`: 14,998 triangles, three lanes and 41 trials/8 warmups. Its existing dataset is explicitly non-exclusive and complements rather than replaces the synthetic matrix above.

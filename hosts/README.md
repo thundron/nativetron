@@ -25,7 +25,7 @@ hosts/android/build.sh --debuggable
 NT_ANDROID_SERIAL=<serial> hosts/android/run.sh
 ```
 
-The runner never chooses a device or starts an emulator implicitly. An explicitly selected emulator also requires `NT_ANDROID_ALLOW_EMULATOR=1`. It tests native command delivery, pause/resume, disposal/reopen and real WebView MIME/headers/offline probes. GPU errors fail; only unavailable WebGPU yields host-only exit 3. The Android 36 arm64 16-KiB-page emulator with WebView 156.0.8078.47 passes host/control/assets/lifecycle but has **no WebGPU adapter**. This is not physical-device GPU evidence. A physical Android device remains unavailable.
+The runner never chooses a device or starts an emulator implicitly. An explicitly selected emulator also requires `NT_ANDROID_ALLOW_EMULATOR=1`. It tests native command delivery, pause/resume, disposal/reopen and real WebView MIME/headers/offline probes. GPU errors fail; only unavailable WebGPU yields host-only exit 3. The Android 36 arm64 16-KiB-page emulator with WebView 156.0.8078.47 passes host/control/assets/lifecycle but has **no WebGPU adapter**. This is not physical-device GPU evidence. A subsequent user-executed S24 Ultra run passes worker WebGPU, 4 KiB checked readback, native control, assets, lifecycle and relaunch. See [physical-device evidence](../docs/ANDROID-S24-ACCEPTANCE.json); this closes that device gate, not all Android configurations. The tested WebView remains non-isolated despite its response headers, so shared-memory wasm threads are unavailable there.
 
 ## Windows
 
