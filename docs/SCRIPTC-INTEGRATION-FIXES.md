@@ -1,6 +1,27 @@
 # Compiler integration follow-up — 2026-11-05
 
-The internal scriptc fork fixes the five defects and the four reported language forms from house-planner study §7.8. Compiler changes are application-neutral; no runtime dependency or native geometry engine was added. Product fixes include `3197aa487`, `a6c29befb`, `d4a068cf1`, `6c57e41d2` and `01637f56a`; subsequent validation fixtures tighten native-only execution and select the trusted Darwin linker where required.
+The internal scriptc fork repairs the earlier integration cases and admits the bounded language forms described below. This does **not** close the entire ten-item checklist in house-planner's `docs/SCRIPTC-FIXES-2026-11.md`; the recheck below identifies remaining work. Compiler changes are application-neutral; no runtime dependency or native geometry engine was added. Product fixes include `3197aa487`, `a6c29befb`, `d4a068cf1`, `6c57e41d2` and `01637f56a`; subsequent validation fixtures tighten native-only execution and select the trusted Darwin linker where required.
+
+## Ten-item checklist recheck
+
+Rechecked against scriptc `4efeaec9b` using the original retained study repros and focused regression tests. Five items are closed for the reported cases, two are partial and three remain open. The earlier completion wording was too broad for this checklist.
+
+| Item | Status | Evidence or remaining work |
+| --- | --- | --- |
+| 1. JSON checked casts and library packs | **Partial** | Native fresh/cached archives and both wasm drivers pass checked-cast linking tests; feature forwarding and pack units are fixed. The library loader still ignores `SCRIPTC_RUNTIME_PACK`. |
+| 2. Imported JSON keys/order | Closed | Own-key presence, ordering and serialization match Node in the JSON corpus repro. |
+| 3. String/byte export results | Closed | Both wasm drivers pass owned-result, memory-growth and cleanup tests. Host-import returns remain scalar-only. |
+| 4. Coverage/library mismatch | Closed | Profile-aware library coverage and actual reached Node bridge plans have regression tests. Coverage remains a preparation check, not proof of successful linking. |
+| 5. Runtime-index tuple writes and widened `??` | Closed for reported forms | Original `b.ts` and `a.ts`/`a2.ts`/`a3.ts` compile natively and match Node. Mixed-element tuple writes remain explicitly refused. |
+| 6. f32 compute contract | **Open** | Float32Array storage and incidental LLVM narrowing are not a supported f32 arithmetic contract; ordinary `number` arithmetic remains f64. |
+| 7. Wasm SIMD | **Open** | No reactor SIMD feature/profile/cache/optimizer integration or vectorized-kernel acceptance was added. |
+| 8. Transitive workspace JS beside declarations | Closed | Source-only workspace admission has a transitive declaration-twin regression; installed-package admission stays enforced. |
+| 9. Early `var` reads and functions with properties | **Partial** | Original `c.js` matches Node. Initialized module-level callable intersections work, but the original `d.ts`, `d2.ts`, `d3.ts` and `d4.ts` still fail with SC1090: call-signature object property access and `Object.assign` function construction remain unsupported. |
+| 10. Shared-memory wasm threads | **Open** | A dedicated engine Worker and independent wasm instances are not a shared-heap threading ABI. Native thread-instance support does not close this wasm gap. |
+
+The pack-override probe passed a deliberately nonexistent `SCRIPTC_RUNTIME_PACK` to `loadRuntimePack` in library mode; it nevertheless selected the installed Darwin pack. `backend/runtime-pack.ts:162` resolves the installed package without consulting that override, and `backend/library-pack.ts:86` calls it without an override root. Callable repro failures are separate from the supported initialized intersection case: `frontend/type-mapper.ts:7909` still restricts hybrid mapping to intersections, and `frontend/lowering/lower-calls.ts:10523` retains the `Object.assign` refusal.
+
+The audit's selected checks pass: nine coverage/pack-matrix assertions and five native/wasm checked-cast/owned-result assertions. These are filtered test runs, not an exhaustive-suite claim. No new performance measurements or thread/SIMD/f32 acceptance claims were made.
 
 ## Defects
 

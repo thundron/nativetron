@@ -142,4 +142,4 @@ Physical Android acceptance is now available on the S24 Ultra: [device record](A
 
 ## Compiler follow-up (2026-11-05)
 
-The later compiler-fix authorization covers all five reported defects and the reported tuple, `var`, widened `??` and initialized callable-property cases. See [SCRIPTC-INTEGRATION-FIXES.md](SCRIPTC-INTEGRATION-FIXES.md) for source revisions, removed house-planner workarounds, regression/integration evidence and explicit validation/platform qualifications. Historical P1–P5 acceptance and benchmark records remain unchanged.
+The later compiler-fix authorization covers all five reported defects and the reported tuple, `var`, widened `??` and initialized callable-property cases. See [SCRIPTC-INTEGRATION-FIXES.md](SCRIPTC-INTEGRATION-FIXES.md) for source revisions, removed house-planner workarounds, regression/integration evidence and explicit validation/platform qualifications. Historical P1–P5 acceptance and benchmark records remain unchanged. The later ten-item recheck is not fully closed: pack override selection and general callable-property forms remain partial; f32 compute, wasm SIMD and shared-memory wasm threads remain open.
