@@ -139,3 +139,7 @@ Remaining external acceptance is explicit: macOS 26 hardware, physical iOS 26 wi
 ## Subsequent evidence
 
 Physical Android acceptance is now available on the S24 Ultra: [device record](ANDROID-S24-ACCEPTANCE.json). It verifies the worker GPU lane and lifecycle without SharedArrayBuffer; WebView response headers alone did not enable cross-origin isolation. The earlier blocked-device matrix remains a dated historical record. The real-scene Bresso tracer measurement is recorded independently in house-planner's `bench/scriptc-bvh/shared-run.json`: 14,998 triangles, three lanes and 41 trials/8 warmups. Its existing dataset is explicitly non-exclusive and complements rather than replaces the synthetic matrix above.
+
+## Compiler follow-up (2026-11-05)
+
+The later compiler-fix authorization covers all five reported defects and the reported tuple, `var`, widened `??` and initialized callable-property cases. See [SCRIPTC-INTEGRATION-FIXES.md](SCRIPTC-INTEGRATION-FIXES.md) for source revisions, removed house-planner workarounds, regression/integration evidence and explicit validation/platform qualifications. Historical P1–P5 acceptance and benchmark records remain unchanged.

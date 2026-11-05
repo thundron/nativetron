@@ -70,3 +70,7 @@ Final verified evidence: Chrome main/worker full GPU descriptors and conformance
 The user ran `hosts/android/run.sh` on an S24 Ultra (SM-S928B, API 37, WebView 156.0.8078.47). The runner's APK hash matches the retained local APK and both launches report worker mode and `GPU_READBACK_OK 4096`; native control, response probes, background/resume, post-resume command delivery, disposal/relaunch and offline checks pass. [The imported physical-device record](ANDROID-S24-ACCEPTANCE.json) closes the previously blocked physical Android gate for that configuration. The earlier six-blocker aggregate is a historical snapshot, not a claim that the phone remains untested. No new device run was performed to claim the subsequent compiler fixes are covered by this APK.
 
 The page reports `crossOriginIsolated: false` despite COOP/COEP. Dedicated Worker WebGPU works; shared-memory wasm threads remain unavailable in the tested Android WebView. Physical iOS 26, macOS 26 and Windows runtime acceptance remain separate outstanding hardware gates.
+
+## Compiler follow-up (2026-11-05)
+
+The later compiler-fix authorization covers all five reported defects and the reported tuple, `var`, widened `??` and initialized callable-property cases. See [SCRIPTC-INTEGRATION-FIXES.md](SCRIPTC-INTEGRATION-FIXES.md) for source revisions, removed house-planner workarounds, regression/integration evidence and explicit validation/platform qualifications. Historical P1–P5 acceptance and benchmark records remain unchanged.
