@@ -300,20 +300,10 @@ In `...With` operations, enum value 0 means the WebGPU default, except that a co
 
 Not implemented: render bundles, external textures, MAP_WRITE `mapAsync`, texture `viewFormats`, debug groups and markers, multi-draw indirect, and `getBindGroupLayout` for `"auto"` layouts (use explicit layouts). Format operands of the original operations remain strings; records use the generated `FORMAT_*` enum.
 
-## Measurements
+## Benchmarking
 
-Recorded 2026-11-04T23:07:34.653Z, protocol 3, Chrome 154.0.8037.98, Apple M4 Max/macOS 27.0.1. The selected adapter is apple/metal-3, **not a fallback adapter**.
-
-| phase | transport/compiled | direct JS |
-|---|---|---|
-| guest encode 500 ops + one no-op callback | 0.01750 ms | — |
-| decoder into no-op handlers (optimisable lower bound) | 0.00688 ms | — |
-| 500-op decode/validation/CPU API recording | 0.01500 ms | 0.00437 ms |
-| 16 MiB writeBuffer CPU call | 0.255 ms | 0.250 ms |
-| 16 MiB post-call queue completion wait | 1.635 ms | 1.590 ms |
-
-`last-run.json` retains all 101 raw paired trials, 20 warmups, rotating CPU phase/alternating upload order, p10/p90/min/max, module/profile/source hashes and correctness records. CPU samples average eight repetitions, normalised to 500 operations. Encoding includes the export, sink selection/flush and one opaque no-op host import, preventing dead-store elimination; it does not call WebGPU. Decode/call and direct timings exclude pass creation/end/finish and are **not submitted**, so they measure CPU recording, not GPU execution. No-op decoding is only a lower bound because the sink can be optimised away.
+`NT_RECORD_GPU=1 node gpu/browser-test.mjs` writes `last-run.json` with raw paired trials, warmups, phase order, module/profile/source hashes and correctness records. Run it only on an otherwise idle machine after builds stop. Encoding includes the export, sink selection/flush and one no-op host import; it does not call WebGPU. Decode/call and direct timings exclude pass creation/end/finish and are not submitted, so they measure CPU recording, not GPU execution. No-op decoding is only a lower bound because the sink can be optimised away.
 
 Upload lanes use the same 16 MiB current guest-memory range and destination; allocation/filling are excluded. The queue is drained before each lane. CPU timing ends when writeBuffer returns; the separately measured wait includes an explicit empty submit and browser scheduling, **not GPU-only timestamp time**. GPU copies back and verifies the first 4,096 and last four bytes before/after the run. Compiled benchmark batches are decoded and checked outside timing. Uploads stay direct from linear memory; readbacks use the guest-owned copy protocol above.
 
-Run `NT_RECORD_GPU=1 node gpu/browser-test.mjs` only after builds/agents stop. The browser gate also checks presented triangle/background pixels, 1,024 computed readback words, optional timestamps, growth during frame encoding, real loss and line-numbered shader diagnostics. These are transport microbenchmarks, not end-to-end engine/frame performance. Previous protocol-1/2 figures are superseded, not comparable samples.
+Run `NT_RECORD_GPU=1 node gpu/browser-test.mjs` only after builds/agents stop. The browser gate also checks presented triangle/background pixels, 1,024 computed readback words, optional timestamps, growth during frame encoding, real loss and line-numbered shader diagnostics. These are transport microbenchmarks, not end-to-end engine/frame performance.

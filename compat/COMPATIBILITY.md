@@ -79,7 +79,7 @@ compile error, not a runtime failure.
 
 ## Node builtins
 
-544 of 565 members lower statically, projected from
+598 of 619 members lower statically, projected from
 scriptc's manifest at compiler 0.4.8.
 
 | module | lowers | missing |
@@ -93,9 +93,11 @@ scriptc's manifest at compiler 0.4.8.
 | `child_process` | 6 | 1 |
 | `stream/consumers` | 1 | 1 |
 | `util` | 22 | 1 |
-| `buffer` | 6 | 0 |
+| `buffer` | 8 | 0 |
 | `cluster` | 4 | 0 |
 | `diagnostics_channel` | 6 | 0 |
+| `dns` | 28 | 0 |
+| `dns/promises` | 25 | 0 |
 | `fs` | 51 | 0 |
 | `fs/promises` | 30 | 0 |
 | `http` | 2 | 0 |
@@ -105,7 +107,7 @@ scriptc's manifest at compiler 0.4.8.
 | `path/posix` | 16 | 0 |
 | `path/win32` | 16 | 0 |
 | `perf_hooks` | 9 | 0 |
-| `process` | 35 | 0 |
+| `process` | 36 | 0 |
 | `punycode` | 8 | 0 |
 | `querystring` | 8 | 0 |
 | `readline` | 2 | 0 |

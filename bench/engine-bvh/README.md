@@ -69,6 +69,4 @@ NT_BVH_EXCLUSIVE=1 node bench/engine-bvh/run.mjs --final
 
 The defaults are `SIZES=4096,50000`, `WARMUPS=5`, `TRIALS=21` and `LANES=v8,release,speed`. Final mode writes `last-run.json` (or `NT_BVH_OUTPUT`). The file holds every raw and warmup sample, the lane orders, deformation counts, per-trial paired wasm/V8 ratios, system load before and after, module hashes and memory sizes, and the correctness record.
 
-`last-run.json` now holds the exclusive final run at 2026-11-04T23:08:57.812Z: 28 cases, 21 paired trials and 5 retained warmups per case/lane. All correctness gates passed. At 50k architectural triangles, original f64 build medians were 39.92 ms V8 / 51.49 ms release / 50.37 ms speed. See the gap report for all 50k distributions and paired ratios; the previous single-distribution, unchanged-refit dataset is superseded.
-
-This is a CPU microbenchmark of the binary builder and refit. It does not cover the CWBVH collapse, quantisation or the triangle repack, a browser or device, or a complete renderer frame. SIMD and shared memory are not enabled. See [the gap report](../../docs/HOUSE-PLANNER-GAPS.md).
+This is a CPU microbenchmark of the binary builder and refit. It does not cover the CWBVH collapse, quantisation or the triangle repack, a browser or device, or a complete renderer frame. SIMD and shared memory are not enabled.
