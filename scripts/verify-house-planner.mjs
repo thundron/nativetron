@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Serialized acceptance on the integration host. No device is selected or emulator started here.
-// Exit 0 all passed, 1 failed, 2 explicit external blockers. See docs/HOUSE-PLANNER-EXECUTION.md.
+// Exit 0 all passed, 1 failed, 2 explicit external blockers.
 import { spawn, execFileSync } from "node:child_process";
 import { mkdirSync, copyFileSync, writeFileSync, readFileSync, openSync, closeSync, existsSync, readdirSync } from "node:fs";
 import { dirname, resolve, join } from "node:path";

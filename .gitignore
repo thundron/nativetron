@@ -9,3 +9,7 @@ security/.scriptc/
 bench/desktop-lane/.scriptc/
 bench/desktop-app/build/
 canvas/.scriptc/
+
+# Generated benchmark output
+/gpu/last-run.json
+/bench/engine-bvh/last-run.json

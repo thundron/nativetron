@@ -25,7 +25,7 @@ hosts/android/build.sh --debuggable
 NT_ANDROID_SERIAL=<serial> hosts/android/run.sh
 ```
 
-The runner never chooses a device or starts an emulator implicitly. An explicitly selected emulator also requires `NT_ANDROID_ALLOW_EMULATOR=1`. It tests native command delivery, pause/resume, disposal/reopen and real WebView MIME/headers/offline probes. GPU errors fail; only unavailable WebGPU yields host-only exit 3. The Android 36 arm64 16-KiB-page emulator with WebView 156.0.8078.47 passes host/control/assets/lifecycle but has **no WebGPU adapter**. This is not physical-device GPU evidence. A subsequent user-executed S24 Ultra run passes worker WebGPU, 4 KiB checked readback, native control, assets, lifecycle and relaunch. See [physical-device evidence](../docs/ANDROID-S24-ACCEPTANCE.json); this closes that device gate, not all Android configurations. The tested WebView remains non-isolated despite its response headers, so shared-memory wasm threads are unavailable there.
+The runner never chooses a device or starts an emulator implicitly. An explicitly selected emulator also requires `NT_ANDROID_ALLOW_EMULATOR=1`. It tests native command delivery, pause/resume, disposal/reopen and real WebView MIME/headers/offline probes. GPU errors fail; only unavailable WebGPU yields host-only exit 3.
 
 ## Windows
 
@@ -33,8 +33,9 @@ See [WebView2 build and acceptance instructions](windows/README.md). `WEBVIEW2_S
 
 The host serves `https://nativetron.localhost/` directly from WebResourceRequested for page/worker requests, rather than virtual-folder mapping. Generated allowlists, link/real-path checks, MIME, optional COOP/COEP, CSP and offline interception are enforced. Native menu commands preserve the generated envelope. Window DPI/minimise, renderer recovery, event-token teardown and bounded self-test exit codes are implemented. Cmd/Ctrl+R changes colour; Cmd/Ctrl+K remains available to the command palette.
 
-Portable policy/runner/PE checks and the cross-build pass on the integration Mac. **Windows runtime execution remains blocked**: no Windows machine/VM/Wine is available. Run `hosts/windows/acceptance.ps1 -Package build` on Windows with WebView2/WebGPU to verify actual worker interception, isolation, menu, DPI, lifecycle and GPU behaviour. WebView2's own browser-level background services are not claimed to be a network sandbox; application page/worker requests are blocked outside the bundle origin.
+Run `hosts/windows/acceptance.ps1 -Package build` on Windows with WebView2/WebGPU to check worker interception, isolation, menu, DPI, lifecycle and GPU behaviour. Cross-building does not exercise those runtime paths. WebView2's own browser-level background services are not a network sandbox; application page/worker requests are blocked outside the bundle origin.
 
-## Evidence
 
-[Completion ledger](../docs/HOUSE-PLANNER-EXECUTION.md) and `build/acceptance/report.json` distinguish passed implementations/builds, host-only unavailable-GPU tests, and unavailable hardware. GPU on Chrome/macOS 27 is separate evidence from the required macOS 26/physical mobile/Windows matrix. Never substitute a mock, cross-build or another application's proof of concept for runtime acceptance.
+## Cross-platform checks
+
+`node scripts/verify-house-planner.mjs --quick` runs the portable checks. The runner writes logs and `build/acceptance/report.json`; exit 0 means all selected checks passed, 1 means a failure, and 2 means an external prerequisite is unavailable. Use the platform-specific runners above to exercise device and operating-system behaviour.

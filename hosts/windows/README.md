@@ -54,8 +54,6 @@ powershell -NoProfile -ExecutionPolicy Bypass -File hosts\windows\acceptance.ps1
 
 The runner first checks the package: no DLLs, no reparse points and no executables in `engine-assets`. It records the OS, the GPUs and the WebView2 runtime version from the EdgeUpdate registry. It then runs `--selftest`, `--selftest=lifecycle` and `--selftest --no-isolation`. A run that does not exit within `-TimeoutSeconds` (default 90) is killed with its process tree. For each run the runner writes stdout and stderr logs, and `summary.json` lists per-run status, exit name, missing evidence, engine mode, DPI lines, the probe, the number of offline blocks, process failures and page exceptions. A run passes only with exit 0 and every evidence line present. Exit codes 2 and 5 are classified as `blocked`, never as passes. The runner exits with 0 when everything passes, 1 on any failure and 2 when only blocked.
 
-## Verification status
+## Cross-build checks
 
-Verified on macOS arm64: the cross-build links a PE32+ x86-64 console executable that imports only system DLLs (`ole32`, `shell32`, `shlwapi`, `user32`, `version`, `advapi32`, `kernel32` and UCRT `api-ms-win-crt-*`). `policy.test.cc` passes natively with ASan/UBSan. `verify.test.mjs` passes, including the exit-code parity check between `policy.h` and `acceptance.ps1`, a PowerShell 7 parse check, and runner classification against a scripted stand-in executable.
-
-Not verified: no Windows machine, VM or Wine was available. Launch, WebView2 interception of the virtual origin and its workers, COOP/COEP effectiveness, MIME handling, offline refusal, the native menu and accelerators, DPI and minimise behaviour, DevTools probe availability, worker/OffscreenCanvas mode, and WebGPU acceptance are therefore all unexecuted. A cross-build is not a running Windows demo, and `acceptance.ps1` is the gate that has to produce that evidence.
+`hosts/windows/build.sh --check` runs the host-side policy tests, PE import checks and portable runner checks. These do not launch WebView2 or exercise Windows runtime behaviour; use `acceptance.ps1` on Windows for that.

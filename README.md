@@ -100,4 +100,4 @@ node engine/browser-test.mjs
 node framework/components.test.mjs
 ```
 
-The engine never runs in native code. WebGPU commands/uploads stay inside the page, with Worker/OffscreenCanvas preferred and detected main-thread fallback. Native handles windows, menus and coarse bounded control messages. Bundled assets work offline. See [GPU API/measurements](gpu/README.md), [engine lane](engine/README.md), [platform hosts](hosts/README.md), [virtual lists/tables](framework/VIRTUAL.md), and [compiler gaps/BVH measurements](docs/HOUSE-PLANNER-GAPS.md). Cross-built platforms and device tests are distinguished in those reports; Android/Windows and iOS WebGPU are not claimed as runtime-verified here.
+The engine never runs in native code. WebGPU commands/uploads stay inside the page, with Worker/OffscreenCanvas preferred and detected main-thread fallback. Native handles windows, menus and coarse bounded control messages. Bundled assets work offline. See [GPU API](gpu/README.md), [engine lane](engine/README.md), [platform hosts](hosts/README.md), [virtual lists/tables](framework/VIRTUAL.md), and [BVH benchmark harness](bench/engine-bvh/README.md).
