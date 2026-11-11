@@ -9,10 +9,10 @@ enum EngineProtocol {
   static func valid(_ data: Data) -> Bool {
     let b = [UInt8](data)
     guard b.count >= 16, b.count <= 65552, b[0] == 1,
-      (1...5).contains(Int(b[1])),
+      (1...6).contains(Int(b[1])),
       b[2] <= 2, b[3] <= 2, b[2] != b[3] else { return false }
     let length = (0..<4).reduce(UInt32(0)) { $0 | UInt32(b[12 + $1]) << ($1 * 8) }
-    return Int(length) == b.count - 16
+    return (b[1] != 6 || b[4..<8].allSatisfy { $0 == 0 }) && Int(length) == b.count - 16
   }
   static func decodeEnvelope(_ text: String) -> Data? {
     guard text.utf8.count <= maxEnvelope, let json = text.data(using: .utf8),

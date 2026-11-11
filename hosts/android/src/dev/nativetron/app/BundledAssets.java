@@ -22,6 +22,9 @@ final class BundledAssets {
     files.put("host/event.generated.mjs", "text/javascript");
     files.put("ipc/engine.generated.mjs", "text/javascript");
     files.put("ipc/engine-bridge.generated.mjs", "text/javascript");
+    files.put("engine/streams.js", "text/javascript");
+    files.put("gpu/frame-scheduler.js", "text/javascript");
+    files.put("host/services.js", "text/javascript");
     FILES = Collections.unmodifiableMap(files);
   }
 }

@@ -1,5 +1,6 @@
+import { createStreams } from "./streams.js";
 import { EngineError, ENGINE_INBOUND_LIMIT, createRateWindow, errorText, instantiateReactor, prepareReactor } from "./reactor.js";
-import { decodeEngineMessage, ENGINE_MAX_RATE, LANE_ENGINE, LANE_NATIVE, LANE_UI } from "../ipc/engine.generated.mjs";
+import { decodeEngineMessage, ENGINE_MAX_RATE, ENGINE_STATE, ENGINE_BULK, LANE_ENGINE, LANE_NATIVE, LANE_UI } from "../ipc/engine.generated.mjs";
 
 export { EngineError };
 export const ENGINE_STATES = Object.freeze(["starting", "ready", "lost", "failed", "restarting", "disposing", "disposed"]);
@@ -77,6 +78,11 @@ export function createEngine(options) {
   const timeouts = { ...ENGINE_TIMEOUTS, ...options.timeouts };
   const assets = { moduleUrl: options.moduleUrl, wasmUrl: options.wasmUrl, prefix: options.prefix };
   const inboundRate = createRateWindow(ENGINE_MAX_RATE, 1000, now);
+  let inputStreams = null, nextStream = 1;
+  let frameMode = options.frameMode ?? "display";
+  if (!["display", "throughput"].includes(frameMode)) throw new EngineError("invalid-options", "invalid frame mode");
+  const streamLeases = new Map();
+  const clearStreams = () => { inputStreams?.close(); inputStreams = null; for (const lease of streamLeases.values()) lease.reject(new Error("engine generation ended")); streamLeases.clear(); };
   const stats = { accepted: 0, rejected: 0, routed: 0, routeRejected: 0, startupDropped: 0, restarts: 0, forcedShutdowns: 0 };
   const startupQueue = [];
   const waiters = new Set();
@@ -133,6 +139,20 @@ export function createEngine(options) {
     switch (data.type) {
       case "report": safe(report, String(data.message)); break;
       case "message": route(data.bytes); break;
+      case "stream": {
+        const gen = generation, target = worker;
+        Promise.resolve().then(() => route(data.bytes)).then(() => {
+          if (gen === generation && workerAlive) target?.postMessage({ type: "stream-ack", generation: gen, id: data.id, ok: true });
+        }, error => {
+          if (gen === generation && workerAlive) target?.postMessage({ type: "stream-ack", generation: gen, id: data.id, ok: false, message: errorText(error) });
+        });
+        break;
+      }
+      case "stream-ack": {
+        const lease = streamLeases.get(data.id); streamLeases.delete(data.id);
+        if (data.ok) lease?.resolve(); else lease?.reject(new Error(data.message ?? "stream rejected"));
+        break;
+      }
       case "gpu-event": gpuEvent(data.event); break;
       case "credit": if (Number.isInteger(data.count) && data.count > 0) inFlight = Math.max(0, inFlight - data.count); break;
       case "failed": engineFailed(new EngineError(data.code ?? "engine-failed", String(data.message))); break;
@@ -146,6 +166,7 @@ export function createEngine(options) {
   const attach = (target) => { target.onmessage = onWorkerMessage; target.onerror = onWorkerError; target.onmessageerror = onWorkerMessageError; };
   const kill = (target) => {
     if (!target) return;
+    clearStreams();
     target.onmessage = null; target.onerror = null; target.onmessageerror = null;
     try { target.terminate(); } catch {}
     if (worker === target) { worker = null; workerAlive = false; }
@@ -177,7 +198,12 @@ export function createEngine(options) {
       stats.routeRejected++; note("route", "ENGINE_ROUTE_REJECTED invalid engine source"); return;
     }
     stats.routed++;
-    safe(frame.target === LANE_NATIVE ? postNative : postUi, bytes);
+    const rejected = error => {
+      note("callback", `ENGINE_CALLBACK_ERROR ${errorText(error)}`);
+      if (frame.kind === ENGINE_BULK) throw new EngineError("bulk-consumer-failed", errorText(error));
+    };
+    try { return Promise.resolve((frame.target === LANE_NATIVE ? postNative : postUi)?.(bytes)).catch(rejected); }
+    catch (error) { return rejected(error); }
   };
   const gpuEvent = (event) => {
     if (event?.type === 1) gpu = event.available ? { available: true, features: event.features ?? [] } : { available: false, reason: event.reason ?? "" };
@@ -186,7 +212,7 @@ export function createEngine(options) {
   };
   const engineFailed = (error) => {
     if (state !== "ready" && state !== "lost") return;
-    failure = error; inFlight = 0;
+    clearStreams(); failure = error; inFlight = 0;
     if (mode === "main") { reactor?.dispose(); reactor = null; }
     setState("failed", { code: error.code, message: error.message });
     say(`ENGINE_FAILED ${error.message}`);
@@ -194,7 +220,7 @@ export function createEngine(options) {
   const transmit = (bytes) => {
     if (mode === "worker") {
       if (!workerAlive) throw new EngineError("failed", "engine worker unavailable");
-      const copy = bytes.slice();
+      const copy = new Uint8Array(bytes);
       inFlight++;
       worker.postMessage({ type: "message", generation, bytes: copy }, [copy.buffer]);
     } else reactor.receive(bytes);
@@ -216,6 +242,15 @@ export function createEngine(options) {
     worker.postMessage({ type: "resize", generation, width, height, dpr });
   };
   const becomeReady = () => {
+    clearStreams();
+    inputStreams = createStreams({
+      deliver: bytes => mode === "main" ? reactor.receiveStream(bytes) : new Promise((resolve, reject) => {
+        if (!workerAlive) { reject(new Error("engine worker unavailable")); return; }
+        const id = nextStream++; streamLeases.set(id, { resolve, reject });
+        worker.postMessage({ type: "stream", generation, id, bytes }, [bytes.buffer]);
+      }),
+      onError: error => engineFailed(new EngineError("stream-failed", errorText(error))),
+    });
     inFlight = 0; failure = null;
     if (mode === "worker") { watcher ??= watchViewport(scope, canvas, resized); }
     setState("ready");
@@ -244,7 +279,7 @@ export function createEngine(options) {
     worker = target; workerAlive = true; attach(target);
     try {
       const probed = expect(["probe"], undefined, timeouts.probeMs, "probe-timeout", "worker probe timed out");
-      target.postMessage({ type: "probe" });
+      target.postMessage({ type: "probe", frameMode });
       const result = await guard(probed);
       if (!result.available) throw new EngineError("probe-failed", result.reason || "worker probe failed");
       const ready = expect(["prepared"], undefined, timeouts.prepareMs, "prepare-timeout", "worker engine preparation timed out");
@@ -263,11 +298,12 @@ export function createEngine(options) {
     const gen = ++generation;
     const current = () => gen === generation && !abortError;
     const created = await guard(instantiateReactor(prepared, {
-      canvas, scope, now, pixelRatio: scope.devicePixelRatio ?? 1,
+      canvas, scope, now, frameMode, pixelRatio: scope.devicePixelRatio ?? 1,
       setTimer: clock.setTimeout, clearTimer: clock.clearTimeout,
       cancelled: () => !current(),
       report: (text) => { if (current()) safe(report, text); },
-      post: (bytes) => { if (current()) route(bytes); },
+      post: (bytes) => { if (current()) return route(bytes); },
+      postStream: (bytes) => { if (current()) return route(bytes); },
       onEvent: (event) => { if (current()) gpuEvent(event); },
       onFailure: (error) => { if (current()) engineFailed(error); },
     }), (orphan) => orphan.dispose());
@@ -281,7 +317,7 @@ export function createEngine(options) {
     transferred = true;
     const gen = ++generation;
     const started = expect(["ready", "error"], gen, timeouts.startMs, "start-timeout", "engine worker startup timed out after canvas transfer");
-    worker.postMessage({ type: "start", generation: gen, canvas: offscreen, options: { pixelRatio: scope.devicePixelRatio ?? 1 } }, [offscreen]);
+    worker.postMessage({ type: "start", generation: gen, canvas: offscreen, options: { pixelRatio: scope.devicePixelRatio ?? 1, frameMode } }, [offscreen]);
     const result = await guard(started);
     if (result.type === "error") throw new EngineError(result.code ?? "start-failed", String(result.message), { canvasTransferred: true });
     mode = "worker";
@@ -343,14 +379,14 @@ export function createEngine(options) {
   ready.catch(() => {});
 
   const restartBody = async (why) => {
-    setState("restarting", { why });
+    clearStreams(); setState("restarting", { why });
     stats.restarts++;
     failure = null; inFlight = 0;
     try {
       if (mode === "worker" && workerAlive) {
         const gen = ++generation;
         const started = expect(["ready", "error"], gen, timeouts.startMs, "restart-timeout", "engine worker restart timed out");
-        worker.postMessage({ type: "restart", generation: gen, options: { pixelRatio: scope.devicePixelRatio ?? 1 } });
+        worker.postMessage({ type: "restart", generation: gen, options: { pixelRatio: scope.devicePixelRatio ?? 1, frameMode } });
         let result;
         try { result = await guard(started); }
         catch (error) {
@@ -402,7 +438,7 @@ export function createEngine(options) {
     get reactor() { return mode === "main" ? reactor ?? undefined : undefined; },
     get gpu() { return gpu; },
     get failure() { return failure; },
-    get stats() { return { ...stats, inFlight, startupQueued: startupQueue.length, workerAlive }; },
+    get stats() { return { ...stats, streams: inputStreams?.stats, inFlight, startupQueued: startupQueue.length, workerAlive }; },
     ready,
     // Never throws and never calls consumer callbacks synchronously; safe from inside another reactor's import.
     trySend(bytes, source = LANE_UI) {
@@ -412,6 +448,11 @@ export function createEngine(options) {
         if (!frame || frame.source !== source || frame.target !== LANE_ENGINE || (source !== LANE_UI && source !== LANE_NATIVE)) return fail("invalid-route", "invalid engine message route");
         if (state === "failed") return fail("failed", `engine lane failed; restart required (${failure?.message ?? "unknown failure"})`);
         const queued = state === "starting" || state === "restarting";
+        if (frame.kind === ENGINE_STATE || frame.kind === ENGINE_BULK) {
+          if (queued || !inputStreams) return fail("not-ready", "await ready before offering state or bulk data");
+          if (!inputStreams.offer(bytes)) return fail("stream-full", "engine state/bulk capacity exceeded");
+          return { ok: true, queued: true };
+        }
         if (queued ? startupQueue.length >= ENGINE_STARTUP_QUEUE_LIMIT : mode === "worker" ? inFlight >= ENGINE_CONTROL_QUEUE_LIMIT : (reactor?.pending ?? 0) >= ENGINE_INBOUND_LIMIT) {
           return fail("queue-full", queued ? "engine startup queue full" : "engine control queue full");
         }
@@ -422,6 +463,24 @@ export function createEngine(options) {
       })();
       if (result.ok) stats.accepted++; else stats.rejected++;
       return result;
+    },
+    setFrameMode(mode) {
+      if (!["display", "throughput"].includes(mode)) throw new EngineError("invalid-options", "invalid frame mode");
+      frameMode = mode;
+      if (state === "ready" || state === "lost") {
+        if (workerAlive) worker.postMessage({ type: "frame-mode", generation, mode });
+        else reactor?.host.setFrameMode(mode);
+      }
+    },
+    sendLatest(bytes, source = LANE_UI) {
+      const frame = decodeEngineMessage(bytes);
+      if (!frame || frame.kind !== ENGINE_STATE) throw new EngineError("invalid-stream", "sendLatest requires a STATE frame");
+      return lane.trySend(bytes, source);
+    },
+    sendBulk(bytes, source = LANE_UI) {
+      const frame = decodeEngineMessage(bytes);
+      if (!frame || frame.kind !== ENGINE_BULK) throw new EngineError("invalid-stream", "sendBulk requires a BULK frame");
+      return lane.trySend(bytes, source);
     },
     send(bytes, source = LANE_UI) {
       const result = lane.trySend(bytes, source);
@@ -436,7 +495,7 @@ export function createEngine(options) {
     },
     dispose() {
       if (closing) return closing;
-      setState("disposing");
+      clearStreams(); setState("disposing");
       abort(new EngineError("aborted", "engine lane disposed", { name: "AbortError" }));
       options.signal?.removeEventListener?.("abort", onAbort);
       startupQueue.length = 0;

@@ -6,6 +6,13 @@
     <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTask"
         android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|uiMode|density|locale|layoutDirection|fontScale">
       <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+        <category android:name="android.intent.category.BROWSABLE"/>
+        <data android:scheme="content" android:mimeType="application/vnd.nativetron.project"/>
+      </intent-filter>
     </activity>
+    <provider android:name=".HostFileProvider" android:authorities="dev.nativetron.app.files" android:exported="false" android:grantUriPermissions="true"/>
   </application>
 </manifest>

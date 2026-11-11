@@ -8,7 +8,7 @@ let offset = 0;
 const layout = spec.header.map((field) => { const [name, type] = field.split(":"); const size = type === "u8" ? 1 : type === "u32" ? 4 : 0; if (!size) throw new Error("unsupported engine header field"); const result = { name, type, offset }; offset += size; return result; });
 const fields = new Set(layout.map((field) => field.name));
 for (const required of ["version", "kind", "source", "target", "requestId", "topic", "payloadLength"]) if (!fields.has(required)) throw new Error(`missing ${required}`);
-const constants = `export const ENGINE_VERSION = ${spec.version};\nexport const ENGINE_MAX_PAYLOAD = ${spec.maxPayloadBytes};\nexport const ENGINE_MAX_RATE = ${spec.maxMessagesPerSecond};\nexport const ENGINE_HEADER_BYTES = ${offset};\n` + Object.entries(spec.lanes).map(([name, value]) => `export const LANE_${name} = ${value};`).join("\n") + "\n" + Object.entries(spec.kinds).map(([name, value]) => `export const ENGINE_${name} = ${value};`).join("\n") + "\n";
+const constants = `export const ENGINE_VERSION = ${spec.version};\nexport const ENGINE_MAX_PAYLOAD = ${spec.maxPayloadBytes};\nexport const ENGINE_MAX_RATE = ${spec.maxMessagesPerSecond};\nexport const ENGINE_MAX_BULK = ${spec.maxBulkBytes};\nexport const ENGINE_HEADER_BYTES = ${offset};\n` + Object.entries(spec.lanes).map(([name, value]) => `export const LANE_${name} = ${value};`).join("\n") + "\n" + Object.entries(spec.kinds).map(([name, value]) => `export const ENGINE_${name} = ${value};`).join("\n") + "\n";
 const render = (ts) => {
   const t = (type) => ts ? `: ${type}` : "";
   const setters = layout.map((field) => `  view.set${field.type === "u8" ? "Uint8" : "Uint32"}(${field.offset}, ${field.name}${field.type === "u32" ? ", true" : ""});`).join("\n");
@@ -20,12 +20,14 @@ function validHeader(kind${t("number")}, source${t("number")}, target${t("number
   return Number.isInteger(kind) && kind >= ${Math.min(...Object.values(spec.kinds))} && kind <= ${Math.max(...Object.values(spec.kinds))} &&
     Number.isInteger(source) && source >= 0 && source <= ${Math.max(...Object.values(spec.lanes))} &&
     Number.isInteger(target) && target >= 0 && target <= ${Math.max(...Object.values(spec.lanes))} && source !== target &&
+    (kind !== ${spec.kinds.STATE} || requestId === 0) &&
+    (kind !== ${spec.kinds.BULK} || (source !== ${spec.lanes.NATIVE} && target !== ${spec.lanes.NATIVE})) &&
     Number.isInteger(requestId) && requestId >= 0 && requestId <= 4294967295 &&
     Number.isInteger(topic) && topic >= 0 && topic <= 4294967295;
 }
 
 export function encodeEngineMessage(kind${t("number")}, source${t("number")}, target${t("number")}, requestId${t("number")}, topic${t("number")}, payload${t("Uint8Array")})${t("Uint8Array")} {
-  if (!validHeader(kind, source, target, requestId, topic) || payload.length > ENGINE_MAX_PAYLOAD) throw new Error("invalid engine message");
+  if (!validHeader(kind, source, target, requestId, topic) || payload.length > (kind === ENGINE_BULK ? ENGINE_MAX_BULK : ENGINE_MAX_PAYLOAD)) throw new Error("invalid engine message");
   const version = ENGINE_VERSION, payloadLength = payload.length;
   const bytes = new Uint8Array(ENGINE_HEADER_BYTES + payloadLength);
   const view = new DataView(bytes.buffer);
@@ -35,10 +37,10 @@ ${setters}
 }
 
 export function decodeEngineMessage(bytes${t("Uint8Array")})${t("EngineMessage | null")} {
-  if (bytes.length < ENGINE_HEADER_BYTES || bytes.length > ENGINE_HEADER_BYTES + ENGINE_MAX_PAYLOAD) return null;
+  if (bytes.length < ENGINE_HEADER_BYTES || bytes.length > ENGINE_HEADER_BYTES + ENGINE_MAX_BULK) return null;
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 ${getters}
-  if (version !== ENGINE_VERSION || payloadLength !== bytes.length - ENGINE_HEADER_BYTES || !validHeader(kind, source, target, requestId, topic)) return null;
+  if (version !== ENGINE_VERSION || payloadLength > (kind === ENGINE_BULK ? ENGINE_MAX_BULK : ENGINE_MAX_PAYLOAD) || payloadLength !== bytes.length - ENGINE_HEADER_BYTES || !validHeader(kind, source, target, requestId, topic)) return null;
   return { kind, source, target, requestId, topic, payload: bytes.subarray(ENGINE_HEADER_BYTES) };
 }
 `;
@@ -49,7 +51,7 @@ const bridge = (ts) => {
     `import { decodeEngineMessage } from "./engine.generated.${ts ? "js" : "mjs"}";\n` + `
 export const ENGINE_ENVELOPE_LIMIT = ${Math.ceil((spec.maxPayloadBytes + offset) / 3) * 4};
 export function engineBase64(bytes${type("Uint8Array")})${type("string")} {
-  if (!decodeEngineMessage(bytes)) throw new Error("invalid engine frame");
+  if (!decodeEngineMessage(bytes) || bytes[1] === ${spec.kinds.BULK} || bytes.length > ${spec.maxPayloadBytes + offset}) throw new Error("invalid engine control frame");
   ${ts ? 'return Buffer.from(bytes).toString("base64");' : 'let text = ""; for (const byte of bytes) text += String.fromCharCode(byte); return btoa(text);'}
 }
 export function engineFromBase64(value${type("string")})${type("Uint8Array | null")} {
@@ -87,10 +89,10 @@ enum EngineProtocol {
   static func valid(_ data: Data) -> Bool {
     let b = [UInt8](data)
     guard b.count >= ${offset}, b.count <= ${offset + spec.maxPayloadBytes}, b[${at("version")}] == ${spec.version},
-      (${Math.min(...Object.values(spec.kinds))}...${Math.max(...Object.values(spec.kinds))}).contains(Int(b[${at("kind")}])),
+      (${Math.min(...Object.values(spec.kinds))}...${spec.kinds.STATE}).contains(Int(b[${at("kind")}])),
       b[${at("source")}] <= ${Math.max(...Object.values(spec.lanes))}, b[${at("target")}] <= ${Math.max(...Object.values(spec.lanes))}, b[${at("source")}] != b[${at("target")}] else { return false }
     let length = (0..<4).reduce(UInt32(0)) { $0 | UInt32(b[${at("payloadLength")} + $1]) << ($1 * 8) }
-    return Int(length) == b.count - ${offset}
+    return (b[${at("kind")}] != ${spec.kinds.STATE} || b[4..<8].allSatisfy { $0 == 0 }) && Int(length) == b.count - ${offset}
   }
   static func decodeEnvelope(_ text: String) -> Data? {
     guard text.utf8.count <= maxEnvelope, let json = text.data(using: .utf8),
@@ -133,9 +135,9 @@ final class EngineProtocol {
   static boolean valid(byte[] bytes) {
     if (bytes.length < ${offset} || bytes.length > ${offset + spec.maxPayloadBytes}) return false;
     ByteBuffer b = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN);
-    return b.get(${at("version")}) == ${spec.version} && b.get(${at("kind")}) >= ${Math.min(...Object.values(spec.kinds))} && b.get(${at("kind")}) <= ${Math.max(...Object.values(spec.kinds))} &&
+    return b.get(${at("version")}) == ${spec.version} && b.get(${at("kind")}) >= ${Math.min(...Object.values(spec.kinds))} && b.get(${at("kind")}) <= ${spec.kinds.STATE} &&
       b.get(${at("source")}) >= 0 && b.get(${at("source")}) <= ${Math.max(...Object.values(spec.lanes))} && b.get(${at("target")}) >= 0 && b.get(${at("target")}) <= ${Math.max(...Object.values(spec.lanes))} && b.get(${at("source")}) != b.get(${at("target")}) &&
-      b.getInt(${at("payloadLength")}) == bytes.length - ${offset};
+      (b.get(${at("kind")}) != ${spec.kinds.STATE} || b.getInt(${at("requestId")}) == 0) && b.getInt(${at("payloadLength")}) == bytes.length - ${offset};
   }
   static byte[] decodeEnvelope(String text) {
     if (text.length() > ${Math.ceil((spec.maxPayloadBytes + offset) / 3) * 4 + 64}) return null;
@@ -172,8 +174,8 @@ inline uint32_t read_u32(const std::vector<uint8_t> &b, size_t offset) {
 }
 inline bool valid(const std::vector<uint8_t> &b) {
   return b.size() >= header_bytes && b.size() <= header_bytes + max_payload && b[${at("version")}] == ${spec.version} &&
-    b[${at("kind")}] >= ${Math.min(...Object.values(spec.kinds))} && b[${at("kind")}] <= ${Math.max(...Object.values(spec.kinds))} &&
-    b[${at("source")}] <= ${Math.max(...Object.values(spec.lanes))} && b[${at("target")}] <= ${Math.max(...Object.values(spec.lanes))} && b[${at("source")}] != b[${at("target")}] && read_u32(b, ${at("payloadLength")}) == b.size() - header_bytes;
+    b[${at("kind")}] >= ${Math.min(...Object.values(spec.kinds))} && b[${at("kind")}] <= ${spec.kinds.STATE} &&
+    b[${at("source")}] <= ${Math.max(...Object.values(spec.lanes))} && b[${at("target")}] <= ${Math.max(...Object.values(spec.lanes))} && b[${at("source")}] != b[${at("target")}] && (b[${at("kind")}] != ${spec.kinds.STATE} || read_u32(b, ${at("requestId")}) == 0) && read_u32(b, ${at("payloadLength")}) == b.size() - header_bytes;
 }
 inline std::vector<uint8_t> command(uint32_t topic) {
   std::vector<uint8_t> bytes(header_bytes);
@@ -217,7 +219,7 @@ const outputs = [
   ["../hosts/android/src/dev/nativetron/app/EngineProtocol.java", java],
   ["engine-bridge.generated.ts", bridge(true)], ["engine-bridge.generated.mjs", bridge(false)],
   ["engine.generated.ts", render(true)], ["engine.generated.mjs", render(false)],
-  ["ENGINE.md", `# Engine IPC\n\nGenerated from \`ipc/engine.json\`. Run \`node ipc/generate-engine.mjs --check\`.\n\nThe low-rate control channel connects native, UI and engine lanes. GPU commands and geometry uploads never use it. Payloads are binary, bounded to ${spec.maxPayloadBytes} bytes; page transports allow at most ${spec.maxMessagesPerSecond} messages per second. A topic identifies an application-owned command, not a framework-defined document format. Request ids are caller-owned; result and error responses echo the id.\n\n| field | offset | type |\n|---|---:|---|\n${layout.map((field) => `| ${field.name} | ${field.offset} | ${field.type} |`).join("\n")}\n\nAll multibyte fields are little-endian. The payload follows the ${offset}-byte header. Unknown versions, kinds, lanes, same-lane delivery, incorrect lengths and oversized payloads fail closed.\n\nLanes: ${Object.entries(spec.lanes).map(([key,value]) => `${key}=${value}`).join(", ")}.\n\nKinds: ${Object.entries(spec.kinds).map(([key,value]) => `${key}=${value}`).join(", ")}.\n\nDesktop and mobile message handlers carry \`{ ${spec.envelope.marker}: ${spec.envelope.version}, ${spec.envelope.field}: base64(frame) }\`. JavaScript evaluated by native contains only the base64 alphabet in a fixed call. In-page UI/engine messages use bytes directly, or a Worker postMessage transfer; neither traverses native.\n\nPublic codec: \`encodeEngineMessage(kind, source, target, requestId, topic, payload): Uint8Array\`; \`decodeEngineMessage(bytes): EngineMessage | null\`.\n`],
+  ["ENGINE.md", `# Engine IPC\n\nGenerated from \`ipc/engine.json\`. Run \`node ipc/generate-engine.mjs --check\`.\n\nReliable control connects native, UI and engine lanes. STATE is an acknowledged, coalescing in-page lane with at most 32 pending topics and one in-flight delivery; it does not consume control rate budget. BULK is an acknowledged in-page lane with chunks bounded to ${spec.maxBulkBytes} bytes and two total queued/in-flight slots. Native JSON/base64 bridges reject BULK. Bulk receivers own the delivered copy and should acknowledge promptly by returning from their callback or resolving its promise. GPU command batches and normal geometry uploads remain local to the engine; explicit image/export transfers may use BULK. Control and STATE payloads are binary, bounded to ${spec.maxPayloadBytes} bytes; reliable control allows at most ${spec.maxMessagesPerSecond} messages per second. STATE requires requestId=0. BULK uses requestId for application-owned job correlation, never a native destination. A topic identifies an application-owned command, not a framework-defined document format. Request ids are caller-owned; result and error responses echo the id.\n\n| field | offset | type |\n|---|---:|---|\n${layout.map((field) => `| ${field.name} | ${field.offset} | ${field.type} |`).join("\n")}\n\nAll multibyte fields are little-endian. The payload follows the ${offset}-byte header. Unknown versions, kinds, lanes, same-lane delivery, incorrect lengths and oversized payloads fail closed.\n\nLanes: ${Object.entries(spec.lanes).map(([key,value]) => `${key}=${value}`).join(", ")}.\n\nKinds: ${Object.entries(spec.kinds).map(([key,value]) => `${key}=${value}`).join(", ")}.\n\nDesktop and mobile message handlers carry \`{ ${spec.envelope.marker}: ${spec.envelope.version}, ${spec.envelope.field}: base64(frame) }\`. JavaScript evaluated by native contains only the base64 alphabet in a fixed call. In-page UI/engine messages use bytes directly, or a Worker postMessage transfer; neither traverses native.\n\nPublic codec: \`encodeEngineMessage(kind, source, target, requestId, topic, payload): Uint8Array\`; \`decodeEngineMessage(bytes): EngineMessage | null\`.\n`],
 ];
 let stale = 0;
 for (const [name, next] of outputs) {

@@ -1,0 +1,30 @@
+<!doctype html><meta charset="utf-8"><title>Engine stream conformance</title><canvas id="surface"></canvas>
+<script type="module">
+import { startEngine } from "../host.js";
+import { fixtureWasm } from "./harness.mjs";
+import * as ipc from "../../ipc/engine.generated.mjs";
+window.streamProbe = async (forceMain) => {
+  const canvas = document.getElementById("surface");
+  const frames = [], reports = [], acknowledgements = [];
+  const wasmUrl = URL.createObjectURL(new Blob([fixtureWasm()], { type: "application/wasm" }));
+  const wait = async predicate => { const end = performance.now() + 5000; while (!predicate()) { if (performance.now() > end) throw Error("stream probe timeout: " + reports); await new Promise(r => setTimeout(r, 5)); } };
+  const lane = await startEngine({ canvas, moduleUrl: new URL("./fake-glue.mjs", import.meta.url).href, wasmUrl, prefix: "fx_", forceMain,
+    report: line => reports.push(line), postUi: bytes => { const frame = ipc.decodeEngineMessage(bytes); frames.push(frame); if (frame.kind === ipc.ENGINE_BULK) return new Promise(resolve => acknowledgements.push(resolve)); },
+  });
+  try {
+    for (let i = 0; i < 1000; i++) if (!lane.sendLatest(ipc.encodeEngineMessage(ipc.ENGINE_STATE, ipc.LANE_UI, ipc.LANE_ENGINE, 0, 1, new Uint8Array([i % 256]))).ok) throw Error("state rejected");
+    await wait(() => frames.some(f => f.topic === 1));
+    if (frames.filter(f => f.topic === 1).length !== 1 || frames.find(f => f.topic === 1).payload[0] !== 999 % 256) throw Error("state did not coalesce");
+    if (!lane.sendBulk(ipc.encodeEngineMessage(ipc.ENGINE_BULK, ipc.LANE_UI, ipc.LANE_ENGINE, 0, 13, new Uint8Array(1024 * 1024).fill(31))).ok) throw Error("inbound bulk rejected");
+    await wait(() => reports.includes("BULK_RECEIVED 1048576 31"));
+    lane.send(ipc.encodeEngineMessage(ipc.ENGINE_COMMAND, ipc.LANE_UI, ipc.LANE_ENGINE, 0, 11, new Uint8Array()));
+    await wait(() => reports.includes("BULK_ACCEPT 110") && frames.filter(f => f.kind === ipc.ENGINE_BULK).length === 2);
+    for (const f of frames.filter(f => f.kind === ipc.ENGINE_BULK)) if (f.payload.length !== 1048576 || f.payload[1048575] !== 73) throw Error("transferred bytes changed or detached early");
+    lane.send(ipc.encodeEngineMessage(ipc.ENGINE_COMMAND, ipc.LANE_UI, ipc.LANE_ENGINE, 0, 12, new Uint8Array()));
+    await wait(() => frames.some(f => f.kind === ipc.ENGINE_STATE));
+    if (frames.find(f => f.kind === ipc.ENGINE_STATE).payload[0] !== 999 % 256) throw Error("outbound latest failed");
+    lane.setFrameMode("throughput"); lane.setFrameMode("display");
+    return { mode: lane.mode, inputBytes: 1048576, outputBytes: 2097152, coalesced: true, backpressure: true };
+  } finally { acknowledgements.forEach(fn => fn()); await lane.dispose(); URL.revokeObjectURL(wasmUrl); }
+};
+</script>

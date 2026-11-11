@@ -12,8 +12,8 @@ inline uint32_t read_u32(const std::vector<uint8_t> &b, size_t offset) {
 }
 inline bool valid(const std::vector<uint8_t> &b) {
   return b.size() >= header_bytes && b.size() <= header_bytes + max_payload && b[0] == 1 &&
-    b[1] >= 1 && b[1] <= 5 &&
-    b[2] <= 2 && b[3] <= 2 && b[2] != b[3] && read_u32(b, 12) == b.size() - header_bytes;
+    b[1] >= 1 && b[1] <= 6 &&
+    b[2] <= 2 && b[3] <= 2 && b[2] != b[3] && (b[1] != 6 || read_u32(b, 4) == 0) && read_u32(b, 12) == b.size() - header_bytes;
 }
 inline std::vector<uint8_t> command(uint32_t topic) {
   std::vector<uint8_t> bytes(header_bytes);

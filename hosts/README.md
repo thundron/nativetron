@@ -36,6 +36,10 @@ The host serves `https://nativetron.localhost/` directly from WebResourceRequest
 Run `hosts/windows/acceptance.ps1 -Package build` on Windows with WebView2/WebGPU to check worker interception, isolation, menu, DPI, lifecycle and GPU behaviour. Cross-building does not exercise those runtime paths. WebView2's own browser-level background services are not a network sandbox; application page/worker requests are blocked outside the bundle origin.
 
 
+## macOS WKWebView and page services
+
+`hosts/macos/build.sh` builds an unsigned WKWebView application at `build/macos/Nativetron.app`; `NT_MACOS_SKIP_ENGINE=1` reuses the staged web bundle. The host uses the same offline asset policy and [page-facing service contract](SERVICES.md) as iOS/Android. No Dawn or bundled browser is added. The legacy desktop entry remains available.
+
 ## Cross-platform checks
 
 `node scripts/verify-house-planner.mjs --quick` runs the portable checks. The runner writes logs and `build/acceptance/report.json`; exit 0 means all selected checks passed, 1 means a failure, and 2 means an external prerequisite is unavailable. Use the platform-specific runners above to exercise device and operating-system behaviour.

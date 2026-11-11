@@ -2,6 +2,7 @@
 export const ENGINE_VERSION = 1;
 export const ENGINE_MAX_PAYLOAD = 65536;
 export const ENGINE_MAX_RATE = 60;
+export const ENGINE_MAX_BULK = 16777216;
 export const ENGINE_HEADER_BYTES = 16;
 export const LANE_NATIVE = 0;
 export const LANE_UI = 1;
@@ -11,19 +12,23 @@ export const ENGINE_RESULT = 2;
 export const ENGINE_ERROR = 3;
 export const ENGINE_EVENT = 4;
 export const ENGINE_REPORT = 5;
+export const ENGINE_STATE = 6;
+export const ENGINE_BULK = 7;
 
 export interface EngineMessage { kind: number; source: number; target: number; requestId: number; topic: number; payload: Uint8Array; }
 
 function validHeader(kind: number, source: number, target: number, requestId: number, topic: number): boolean {
-  return Number.isInteger(kind) && kind >= 1 && kind <= 5 &&
+  return Number.isInteger(kind) && kind >= 1 && kind <= 7 &&
     Number.isInteger(source) && source >= 0 && source <= 2 &&
     Number.isInteger(target) && target >= 0 && target <= 2 && source !== target &&
+    (kind !== 6 || requestId === 0) &&
+    (kind !== 7 || (source !== 0 && target !== 0)) &&
     Number.isInteger(requestId) && requestId >= 0 && requestId <= 4294967295 &&
     Number.isInteger(topic) && topic >= 0 && topic <= 4294967295;
 }
 
 export function encodeEngineMessage(kind: number, source: number, target: number, requestId: number, topic: number, payload: Uint8Array): Uint8Array {
-  if (!validHeader(kind, source, target, requestId, topic) || payload.length > ENGINE_MAX_PAYLOAD) throw new Error("invalid engine message");
+  if (!validHeader(kind, source, target, requestId, topic) || payload.length > (kind === ENGINE_BULK ? ENGINE_MAX_BULK : ENGINE_MAX_PAYLOAD)) throw new Error("invalid engine message");
   const version = ENGINE_VERSION, payloadLength = payload.length;
   const bytes = new Uint8Array(ENGINE_HEADER_BYTES + payloadLength);
   const view = new DataView(bytes.buffer);
@@ -39,7 +44,7 @@ export function encodeEngineMessage(kind: number, source: number, target: number
 }
 
 export function decodeEngineMessage(bytes: Uint8Array): EngineMessage | null {
-  if (bytes.length < ENGINE_HEADER_BYTES || bytes.length > ENGINE_HEADER_BYTES + ENGINE_MAX_PAYLOAD) return null;
+  if (bytes.length < ENGINE_HEADER_BYTES || bytes.length > ENGINE_HEADER_BYTES + ENGINE_MAX_BULK) return null;
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const version = view.getUint8(0);
   const kind = view.getUint8(1);
@@ -48,6 +53,6 @@ export function decodeEngineMessage(bytes: Uint8Array): EngineMessage | null {
   const requestId = view.getUint32(4, true);
   const topic = view.getUint32(8, true);
   const payloadLength = view.getUint32(12, true);
-  if (version !== ENGINE_VERSION || payloadLength !== bytes.length - ENGINE_HEADER_BYTES || !validHeader(kind, source, target, requestId, topic)) return null;
+  if (version !== ENGINE_VERSION || payloadLength > (kind === ENGINE_BULK ? ENGINE_MAX_BULK : ENGINE_MAX_PAYLOAD) || payloadLength !== bytes.length - ENGINE_HEADER_BYTES || !validHeader(kind, source, target, requestId, topic)) return null;
   return { kind, source, target, requestId, topic, payload: bytes.subarray(ENGINE_HEADER_BYTES) };
 }

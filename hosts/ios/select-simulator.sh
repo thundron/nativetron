@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Print the UDID of the simulator to use. Read-only: lists devices, never boots or creates.
-# NT_IOS_SIMULATOR selects explicitly; otherwise the first available iOS 18.6 simulator.
-# iOS 26 simulators are refused on macOS 27 (WebContent JIT PAC crash).
+# NT_IOS_SIMULATOR selects explicitly; otherwise prefer iOS 18.6, then another available iOS runtime.
+# The launch helper applies the iOS 26/macOS 27 JIT compatibility setting.
 # NT_IOS_SIMCTL_JSON / NT_IOS_MACOS_VERSION substitute inputs for tests.
 set -euo pipefail
 if [[ -n "${NT_IOS_SIMCTL_JSON:-}" ]]; then LIST="$(cat "$NT_IOS_SIMCTL_JSON")"; else LIST="$(xcrun simctl list devices -j)"; fi
@@ -18,9 +18,10 @@ if wanted:
     udid = wanted
 else:
     found = [(k, x["udid"]) for k, v in devices.items() if k.endswith("iOS-18-6") for x in v if x.get("isAvailable")]
-    if not found: sys.exit("ios: iOS 18.6 simulator required; do not use the iOS 26 simulator on macOS 27")
+    if not found: found = [(k, x["udid"]) for k, v in devices.items() if "iOS-" in k for x in v if x.get("isAvailable")]
+    if not found: sys.exit("ios: no available iOS simulator")
     runtime, udid = found[0]
-if macos.startswith("27.") and "iOS-26" in runtime:
-    sys.exit("ios: iOS 26 simulator WebContent JIT PAC crash on macOS 27: use iOS 18.6 or a physical device")
+if not any(x["udid"] == udid and x.get("isAvailable", True) for x in devices[runtime]):
+    sys.exit("ios: selected simulator is unavailable")
 print(udid)
 ' "$LIST" "${NT_IOS_SIMULATOR:-}" "$MACOS"

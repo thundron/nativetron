@@ -35,7 +35,8 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
     super.buildMenu(with: builder)
     guard builder.system == .main else { return }
     let command = UIKeyCommand(title: "Change Clear Colour", action: #selector(HostController.changeClearColour(_:)), input: "r", modifierFlags: .command)
-    builder.insertSibling(UIMenu(title: "Engine", children: [command]), afterMenu: .view)
+    let pageCommands = UIApplication.shared.connectedScenes.compactMap { ($0 as? UIWindowScene)?.keyWindow?.rootViewController as? HostController }.first?.hostServices?.keyCommands ?? []
+    builder.insertSibling(UIMenu(title: "Engine", children: [command] + pageCommands), afterMenu: .view)
   }
 }
 
@@ -49,6 +50,7 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     self.window = window
     mount()
     window.makeKeyAndVisible()
+    for context in options.urlContexts { HostServices.open(context.url) }
     if Acceptance.enabled { Acceptance.shared.begin(scene: self) }
   }
 
@@ -68,6 +70,8 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     mount()
     return old
   }
+
+  func scene(_ scene: UIScene, openURLContexts contexts: Set<UIOpenURLContext>) { for context in contexts { HostServices.open(context.url) } }
 
   func sceneDidEnterBackground(_ scene: UIScene) { host?.enterBackground() }
   func sceneWillEnterForeground(_ scene: UIScene) { host?.enterForeground() }
@@ -125,6 +129,7 @@ final class HostController: UIViewController, WKNavigationDelegate, WKUIDelegate
   weak var observer: HostObserver?
   private let library = ControlLibrary.shared
   private var web: WKWebView?
+  private(set) var hostServices: HostServices?
   private var assets: AssetSchemeHandler?
   private var pageReady = false, foreground = true, disposed = false, delivering = false
   private var outbox: [Data] = []
@@ -135,6 +140,9 @@ final class HostController: UIViewController, WKNavigationDelegate, WKUIDelegate
   private var terminations: [Date] = []
   private let commandButton = UIButton(type: .system)
   private let container = UIView()
+
+  override var keyCommands: [UIKeyCommand]? { (super.keyCommands ?? []) + (hostServices?.keyCommands ?? []) }
+  @objc func ntHostShortcut(_ command: UIKeyCommand) { hostServices?.shortcut(command) }
 
   override func viewDidLoad() {
     super.viewDidLoad()
@@ -180,6 +188,7 @@ final class HostController: UIViewController, WKNavigationDelegate, WKUIDelegate
     config.userContentController.add(WeakMessageHandler(self), name: "ntConsole")
     config.userContentController.addUserScript(WKUserScript(source: Self.consoleBridge, injectionTime: .atDocumentStart, forMainFrameOnly: true))
     let web = WKWebView(frame: .zero, configuration: config)
+    hostServices = HostServices(web: web, presenter: self, scheme: AssetCatalog.scheme, host: AssetCatalog.host)
     web.navigationDelegate = self
     web.uiDelegate = self
     web.allowsLinkPreview = false
@@ -299,6 +308,8 @@ final class HostController: UIViewController, WKNavigationDelegate, WKUIDelegate
     decisionHandler(allowed ? .allow : .cancel)
   }
 
+  func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) { hostServices?.reset() }
+
   func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
     Evidence.emit("NT_IOS_PAGE_LOADED", webView.url?.absoluteString ?? "")
     observer?.hostDidLoadPage(self)
@@ -316,6 +327,7 @@ final class HostController: UIViewController, WKNavigationDelegate, WKUIDelegate
   }
 
   func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+    hostServices?.reset()
     pageReady = false
     delivering = false
     let now = Date()
@@ -356,6 +368,7 @@ final class HostController: UIViewController, WKNavigationDelegate, WKUIDelegate
   func dispose() {
     guard !disposed else { return }
     disposed = true
+    hostServices?.dispose(); hostServices = nil
     outbox.removeAll()
     if library.delegate === self { library.delegate = nil }
     if let web {

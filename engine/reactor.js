@@ -1,7 +1,8 @@
 import { createGpuHost } from "../gpu/host.js";
-import { decodeEngineMessage, encodeEngineMessage, ENGINE_MAX_PAYLOAD, ENGINE_MAX_RATE, ENGINE_REPORT, LANE_ENGINE, LANE_NATIVE, LANE_UI } from "../ipc/engine.generated.mjs";
+import { createStreams } from "./streams.js";
+import { decodeEngineMessage, encodeEngineMessage, ENGINE_MAX_PAYLOAD, ENGINE_MAX_RATE, ENGINE_REPORT, ENGINE_STATE, ENGINE_BULK, LANE_ENGINE, LANE_NATIVE, LANE_UI } from "../ipc/engine.generated.mjs";
 
-// Per-instance bounds. Inbound control frames wait for the reactor to be idle; outbound frames wait for rate budget.
+// Per-instance bounds. Reliable control waits for idle/rate budget; state and bulk use acknowledged stream leases.
 export const ENGINE_INBOUND_LIMIT = 64;
 export const ENGINE_OUTBOUND_LIMIT = 64;
 export const ENGINE_EVENT_LIMIT = 1024;
@@ -129,6 +130,8 @@ export async function instantiateReactor(prepared, options) {
   let pixelRatio = options.pixelRatio ?? 1;
   const now = options.now ?? (() => performance.now());
   const inbox = [];
+  const streamWaiters = new Set();
+  const rejectStreams = (error) => { for (const waiter of streamWaiters) waiter.reject(error); streamWaiters.clear(); };
   let inboxMessages = 0, inboxEvents = 0;
   const safe = (fn, ...args) => { try { fn?.(...args); } catch (error) { try { report(`ENGINE_CALLBACK_ERROR ${errorText(error)}`); } catch {} } };
   const outbound = createOutbound({
@@ -141,8 +144,9 @@ export async function instantiateReactor(prepared, options) {
       queueMicrotask(() => safe(report, `ENGINE_ROUTE_DROPPED ${count} outbound frames (queue full)`));
     },
   });
+  const streams = createStreams({ deliver: options.postStream ?? post, onError: error => fail(error) });
   const host = createGpuHost({
-    canvas, scope,
+    canvas, scope, frameMode: options.frameMode,
     getPixelRatio: () => canvas.clientWidth === undefined ? pixelRatio : (scope.devicePixelRatio ?? 1),
     getMemory: () => api.__memory(),
     onFrame: (time) => call("frame", time),
@@ -156,7 +160,7 @@ export async function instantiateReactor(prepared, options) {
     if (failure || disposed) return;
     failure = error instanceof EngineError ? error : new EngineError("engine-failed", `engine instance failed: ${errorText(error)}`, { cause: error });
     inbox.length = 0; inboxMessages = 0; inboxEvents = 0;
-    outbound.close(); host.dispose();
+    rejectStreams(failure); streams.close(); outbound.close(); host.dispose();
     if (started) queueMicrotask(() => safe(options.onFailure, failure));
   };
   // Every export call is guarded: nested calls are rejected and a throwing export discards the instance.
@@ -191,9 +195,10 @@ export async function instantiateReactor(prepared, options) {
       const item = inbox.shift();
       if (item.event) { inboxEvents--; deliver(item.event); }
       else {
-        inboxMessages--; consumed++;
+        if (!item.waiter) { inboxMessages--; consumed++; }
         if (typeof api[`${prefix}receive`] === "function") call("receive", item.frame);
         else call("message", item.topic, item.payload);
+        if (item.waiter) { streamWaiters.delete(item.waiter); if (failure) item.waiter.reject(failure); else item.waiter.resolve(); }
       }
     }
     if (consumed) safe(options.onConsumed, consumed);
@@ -211,11 +216,22 @@ export async function instantiateReactor(prepared, options) {
     engineSend: (bytes) => {
       const message = decodeEngineMessage(bytes);
       if (!message || message.source !== LANE_ENGINE || (message.target !== LANE_NATIVE && message.target !== LANE_UI)) throw new EngineError("invalid-route", "invalid outbound engine message");
-      if (!failure && !disposed) outbound.push({ frame: bytes.slice() });
+      if (!failure && !disposed) {
+        if (message.kind === ENGINE_STATE || message.kind === ENGINE_BULK) {
+          if (!streams.offer(bytes)) safe(report, "ENGINE_STREAM_FULL use engineOffer to observe backpressure");
+        } else outbound.push({ frame: new Uint8Array(bytes) });
+      }
+    },
+    // Scalar acknowledgement: accepted bytes are copied before returning.
+    // A full bulk lane returns false, never silently drops or traps the guest.
+    engineOffer: (bytes) => {
+      const message = decodeEngineMessage(bytes);
+      if (!message || message.source !== LANE_ENGINE || (message.target !== LANE_UI && message.target !== LANE_NATIVE) || (message.kind !== ENGINE_STATE && message.kind !== ENGINE_BULK)) throw new EngineError("invalid-route", "invalid outbound engine stream");
+      return !failure && !disposed && streams.offer(bytes);
     },
     panic: (message) => { throw new EngineError("engine-panic", `engine panic: ${message}`); },
   };
-  const abandon = () => { disposed = true; inbox.length = 0; outbound.close(); host.dispose(); };
+  const abandon = () => { disposed = true; rejectStreams(new EngineError("disposed", "engine disposed")); inbox.length = 0; streams.close(); outbound.close(); host.dispose(); };
   try { api = await prepared.module.instantiateFromBytes(prepared.bytes, imports); }
   catch (error) { abandon(); throw new EngineError("instantiate-failed", `engine reactor instantiation failed: ${errorText(error)}`, { cause: error }); }
   if (options.cancelled?.()) { abandon(); throw new EngineError("aborted", "engine start cancelled", { name: "AbortError" }); }
@@ -229,14 +245,23 @@ export async function instantiateReactor(prepared, options) {
     get disposed() { return disposed; },
     get pending() { return inboxMessages; },
     get outbound() { return { pending: outbound.pending, dropped: outbound.dropped, delivered: outbound.delivered }; },
-    receive(bytes) {
+    receiveStream(bytes) {
+      return new Promise((resolve, reject) => {
+        const waiter = { resolve, reject }; streamWaiters.add(waiter);
+        try { this.receive(bytes, waiter); } catch (error) { streamWaiters.delete(waiter); reject(error); }
+      });
+    },
+    receive(bytes, waiter) {
       const message = bytes instanceof Uint8Array ? decodeEngineMessage(bytes) : null;
       if (!message || message.target !== LANE_ENGINE) throw new Error("invalid engine destination");
       if (disposed) throw new EngineError("disposed", "engine reactor disposed");
       if (failure) throw new EngineError("failed", `engine reactor failed: ${failure.message}`, { cause: failure });
       if (typeof api[`${prefix}receive`] !== "function" && message.requestId !== 0) throw new EngineError("envelope-export-required", "reactor must export receive(bytes) to preserve correlation identifiers");
-      if (inboxMessages >= inboundLimit) throw new EngineError("queue-full", "engine inbound queue full");
-      inbox.push({ topic: message.topic, payload: message.payload.slice(), frame: bytes.slice() }); inboxMessages++; schedule();
+      const fast = message.kind === ENGINE_STATE || message.kind === ENGINE_BULK;
+      if (fast !== Boolean(waiter)) throw new EngineError("invalid-stream", "state/bulk requires acknowledged stream delivery");
+      if (waiter && streamWaiters.size > 3) throw new EngineError("stream-full", "engine stream capacity exceeded");
+      if (!waiter && inboxMessages >= inboundLimit) throw new EngineError("queue-full", "engine inbound queue full");
+      inbox.push({ topic: message.topic, payload: new Uint8Array(message.payload), frame: new Uint8Array(bytes), waiter }); if (!waiter) inboxMessages++; schedule();
     },
     resize(width, height, dpr) {
       if (disposed || failure) return;

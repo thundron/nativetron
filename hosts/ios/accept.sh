@@ -54,13 +54,13 @@ if [[ "$MODE" == sim ]]; then
   PIDS+=($!)
   sleep 2
   xcrun simctl terminate "$SIM" "$BUNDLE" 2>/dev/null || true
-  xcrun simctl launch --console-pty --terminate-running-process "$SIM" "$BUNDLE" --nt-acceptance >"$EVIDENCE/console.txt" 2>&1 &
+  "$HERE/launch-simulator.sh" "$SIM" --console-pty --terminate-running-process "$BUNDLE" --nt-acceptance >"$EVIDENCE/console.txt" 2>&1 &
   PIDS+=($!)
   wait_for NT_IOS_ACCEPT_DONE "$TIMEOUT" || echo "ios accept: NT_IOS_ACCEPT_DONE not observed within ${TIMEOUT}s" | tee "$EVIDENCE/runner.txt"
   # Lifecycle: background by foregrounding Settings, then bring the host back.
-  xcrun simctl launch "$SIM" com.apple.Preferences >/dev/null 2>&1 || true
+  "$HERE/launch-simulator.sh" "$SIM" com.apple.Preferences >/dev/null 2>&1 || true
   wait_for 'NT_IOS_LIFECYCLE background' 15 || echo 'ios accept: background transition not observed' >>"$EVIDENCE/runner.txt"
-  xcrun simctl launch "$SIM" "$BUNDLE" >/dev/null 2>&1 || true
+  "$HERE/launch-simulator.sh" "$SIM" "$BUNDLE" >/dev/null 2>&1 || true
   wait_for 'NT_IOS_LIFECYCLE foreground' 15 || echo 'ios accept: foreground transition not observed' >>"$EVIDENCE/runner.txt"
   sleep 2
   xcrun simctl terminate "$SIM" "$BUNDLE" 2>/dev/null || true

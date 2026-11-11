@@ -12,9 +12,9 @@ final class EngineProtocol {
   static boolean valid(byte[] bytes) {
     if (bytes.length < 16 || bytes.length > 65552) return false;
     ByteBuffer b = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN);
-    return b.get(0) == 1 && b.get(1) >= 1 && b.get(1) <= 5 &&
+    return b.get(0) == 1 && b.get(1) >= 1 && b.get(1) <= 6 &&
       b.get(2) >= 0 && b.get(2) <= 2 && b.get(3) >= 0 && b.get(3) <= 2 && b.get(2) != b.get(3) &&
-      b.getInt(12) == bytes.length - 16;
+      (b.get(1) != 6 || b.getInt(4) == 0) && b.getInt(12) == bytes.length - 16;
   }
   static byte[] decodeEnvelope(String text) {
     if (text.length() > 87468) return null;

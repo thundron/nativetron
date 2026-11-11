@@ -71,7 +71,7 @@ const simctl = (devices) => {
 };
 const device = (udid, isAvailable = true) => ({ udid, isAvailable, name: "iPhone 16", state: "Shutdown" });
 
-test("simulator selection prefers iOS 18.6 and refuses iOS 26 on macOS 27", () => {
+test("simulator selection prefers iOS 18.6 and permits iOS 26 with launch compatibility", () => {
   const fixture = simctl({
     "com.apple.CoreSimulator.SimRuntime.iOS-26-1": [device("S26")],
     "com.apple.CoreSimulator.SimRuntime.iOS-18-6": [device("S18-OFF", false), device("S18")],
@@ -79,14 +79,14 @@ test("simulator selection prefers iOS 18.6 and refuses iOS 26 on macOS 27", () =
   const select = (extra) => spawnSync("bash", [join(here, "select-simulator.sh")], { env: { ...process.env, NT_IOS_SIMULATOR: "", NT_IOS_SIMCTL_JSON: fixture.file, NT_IOS_MACOS_VERSION: "27.0.1", ...extra }, encoding: "utf8" });
   try {
     assert.equal(select({}).stdout.trim(), "S18");
-    const refused = select({ NT_IOS_SIMULATOR: "S26" });
-    assert.notEqual(refused.status, 0);
-    assert.match(refused.stderr, /iOS 26 simulator WebContent JIT PAC crash on macOS 27/);
+    assert.equal(select({ NT_IOS_SIMULATOR: "S26" }).stdout.trim(), "S26");
+    assert.notEqual(select({ NT_IOS_SIMULATOR: "S18-OFF" }).status, 0);
     assert.equal(select({ NT_IOS_SIMULATOR: "S26", NT_IOS_MACOS_VERSION: "15.6" }).stdout.trim(), "S26");
     assert.match(select({ NT_IOS_SIMULATOR: "missing" }).stderr, /not found/);
     const none = simctl({ "com.apple.CoreSimulator.SimRuntime.iOS-26-1": [device("S26")] });
     const result = spawnSync("bash", [join(here, "select-simulator.sh")], { env: { ...process.env, NT_IOS_SIMULATOR: "", NT_IOS_SIMCTL_JSON: none.file, NT_IOS_MACOS_VERSION: "27.0.1" }, encoding: "utf8" });
-    assert.match(result.stderr, /iOS 18.6 simulator required/);
+    assert.equal(result.status, 0);
+    assert.equal(result.stdout.trim(), "S26");
     rmSync(none.dir, { recursive: true, force: true });
   } finally { rmSync(fixture.dir, { recursive: true, force: true }); }
 });

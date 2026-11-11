@@ -3,6 +3,8 @@
 <style>body{font:15px system-ui;margin:16px;background:#101822;color:#ddd}canvas{width:640px;max-width:100%;height:400px}button{padding:8px}pre{white-space:pre-wrap}</style></head>
 <body><div id="nt-root"></div><canvas id="surface" width="640" height="400"></canvas><pre id="report"></pre>
 <script type="module">
+import { installHostServices } from "../host/services.js";
+window.nativetronHost = installHostServices(window);
 import { createEngine } from "./host.js";
 import { instantiateFromBytes } from "./.scriptc/ui.mjs";
 import { bindEventCallbacks } from "../host/event.generated.mjs";
@@ -39,6 +41,7 @@ const report = (line) => {
   }
   if (line.startsWith("ENGINE_") || line.startsWith("GPU_CAPABILITIES ")) native?.(engineEnvelope(encodeEngineMessage(ENGINE_REPORT, LANE_ENGINE, LANE_NATIVE, 0, 0, payload)));
 };
+window.__nt_engine_dispose = () => lane?.dispose();
 window.__nt_engine_receive = (base64) => {
   const bytes = engineFromBase64(base64);
   if (!bytes) throw new Error("invalid native engine frame");

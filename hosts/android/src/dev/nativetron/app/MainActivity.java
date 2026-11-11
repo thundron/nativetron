@@ -49,6 +49,7 @@ public final class MainActivity extends Activity implements NativeControl.Listen
   private final ArrayDeque<byte[]> pageQueue = new ArrayDeque<>();
   private WebView web;
   private Bridge bridge;
+  private HostServices hostServices;
   private NativeControl control;
   private boolean debuggable, destroyed, pageReady, selftest, selftestCommandSent, selftestDone;
   private int rendererRestarts;
@@ -67,6 +68,7 @@ public final class MainActivity extends Activity implements NativeControl.Listen
       main.postDelayed(selftestTimeout, SELFTEST_TIMEOUT_MS);
     }
     createWebView();
+    hostServices.openIntent(intent);
     lifecycle("create");
   }
 
@@ -91,6 +93,7 @@ public final class MainActivity extends Activity implements NativeControl.Listen
     settings.setCacheMode(WebSettings.LOAD_NO_CACHE);
     bridge = new Bridge(this);
     web.addJavascriptInterface(bridge, "ntEngine");
+    hostServices = new HostServices(this, web, this::serve);
     web.setWebChromeClient(new WebChromeClient() {
       @Override public boolean onConsoleMessage(ConsoleMessage message) {
         String text = String.valueOf(message.message());
@@ -116,8 +119,11 @@ public final class MainActivity extends Activity implements NativeControl.Listen
         Uri uri = Uri.parse(url);
         bridge.trusted = AssetPolicy.isEntry(uri.getScheme(), uri.getHost(), uri.getPort(), uri.getEncodedPath());
         pageReady = false;
+        if (hostServices != null) hostServices.pageStarted(uri);
         if (!bridge.trusted) Log.w("nt-offline", "PAGE_UNTRUSTED " + uri.getScheme() + " " + uri.getHost());
       }
+      @Override public void onPageCommitVisible(WebView view, String url) { if (view == web && hostServices != null) hostServices.pageFinished(); }
+      @Override public void onPageFinished(WebView view, String url) { if (view == web && hostServices != null) hostServices.pageFinished(); }
       @Override public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
         Log.e(TAG, "NT_RENDERER_GONE crashed=" + detail.didCrash() + " priority=" + detail.rendererPriorityAtExit());
         if (view != web) return true;
@@ -136,7 +142,7 @@ public final class MainActivity extends Activity implements NativeControl.Listen
     web.loadUrl(AssetPolicy.ORIGIN + "/" + AssetPolicy.ENTRY);
   }
 
-  private WebResourceResponse serve(String method, Uri url) {
+  WebResourceResponse serve(String method, Uri url) {
     AssetPolicy.Decision decision = AssetPolicy.resolve(method, url.getScheme(), url.getHost(), url.getPort(), url.getEncodedPath(), BundleManifest.FILES);
     if (decision.status == 403) Log.w("nt-offline", "REQUEST_BLOCKED " + url.getScheme() + " " + url.getHost());
     else if (decision.status != 200) Log.w("nt-offline", "REQUEST_REFUSED " + decision.status + " " + url.getEncodedPath());
@@ -175,6 +181,7 @@ public final class MainActivity extends Activity implements NativeControl.Listen
   private void destroyWebView() {
     if (web == null) return;
     WebView old = web;
+    if (hostServices != null) hostServices.dispose(); hostServices = null;
     web = null;
     if (bridge != null) bridge.activity = null;
     bridge = null;
@@ -272,20 +279,22 @@ public final class MainActivity extends Activity implements NativeControl.Listen
 
   // ── native menu and debuggable-only runner commands ────────────────────
 
-  @Override public boolean onCreateOptionsMenu(Menu menu) { menu.add(0, 1, 0, "Change clear colour"); return true; }
+  @Override public boolean onCreateOptionsMenu(Menu menu) { menu.add(0, 1, 0, "Change clear colour"); if (hostServices != null) hostServices.addMenu(menu); return true; }
   @Override public boolean onPrepareOptionsMenu(Menu menu) {
     MenuItem item = menu.findItem(1);
     if (item != null) item.setEnabled(control != null && control.ready());
     return true;
   }
   @Override public boolean onOptionsItemSelected(MenuItem item) {
+    if (hostServices != null && hostServices.menu(item)) return true;
     if (item.getItemId() != 1) return super.onOptionsItemSelected(item);
     control.command(TOPIC_CHANGE_COLOUR, new byte[0]);
     return true;
   }
 
   @Override protected void onNewIntent(Intent intent) {
-    super.onNewIntent(intent);
+    super.onNewIntent(intent); setIntent(intent);
+    if (hostServices != null) hostServices.openIntent(intent);
     if (!debuggable) return;
     if (intent.hasExtra("nt.command")) {
       int topic = intent.getIntExtra("nt.command", -1);
@@ -294,6 +303,9 @@ public final class MainActivity extends Activity implements NativeControl.Listen
     }
     if (intent.getBooleanExtra("nt.finish", false)) finish();
   }
+
+  @Override public boolean onKeyShortcut(int keyCode, android.view.KeyEvent event) { return (hostServices != null && hostServices.shortcut(event)) || super.onKeyShortcut(keyCode, event); }
+  @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) { if (hostServices == null || !hostServices.result(requestCode, resultCode, data)) super.onActivityResult(requestCode, resultCode, data); }
 
   // ── lifecycle ──────────────────────────────────────────────────────────
 

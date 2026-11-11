@@ -18,7 +18,10 @@ static const NtBundledAsset NT_ASSETS[] = {
   {"host/dom-host.js", "text/javascript"},
   {"host/event.generated.mjs", "text/javascript"},
   {"ipc/engine.generated.mjs", "text/javascript"},
-  {"ipc/engine-bridge.generated.mjs", "text/javascript"}
+  {"ipc/engine-bridge.generated.mjs", "text/javascript"},
+  {"engine/streams.js", "text/javascript"},
+  {"gpu/frame-scheduler.js", "text/javascript"},
+  {"host/services.js", "text/javascript"}
 };
 static inline const char *nt_asset_mime(const char *path) {
   for (size_t index = 0; index < sizeof(NT_ASSETS) / sizeof(NT_ASSETS[0]); index++) if (strcmp(path, NT_ASSETS[index].path) == 0) return NT_ASSETS[index].mime;

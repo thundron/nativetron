@@ -1,11 +1,14 @@
 import { EngineError, errorText, instantiateReactor, prepareReactor } from "./reactor.js";
 
-// Protocol (host → worker): probe, prepare, start, restart, message, resize, stop.
-// Protocol (worker → host): probe, prepared, ready, error, report, message, gpu-event, credit, failed, stopped.
+// Protocol (host → worker): probe, prepare, start, restart, message, stream, stream-ack, frame-mode, resize, stop.
+// Protocol (worker → host): probe, prepared, ready, error, report, message, stream, stream-ack, gpu-event, credit, failed, stopped.
 // Every post-start message carries the generation it belongs to; anything for another generation is ignored.
 const scope = self;
 let prepared = null, preparing = null, reactor = null, canvas = null, generation = 0, pixelRatio = 1, stopping = false;
-let credits = 0, creditQueued = false;
+let credits = 0, creditQueued = false, frameMode = "display";
+const streamLeases = new Map();
+let nextStream = 1;
+const clearStreams = () => { for (const lease of streamLeases.values()) lease.reject(new Error("engine generation ended")); streamLeases.clear(); };
 
 const send = (message, transfer) => { if (!stopping) scope.postMessage(message, transfer); };
 const credit = (gen, count) => {
@@ -19,10 +22,10 @@ const credit = (gen, count) => {
   });
 };
 
-async function probe() {
+async function probe(mode = "display") {
   let device;
   try {
-    if (!scope.navigator?.gpu || !scope.OffscreenCanvas || !scope.requestAnimationFrame || !scope.WebAssembly) throw new Error("worker WebGPU, OffscreenCanvas or rAF absent");
+    if (!scope.navigator?.gpu || !scope.OffscreenCanvas || (mode !== "throughput" && !scope.requestAnimationFrame) || !scope.WebAssembly) throw new Error("worker WebGPU, OffscreenCanvas or rAF absent");
     const adapter = await scope.navigator.gpu.requestAdapter();
     if (!adapter) throw new Error("worker adapter unavailable");
     device = await adapter.requestDevice();
@@ -50,10 +53,15 @@ async function launch(gen) {
   if (!canvas) throw new EngineError("no-canvas", "engine worker has no OffscreenCanvas");
   const current = () => gen === generation && !stopping;
   const created = await instantiateReactor(prepared, {
-    canvas, pixelRatio, scope,
+    canvas, pixelRatio, scope, frameMode,
     cancelled: () => !current(),
     report: (message) => { if (current()) send({ type: "report", generation: gen, message }); },
     post: (bytes) => { if (current()) send({ type: "message", generation: gen, bytes }, [bytes.buffer]); },
+    postStream: (bytes) => new Promise((resolve, reject) => {
+      if (!current()) { reject(new Error("stale engine generation")); return; }
+      const id = nextStream++; streamLeases.set(id, { resolve, reject });
+      send({ type: "stream", generation: gen, id, bytes }, [bytes.buffer]);
+    }),
     onEvent: (event) => { if (current()) send({ type: "gpu-event", generation: gen, event }); },
     onFailure: (error) => { if (current()) send({ type: "failed", generation: gen, code: error.code ?? "engine-failed", message: errorText(error) }); },
     onConsumed: (count) => { if (current()) credit(gen, count); },
@@ -66,7 +74,7 @@ async function launch(gen) {
 function begin(gen) {
   if (!Number.isInteger(gen) || gen <= generation) { send({ type: "error", generation: gen, code: "invalid-generation", message: "engine worker generation must increase" }); return; }
   const previous = reactor;
-  reactor = null; generation = gen; credits = 0;
+  clearStreams(); reactor = null; generation = gen; credits = 0;
   try { previous?.dispose(); } catch {}
   launch(gen).catch((error) => { if (gen === generation && !stopping) send({ type: "error", generation: gen, code: error.code ?? "start-failed", message: errorText(error) }); });
 }
@@ -74,7 +82,7 @@ function begin(gen) {
 function stop() {
   if (stopping) return;
   const previous = reactor;
-  reactor = null; generation = Infinity;
+  clearStreams(); reactor = null; generation = Infinity;
   let message = "";
   try { previous?.dispose(); } catch (error) { message = errorText(error); }
   scope.postMessage({ type: "stopped", ok: !message, message });
@@ -86,21 +94,40 @@ scope.onmessage = ({ data }) => {
   if (stopping || !data || typeof data.type !== "string") return;
   try {
     switch (data.type) {
-      case "probe": probe(); break;
+      case "probe": probe(data.frameMode); break;
       case "prepare": prepare(data.options); break;
       case "start":
         if (canvas) { send({ type: "error", generation: data.generation, code: "already-started", message: "engine worker already owns a canvas" }); break; }
         canvas = data.canvas ?? null; pixelRatio = data.options?.pixelRatio ?? 1;
+        frameMode = data.options?.frameMode ?? frameMode;
         begin(data.generation);
         break;
       case "restart":
         if (Number.isFinite(data.options?.pixelRatio)) pixelRatio = data.options.pixelRatio;
+        frameMode = data.options?.frameMode ?? frameMode;
         begin(data.generation);
         break;
       case "message":
         if (data.generation !== generation) break;
         try { if (!reactor) throw new EngineError("not-ready", "engine worker has no live reactor"); reactor.receive(data.bytes); }
         catch { credit(generation, 1); }
+        break;
+      case "stream-ack":
+        if (data.generation === generation) {
+          const lease = streamLeases.get(data.id); streamLeases.delete(data.id);
+          if (data.ok) lease?.resolve(); else lease?.reject(new Error(data.message ?? "stream rejected"));
+        }
+        break;
+      case "stream": {
+        if (data.generation !== generation) break;
+        const gen = generation;
+        Promise.resolve().then(() => { if (!reactor) throw new Error("engine not ready"); return reactor.receiveStream(data.bytes); })
+          .then(() => send({ type: "stream-ack", generation: gen, id: data.id, ok: true }),
+            error => send({ type: "stream-ack", generation: gen, id: data.id, ok: false, message: errorText(error) }));
+        break;
+      }
+      case "frame-mode":
+        if (data.generation === generation) { reactor?.host.setFrameMode(data.mode); frameMode = data.mode; }
         break;
       case "resize":
         if (data.generation === generation) { pixelRatio = data.dpr; reactor?.resize(data.width, data.height, data.dpr); }

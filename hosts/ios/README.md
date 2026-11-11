@@ -73,4 +73,4 @@ native command through the library, probes the asset policy from inside WebKit, 
 and checks it was released; cycle 2 repeats on a fresh web view. On the simulator the runner also
 backgrounds (Settings) and foregrounds the app. Exit 0 requires `GPU_COLOUR_CHANGED` in both cycles;
 exit 3 means the control/asset/lifecycle path passed but the engine reported no GPU; anything else
-is 1. The simulator runner refuses iOS 26 runtimes on macOS 27.
+is 1. The selector prefers iOS 18.6 when installed and permits an explicitly selected iOS 26 simulator. On macOS 27, `launch-simulator.sh` applies `__XPC_JSC_useJIT=false` to the launcher and simulated child for iOS 26 instead of refusing it. All build/run/acceptance launches use that helper. This compatibility mode is not a performance baseline and still needs runtime Wasm/GPU checks.

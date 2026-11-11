@@ -1,3 +1,4 @@
+import { createFrameScheduler } from "./frame-scheduler.js";
 import {
   decodeGpuBatch, readGpuRecord, GPU_HANDLE_SLOT_BITS, GPU_HANDLE_GENERATION_BITS, GPU_ENUMS, GPU_RECORDS, GPU_MAX_PENDING_REQUESTS,
   GPU_FEATURES, GPU_LIMITS, GPU_PROTOCOL_VERSION, GPU_PROTOCOL_IDENTITY,
@@ -161,6 +162,8 @@ export function createGpuHost(options) {
   const stats = { batches: 0, frames: 0, uploadedBytes: 0 };
   const raf = options.requestAnimationFrame ?? scope.requestAnimationFrame?.bind(scope);
   const cancelRaf = options.cancelAnimationFrame ?? scope.cancelAnimationFrame?.bind(scope);
+  let frameMode = options.frameMode ?? "display";
+  let scheduler = createFrameScheduler(frameMode, scope, options);
   const emit = (type, requestId = 0, handle = 0, status = GPU_STATUS_OK, data = {}) => {
     if (stopped) return;
     const event = { type, requestId, handle: handle >>> 0, status, ...data };
@@ -220,7 +223,7 @@ export function createGpuHost(options) {
   const loseDevice = (epoch, reason, message) => {
     if (stopped || epoch !== deviceEpoch || !device) return;
     device = null; deviceEpoch++; configured = false; lostSignal = null;
-    if (frameToken !== null) cancelRaf?.(frameToken);
+    if (frameToken !== null) scheduler.cancel(frameToken);
     frameToken = null;
     for (const [id, record] of [...pending]) if (record.device) settle(id, record, record.type, GPU_STATUS_LOST, { message: "GPU device lost" });
     handles.lose();
@@ -719,10 +722,19 @@ export function createGpuHost(options) {
       const queue = active().queue;
       request(requestId, GPU_EVENT_WORK_DONE, 0, async (current, record) => { await queue.onSubmittedWorkDone(); if (current()) settle(requestId, record, GPU_EVENT_WORK_DONE, GPU_STATUS_OK); });
     },
+    setFrameMode(mode) {
+      if (stopped) throw new Error("GPU host disposed");
+      if (mode === frameMode) return;
+      const next = createFrameScheduler(mode, scope, options);
+      const requested = frameToken !== null;
+      if (requested) scheduler.cancel(frameToken);
+      scheduler.dispose(); scheduler = next; frameMode = mode; frameToken = null;
+      if (requested) host.requestFrame();
+    },
+    get frameMode() { return frameMode; },
     requestFrame() {
       if (stopped || !device || frameToken !== null) return;
-      if (!raf) throw new Error("requestAnimationFrame unavailable");
-      frameToken = raf((time) => {
+      frameToken = scheduler.request((time) => {
         frameToken = null;
         if (stopped || !device) return;
         pixels(); stats.frames++;
@@ -742,9 +754,10 @@ export function createGpuHost(options) {
       if (stopped) return;
       stopped = true; deviceEpoch++;
       pending.clear();
-      if (frameToken !== null) cancelRaf?.(frameToken);
+      if (frameToken !== null) scheduler.cancel(frameToken);
       frameToken = null;
       observer?.disconnect(); media?.removeEventListener("change", changedDpr); scope.removeEventListener?.("resize", changedWindow);
+      scheduler.dispose();
       if (resizeFrame !== null) cancelRaf?.(resizeFrame);
       handles.clear(); context?.unconfigure(); device?.destroy(); device = null;
     },

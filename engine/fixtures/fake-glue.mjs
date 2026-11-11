@@ -1,7 +1,7 @@
 import { GPU_PROTOCOL_HEADER_BYTES, writeGpuProtocolHeader } from "../../gpu/gpu-host.generated.js";
 // Test-only stand-in for scriptc's generated reactor glue (`instantiateFromBytes(bytes, host)`).
 // Behaviour is chosen by the module URL's `mode` query, so each mode is a separate module instance.
-import { decodeEngineMessage, encodeEngineMessage, ENGINE_RESULT, LANE_ENGINE, LANE_NATIVE, LANE_UI } from "../../ipc/engine.generated.mjs";
+import { decodeEngineMessage, encodeEngineMessage, ENGINE_RESULT, ENGINE_STATE, ENGINE_BULK, LANE_ENGINE, LANE_NATIVE, LANE_UI } from "../../ipc/engine.generated.mjs";
 
 const mode = new URL(import.meta.url).searchParams.get("mode") ?? "ok";
 const log = (globalThis.__engineFixture ??= { instances: 0, calls: [], hooks: {} });
@@ -56,10 +56,17 @@ export async function instantiateFromBytes(bytes, host) {
         else if (topic === 3) throw new Error("trap: message");
         else if (topic === 4) for (let i = 0; i < payload[0] * 10; i++) host.engineSend(frame(LANE_UI, 4, new Uint8Array([i & 255])));
         else if (topic === 5) host.engineSend(encodeEngineMessage(ENGINE_RESULT, LANE_UI, LANE_NATIVE, 0, 5, new Uint8Array(0)));
-        else if (topic === 6) log.hooks.during?.(id);
+        else if (topic === 6) log.hooks.during?.(id, host);
         else if (topic === 7) host.gpuReport("x".repeat(70000));
         else if (topic === 8) host.panic("message panic");
         else if (topic === 10) present(new Uint8Array([47]));
+        else if (topic === 11) {
+          const bytes = encodeEngineMessage(ENGINE_BULK, LANE_ENGINE, LANE_UI, 0, 11, new Uint8Array(1024 * 1024).fill(73));
+          let accepted = ""; for (let i = 0; i < 3; i++) accepted += host.engineOffer(bytes) ? "1" : "0";
+          host.gpuReport("BULK_ACCEPT " + accepted);
+        } else if (topic === 12) {
+          for (let i = 0; i < 1000; i++) host.engineOffer(encodeEngineMessage(ENGINE_STATE, LANE_ENGINE, LANE_UI, 0, 12, new Uint8Array([i % 256])));
+        } else if (topic === 13) host.gpuReport("BULK_RECEIVED " + payload.length + " " + payload[payload.length - 1]);
       } finally { leave("message"); }
       return 0;
     },

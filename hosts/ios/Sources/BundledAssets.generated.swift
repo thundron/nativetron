@@ -16,6 +16,9 @@ enum BundledAssets {
     "host/dom-host.js": "text/javascript",
     "host/event.generated.mjs": "text/javascript",
     "ipc/engine.generated.mjs": "text/javascript",
-    "ipc/engine-bridge.generated.mjs": "text/javascript"
+    "ipc/engine-bridge.generated.mjs": "text/javascript",
+    "engine/streams.js": "text/javascript",
+    "gpu/frame-scheduler.js": "text/javascript",
+    "host/services.js": "text/javascript"
   ]
 }

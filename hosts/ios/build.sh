@@ -52,5 +52,5 @@ case "$MODE" in
       -derivedDataPath "$DERIVED" CODE_SIGNING_ALLOWED=NO NT_IOS_TEAM= DEVELOPMENT_TEAM= -quiet build
     xcrun simctl boot "$SIM" 2>/dev/null || true
     xcrun simctl install "$SIM" "$APP"
-    xcrun simctl launch "$SIM" dev.nativetron.gpu ;;
+    "$HERE/launch-simulator.sh" "$SIM" dev.nativetron.gpu ;;
 esac

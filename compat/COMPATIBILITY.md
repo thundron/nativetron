@@ -79,15 +79,15 @@ compile error, not a runtime failure.
 
 ## Node builtins
 
-598 of 619 members lower statically, projected from
-scriptc's manifest at compiler 0.4.8.
+610 of 631 members lower statically, projected from
+scriptc's manifest at compiler 0.4.10.
 
 | module | lowers | missing |
 |---|---|---|
 | `crypto` | 41 | 5 |
 | `assert` | 1 | 3 |
 | `assert/strict` | 1 | 3 |
-| `module` | 1 | 3 |
+| `module` | 5 | 3 |
 | `http2` | 1 | 2 |
 | `tls` | 6 | 2 |
 | `child_process` | 6 | 1 |
@@ -107,17 +107,18 @@ scriptc's manifest at compiler 0.4.8.
 | `path/posix` | 16 | 0 |
 | `path/win32` | 16 | 0 |
 | `perf_hooks` | 9 | 0 |
-| `process` | 36 | 0 |
+| `process` | 37 | 0 |
 | `punycode` | 8 | 0 |
 | `querystring` | 8 | 0 |
 | `readline` | 2 | 0 |
 | `readline/promises` | 2 | 0 |
+| `sea` | 5 | 0 |
 | `timers/promises` | 5 | 0 |
 | `tty` | 2 | 0 |
 | `url` | 10 | 0 |
 | `util/types` | 42 | 0 |
 | `v8` | 2 | 0 |
-| `worker_threads` | 4 | 0 |
+| `worker_threads` | 5 | 0 |
 | `zlib` | 142 | 0 |
 
 ### Missing node members

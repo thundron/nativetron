@@ -3,7 +3,7 @@ import { decodeEngineMessage } from "./engine.generated.mjs";
 
 export const ENGINE_ENVELOPE_LIMIT = 87404;
 export function engineBase64(bytes) {
-  if (!decodeEngineMessage(bytes)) throw new Error("invalid engine frame");
+  if (!decodeEngineMessage(bytes) || bytes[1] === 7 || bytes.length > 65552) throw new Error("invalid engine control frame");
   let text = ""; for (const byte of bytes) text += String.fromCharCode(byte); return btoa(text);
 }
 export function engineFromBase64(value) {
