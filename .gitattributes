@@ -1,0 +1,2 @@
+# Unified patch context lines need their single-space prefix.
+gpu/native/compiler/patches/*.patch -whitespace

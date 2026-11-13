@@ -1,6 +1,6 @@
 # GPU surface
 
-A bounded WebGPU command transport for an in-page scriptc reactor. No GPU calls or geometry uploads cross the native/page bridge. `ops.json` owns the generated guest functions, record builders, constants, host decoder, protocol identity and the generated tables in this file; `node gpu/generate.mjs --check` detects drift.
+A bounded WebGPU command transport for an in-page scriptc reactor. By default, no GPU calls or geometry uploads cross the native/page bridge. An opt-in native executor exists for the macOS feasibility experiment; see [results and acceptance limits](native/FEASIBILITY.md). It is not the recommended default. `ops.json` owns the generated guest functions, record builders, constants, host decoder, protocol identity and the generated tables in this file; `node gpu/generate.mjs --check` detects drift.
 
 Protocol tests use a recording WebGPU double. The conformance reactor runs the same guest API on real Chrome WebGPU, on the main thread and in a dedicated worker. Desktop and mobile acceptance are tracked separately. No renderer or third-party runtime is included.
 

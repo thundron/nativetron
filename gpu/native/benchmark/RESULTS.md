@@ -1,33 +1,22 @@
 # Native GPU spike: measurements (deliverable 6) and go/no-go (deliverable 7)
 
-Measured 2026-11-13, 18:03–20:33 UTC. Machine: Apple M4 Max (16 cores, 128 GB), macOS 27.0.1 (26A434), built-in
-display at backing scale 2. The house-planner app ran with its full UI on the Bresso scene, at canvas 1600×1520,
-desktop tier, deterministic GI rays. The runs used nativetron `598d7b0` ("frame credits follow real GPU completion")
-and consumer `67ffa0c` (the commit the canonical engine Wasm and native dylib were built from). Method and counters:
-[`README.md`](README.md). Raw data: `/tmp/nt-native-gpu-measurements-root` (see the end).
+Measured 2026-11-13, 18:03–20:33 UTC. Machine: Apple M4 Max (16 cores, 128 GB), macOS 27.0.1 (26A434), built-in display at backing scale 2. The house-planner app ran with its full UI on the Bresso scene, at canvas 1600×1520, desktop tier, deterministic GI rays. The runs used nativetron `598d7b0` ("frame credits follow real GPU completion") and consumer `67ffa0c` (the commit the canonical engine Wasm and native dylib were built from). Method and counters: [`README.md`](README.md). Raw data: `/tmp/nt-native-gpu-measurements-root` (see the end).
 
 ## Verdict
 
-**No-go for making the native executor the default macOS GPU path. Go only for keeping it as an explicit, opt-in
-experimental path.** The reasons are measured:
+**No-go for making the native executor the default macOS GPU path. Go only for keeping it as an explicit, opt-in experimental path.** The reasons are measured:
 
-1. **Slower than Chrome's JS WebGPU on the same frames.** Each frame is rendered back to back and waits for its GPU
-   completion.
+1. **Slower than Chrome's JS WebGPU on the same frames.** Each frame is rendered back to back and waits for its GPU completion.
    - Moving camera: 21.2 ms vs 15.2 ms per frame (+39 %).
    - Still camera: 8.1 ms vs 3.9 ms per frame (+107 %).
 2. **The GPU work itself is the main cause, not the WKWebView crossing.**
-   - Kernel-accounted GPU time per frame: 15.9 vs 12.0 ms moving, 4.8 vs 2.9 ms still. That is wgpu-native/Metal
-     against Dawn/Metal on identical engine input.
+   - Kernel-accounted GPU time per frame: 15.9 vs 12.0 ms moving, 4.8 vs 2.9 ms still. That is wgpu-native/Metal against Dawn/Metal on identical engine input.
    - The best-case CLI path, with the same executor and no WebView, is no faster: 21.3 ms moving, 6.1 ms still.
-   - Compared with that CLI path, the crossing costs about 2 ms per GPU-completed round trip on still frames and
-     nothing measurable on moving frames.
+   - Compared with that CLI path, the crossing costs about 2 ms per GPU-completed round trip on still frames and nothing measurable on moving frames.
 3. **Presentation is not shippable.**
    - With public API (overlay), DOM cannot blend over the scene; transparency needs private SPI (macOS app lane).
-   - With overlay presentation, **2 of 16 runs never produced a first frame within 20 min**. In both, the host
-     reported `NT_MACOS_NATIVE_GPU_PRESENTATION visible=false`: the window was not on a visible workspace. The engine
-     stalls with no headless fallback.
-   - In 3 of 16 overlay runs (0 of 14 headless, 0 of 14 Chrome) the camera left the driver's view; the cause was not
-     isolated.
+   - With overlay presentation, **2 of 16 runs never produced a first frame within 20 min**. In both, the host reported `NT_MACOS_NATIVE_GPU_PRESENTATION visible=false`: the window was not on a visible workspace. The engine stalls with no headless fallback.
+   - In 3 of 16 overlay runs (0 of 14 headless, 0 of 14 Chrome) the camera left the driver's view; the cause was not isolated.
 4. **Where native does better:**
    - About 150 MB less physical footprint: 713 MB across the app's processes vs 863 MB for Chrome's.
    - The same first-image time with warm caches: 553 ms vs 522 ms.
@@ -36,8 +25,7 @@ experimental path.** The reasons are measured:
 
 A default switch would need, at minimum, three things:
 
-- closing the executor's GPU-time gap (profile wgpu-native's Metal passes against Dawn for the `lighting`, `glass`
-  and `reflect` work);
+- closing the executor's GPU-time gap (profile wgpu-native's Metal passes against Dawn for the `lighting`, `glass` and `reflect` work);
 - a hidden-surface fallback that keeps the engine progressing;
 - composition that needs no private SPI.
 
@@ -50,8 +38,7 @@ A run counts as **clean** only when all of these hold; the other runs are kept a
 - it finished;
 - the camera stayed on the driver's view;
 - power source, Low Power Mode and thermal state were AC / off / nominal both before and after the run;
-- other Metal clients used ≤ 200 ms/s of GPU time inside the measured phases (WindowServer excluded; the user's
-  resident Slack and terminal used 60–140 ms/s throughout).
+- other Metal clients used ≤ 200 ms/s of GPU time inside the measured phases (WindowServer excluded; the user's resident Slack and terminal used 60–140 ms/s throughout).
 
 | path | clean / runs | still ms/frame (range) | moving ms/frame (range) | CPU ms/frame still · moving | kernel GPU ms/frame still · moving | GPU timestamp frame span ms (moving) |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -66,11 +53,8 @@ Each run contributes 5 still samples and 6 moving samples of 10 frames each, aft
 - **ms/frame** = 1000 / (back-to-back GPU-completed frames per second); it is not a display frame rate.
 - **CPU** = user + system time of every process of the launch, per frame.
 - **Kernel GPU** = `AGXDeviceUserClient` `accumulatedGPUTime` of those processes, per frame.
-- **†** The CLI samples the processes at 20 Hz rather than at the driver's marks, so its per-frame GPU time is coarse;
-  compare its wall time.
-- **GPU timestamps** are the engine's own pass spans. They are not busy time: a 3.9 ms Chrome still frame spans 14.3 ms.
-  Per-pass splits are not comparable across implementations: wgpu-native reports `lighting` ≈ `glass` ≈ 15.6 ms and
-  `tonemap` 0, which are overlapping encoder-boundary samples on a TBDR GPU.
+- **†** The CLI samples the processes at 20 Hz rather than at the driver's marks, so its per-frame GPU time is coarse; compare its wall time.
+- **GPU timestamps** are the engine's own pass spans. They are not busy time: a 3.9 ms Chrome still frame spans 14.3 ms. Per-pass splits are not comparable across implementations: wgpu-native reports `lighting` ≈ `glass` ≈ 15.6 ms and `tonemap` 0, which are overlapping encoder-boundary samples on a TBDR GPU.
 - **CLI is the best-case headless number** for this engine on this executor. It is never the app path:
   - frame-synchronous replay with a lockstep pump;
   - 13 frame-sync divergences per replay, where the engine went idle earlier than the page's frame count;
@@ -79,8 +63,7 @@ Each run contributes 5 still samples and 6 moving samples of 10 frames each, aft
 **Where the CPU goes** (clean-run medians, ms per frame, still · moving):
 
 - Chrome: GPU process and helpers 0.92 · 2.38, renderer (page and engine Worker) 0.54 · 1.91, browser ≈ 0.
-- `wk-native`: the Nativetron process (bridge and executor) 1.52 · 3.11, WebContent (page and Worker) 1.04 · 1.79,
-  WebKit GPU process ≈ 0.
+- `wk-native`: the Nativetron process (bridge and executor) 1.52 · 3.11, WebContent (page and Worker) 1.04 · 1.79, WebKit GPU process ≈ 0.
 - `cli-wasm` costs 0.2–0.7 ms of CPU per frame more than `cli-native` (V8 against native code) at the same wall time.
 
 ### Startup, first image, shader and pipeline caches
@@ -92,24 +75,16 @@ Each run contributes 5 still samples and 6 moving samples of 10 frames each, aft
 | `wk-native`, app Metal cache moved aside | **6274** (1 run) · 563 (next run) | 9927 · 1521 | cold: the executor's largest single submit took **5709 ms** and the 46 startup submits 8532 ms, against 42 ms and 128 ms warm. This run's later phases were contended, but its startup was not |
 | `wk-native-overlay` | 567 (warm median) | 1598 | as `wk-native` |
 
-First image is the app's own `startup.firstFrame`: an engine status with the scene, then one more rendered frame.
-Page times are measured from navigation.
+First image is the app's own `startup.firstFrame`: an engine status with the scene, then one more rendered frame. Page times are measured from navigation.
 
-- **Pipeline-compile cost.** The executor creates pipelines synchronously inside its submit, so the cold-cache
-  startup submit is a pipeline-compile bound: about 5.7 s, against Chrome's asynchronous creation, which is not
-  observable from the page.
-- **Host launch.** Process launch to page bootstrap is 353 ms for the macOS host. Chrome's 21 ms is only
-  `page.goto` after the browser was already up.
-- **Shader corpus through the executor** (`executor-corpus.mjs`: 199 modules, 810 pipelines, Naga → MSL → Metal):
-  615 / 632 / 615 ms per process with all 810 pipelines OK, 0 uncaught errors and 0 device losses. The system Metal
-  cache was warm; it is shared by non-bundled executables, so a cold run would mean clearing a cache other
-  applications use, and was not done.
+- **Pipeline-compile cost.** The executor creates pipelines synchronously inside its submit, so the cold-cache startup submit is a pipeline-compile bound: about 5.7 s, against Chrome's asynchronous creation, which is not observable from the page.
+- **Host launch.** Process launch to page bootstrap is 353 ms for the macOS host. Chrome's 21 ms is only `page.goto` after the browser was already up.
+- **Shader corpus through the executor** (`executor-corpus.mjs`: 199 modules, 810 pipelines, Naga → MSL → Metal): 615 / 632 / 615 ms per process with all 810 pipelines OK, 0 uncaught errors and 0 device losses. The system Metal cache was warm; it is shared by non-bundled executables, so a cold run would mean clearing a cache other applications use, and was not done.
   - **Chrome:** no equivalent isolated compile time was measured.
 
 ### Memory (tracked allocation ≠ physical residency)
 
-- **Engine-tracked allocations:** 346 MB on every path, from the engine's own estimate (GI 166 + direct 18 +
-  reflections 28 + targets 134).
+- **Engine-tracked allocations:** 346 MB on every path, from the engine's own estimate (GI 166 + direct 18 + reflections 28 + targets 134).
 - **Physical footprint** (`phys_footprint`) at the end of the idle window, per process class:
 
 | path | process class | footprint |
@@ -125,8 +100,7 @@ Page times are measured from navigation.
 | `wk-native` | **total** | **713 MB** |
 | overlay | Nativetron | 474 MB |
 
-- **CLI:** peak footprint is 1124 MB for `cli-native` and 1244 MB for `cli-wasm` (nt-reactor plus the Node guest).
-  These peaks include the reactor's capture buffers, so they are not comparable with the table.
+- **CLI:** peak footprint is 1124 MB for `cli-native` and 1244 MB for `cli-wasm` (nt-reactor plus the Node guest). These peaks include the reactor's capture buffers, so they are not comparable with the table.
 
 ### Observable copies and bytes (`wk-native`, from `GET /__ntgpu/stats`, per frame)
 
@@ -142,8 +116,7 @@ Page times are measured from navigation.
 | body queue | 0.20 ms | 0.26 ms |
 
 - **Wasm → owned chunk:** 1 copy in JS (`stats.copiedBytes`, not sampled by this harness).
-- **Not observable:** copies inside WebKit (request bodies, responses) and inside Chrome (IPC to its GPU process).
-  They are not claimed.
+- **Not observable:** copies inside WebKit (request bodies, responses) and inside Chrome (IPC to its GPU process). They are not claimed.
 
 ### Idle after settle (10 s window)
 
@@ -154,41 +127,28 @@ Page times are measured from navigation.
   - overlay 0.70 ms/s.
 - **Kernel GPU time:** 0 ms/s for all.
 
-**Settle never happened.** The engine's `STATUS_SETTLED` never arrived in the full app on any path: the direct light
-stays `pending`. That is the consumer's behaviour, also in Chrome. The procedure therefore continues after a bounded
-20 s wait, and `hpPresent.still` would only measure its own 60 s timeout.
+**Settle never happened.** The engine's `STATUS_SETTLED` never arrived in the full app on any path: the direct light stays `pending`. That is the consumer's behaviour, also in Chrome. The procedure therefore continues after a bounded 20 s wait, and `hpPresent.still` would only measure its own 60 s timeout.
 
 ### Image check
 
-On every clean app run (LIVING view, `runGi(64)`, `capture()`, 16×16 box thumbnail, golden rule): 0 % of pixels over
-12/255, max channel delta ≤ 5, against Chrome (20 clean app runs, each compared with Chrome run 0, or with run 1
-for run 0 itself). The camera runs show why the camera is also checked directly: overlay #0 failed the check at
-99.6 %, but #1 and #4, moved to nearby views, differed in only 0.02 %.
+On every clean app run (LIVING view, `runGi(64)`, `capture()`, 16×16 box thumbnail, golden rule): 0 % of pixels over 12/255, max channel delta ≤ 5, against Chrome (20 clean app runs, each compared with Chrome run 0, or with run 1 for run 0 itself). The camera runs show why the camera is also checked directly: overlay #0 failed the check at 99.6 %, but #1 and #4, moved to nearby views, differed in only 0.02 %.
 
 ## Low Power Mode
 
-**The controlled bracket is blocked.** The gate authorized `sudo -n /usr/bin/pmset -c powermode 1` and restoration.
-Both attempts (18:18:01Z and 19:23:46Z) returned `sudo: a password is required` (exit 1), so the harness entered no
-low-power runs, prompted for no password and changed no setting.
+**The controlled bracket is blocked.** The gate authorized `sudo -n /usr/bin/pmset -c powermode 1` and restoration. Both attempts (18:18:01Z and 19:23:46Z) returned `sudo: a password is required` (exit 1), so the harness entered no low-power runs, prompted for no password and changed no setting.
 
-**Restoration evidence.** The original was AC `powermode 2`, `isLowPowerModeEnabled=false`. Afterwards, `pmset -g
-custom` was byte-identical to before (`power-evidence*.json`, `customIdentical: true`). Unblocking it takes a
-non-interactive pmset privilege for the measuring process, which only the machine's owner can grant.
+**Restoration evidence.** The original was AC `powermode 2`, `isLowPowerModeEnabled=false`. Afterwards, `pmset -g custom` was byte-identical to before (`power-evidence*.json`, `customIdentical: true`). Unblocking it takes a non-interactive pmset privilege for the measuring process, which only the machine's owner can grant.
 
-**Observed, not controlled.** Between 19:25Z and 19:33Z the machine's user unplugged the charger, so the source
-became Battery Power and battery `powermode 1` set `isLowPowerModeEnabled=true`:
+**Observed, not controlled.** Between 19:25Z and 19:33Z the machine's user unplugged the charger, so the source became Battery Power and battery `powermode 1` set `isLowPowerModeEnabled=true`:
 
-- **Chrome:** one clean run happened entirely in that state. Still 5.57 ms and moving 24.35 ms per frame (+42 % and
-  +60 % against AC); kernel GPU 4.69 · 20.37 ms; first image 856 ms. n = 1, not a measurement of record.
-- **Native:** no native run in that window was clean. One overlay run was contended; one headless run changed state
-  mid-run.
+- **Chrome:** one clean run happened entirely in that state. Still 5.57 ms and moving 24.35 ms per frame (+42 % and +60 % against AC); kernel GPU 4.69 · 20.37 ms; first image 856 ms. n = 1, not a measurement of record.
+- **Native:** no native run in that window was clean. One overlay run was contended; one headless run changed state mid-run.
 
 These runs are grouped as `ac-high~observed-battery-lowpower` and never mixed into the AC numbers.
 
 ## Exclusions and contention (all raw runs kept)
 
-**The machine was not uncontended.** A different pi session (pid 79469, house-planner worktrees under
-`…/development/.pi-worktrees/20261103-001946-session-*`, not this task's parent) ran the following during the window:
+**The machine was not uncontended.** A different pi session (pid 79469, house-planner worktrees under `…/development/.pi-worktrees/20261103-001946-session-*`, not this task's parent) ran the following during the window:
 
 - `scripts/gates.mjs`: tsc, eslint, vitest, drawings, goldens-raster, ui-smoke, lowend-smoke;
 - QCAD;
@@ -212,25 +172,19 @@ This harness did not stop them. Instead it does three things:
 | entirely on battery with Low Power Mode on (regrouped as observed) | 1 (#10, clean) | — | 1 (#10, contended) | — |
 | contention not recorded (first session) | — | — | — | 8 runs (#0–#3 of each guest) |
 
-- **Activation.** The diagnostic `--no-activate` overlay runs (`diag-noactivate`, n = 1 clean) had no camera
-  contamination, but moving was slower at 25.9 ms. They are not mixed in.
+- **Activation.** The diagnostic `--no-activate` overlay runs (`diag-noactivate`, n = 1 clean) had no camera contamination, but moving was slower at 25.9 ms. They are not mixed in.
 - **Run order.** Runs were interleaved across paths (run i of every path before run i + 1).
-- **Thermal state** was `nominal` throughout, except the two transitions involving `fair` in the `#14` runs, which are
-  excluded.
+- **Thermal state** was `nominal` throughout, except the two transitions involving `fair` in the `#14` runs, which are excluded.
 
 ## Excluded path: WKWebView WebGPU
 
-`wk-webgpu` runs, but it is not a baseline. WebKit fails to compile the engine's shaders
-(`Failed to compile the shader source, generated metal …`) and then reports `encoder state is not valid` every
-frame. The gpu-shaders lane traced this to WebKit's CAS prelude. A WKWebView app on this OS therefore cannot use the
-engine through WebKit WebGPU at all: the native executor path is the only working GPU path inside WKWebView here.
+`wk-webgpu` runs, but it is not a baseline. WebKit fails to compile the engine's shaders (`Failed to compile the shader source, generated metal …`) and then reports `encoder state is not valid` every frame. The gpu-shaders lane traced this to WebKit's CAS prelude. A WKWebView app on this OS therefore cannot use the engine through WebKit WebGPU at all: the native executor path is the only working GPU path inside WKWebView here.
 
 ## Scope, binary, CI and fallback
 
 **Measured on:**
 
-- macOS 27.0.1 / Apple M4 Max only, on AC in High Power energy mode, plus the observed battery and Low Power Mode
-  anecdote above;
+- macOS 27.0.1 / Apple M4 Max only, on AC in High Power energy mode, plus the observed battery and Low Power Mode anecdote above;
 - one display scale (2), one canvas size (1600×1520) and the desktop tier;
 - the Bresso scene.
 
@@ -238,32 +192,27 @@ engine through WebKit WebGPU at all: the native executor path is the only workin
 
 - other Apple GPUs (M1/M2/M3, base and Pro variants);
 - Intel Macs;
-- iOS (simulator and emulator expose no WebGPU adapter, and the executor was not run on a device);
+- iOS (the native executor was not built or run there; missing browser WebGPU in a simulator does not establish native Metal availability);
 - Android, Windows and Linux (executor built for macOS only);
 - other tiers, scenes and window sizes;
 - display frame pacing (no presentation counter is common to all paths).
 
 **Binary:**
 
-- The macOS host grows from 0.93 MB to 12.69 MB (arm64, unstripped) when the executor and the patched wgpu-native
-  are statically linked.
+- The macOS host grows from 0.93 MB to 12.69 MB (arm64, unstripped) when the executor and the patched wgpu-native are statically linked.
 - `libntgpu-executor.dylib` is 11.6 MB; the static `libwgpu_native.a` is 36.6 MB.
 - No signing or notarization was done.
 
 **CI:**
 
-- The build needs the patched wgpu-native build (`v29.0.1.1+naga-wgsl-compat.1`, a Rust toolchain and a cache).
-  The unpatched build fails the `gi.insert` / `gi.merge` pipelines, and wgpu then aborts the process.
-- Every number here needs a real Metal GPU and a logged-in session: the app opens a window, and the WK paths need
-  a visible window for overlay presentation. Hosted macOS runners were not validated.
-- The harness is reproducible with one command (below). Its contention, camera and power gates make it usable on a
-  shared machine only with the exclusions reported.
+- The build needs the patched wgpu-native build (`v29.0.1.1+naga-wgsl-compat.1`, a Rust toolchain and a cache). The unpatched build fails the `gi.insert` / `gi.merge` pipelines, and wgpu then aborts the process.
+- Every number here needs a real Metal GPU and a logged-in session: the app opens a window, and the WK paths need a visible window for overlay presentation. Hosted macOS runners were not validated.
+- The harness is reproducible with one command (below). Its contention, camera and power gates make it usable on a shared machine only with the exclusions reported.
 
 **Fallback:**
 
 - JS WebGPU stays the default. The native path needs `--native-gpu`, and the page claims it explicitly.
-- No runtime fallback exists. A hidden or invisible overlay surface stalls the engine (measured), and an executor
-  abort takes down the host (executor lane).
+- No runtime fallback exists. A hidden or invisible overlay surface stalls the engine (measured), and an executor abort takes down the host (executor lane).
 - WebKit's own WebGPU is not a fallback on this OS: it fails the engine's shaders.
 - Chrome or another browser engine (Dawn) is the only measured path that is both correct and faster here.
 
@@ -295,11 +244,8 @@ node gpu/native/benchmark/summarize.mjs --runs $R/runs
 
 - `runs/summary.md` and `runs/summary.json`: per-path medians, exclusions, and every derived row.
 - `runs/results.csv`: one row per run, raw values.
-- `runs/<mode>/app/<path>-NN.json`: raw app runs. Each holds the driver's output, every probe sample per mark
-  (CPU, GPU and footprint per pid, plus all Metal clients), native stats per mark, power state before and after,
-  contention before and after, host lines, and cache state.
-- `runs/ac-high/cli/<guest>-NN.json` and `<guest>-NN/`: raw CLI runs (timepoints, `run.json`, engine log, 20 Hz
-  samples) and the compiled scenario.
+- `runs/<mode>/app/<path>-NN.json`: raw app runs. Each holds the driver's output, every probe sample per mark (CPU, GPU and footprint per pid, plus all Metal clients), native stats per mark, power state before and after, contention before and after, host lines, and cache state.
+- `runs/ac-high/cli/<guest>-NN.json` and `<guest>-NN/`: raw CLI runs (timepoints, `run.json`, engine log, 20 Hz samples) and the compiled scenario.
 - `runs/ac-high/corpus/`: executor shader-corpus reports and timing.
 
 **Power and session logs:**
