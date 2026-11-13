@@ -34,16 +34,26 @@ header) have a handler and a schema change is a compile error. The JS host, `ops
   end of that `submit`, after every operation ran (so a later `cancelRequest`/`destroy` in the same batch wins).
   Native completions — `MAP_READY`, `WORK_DONE`, `UNCAUGHT_ERROR`, a native `DEVICE_LOST` — are emitted only by
   `process()`.
-- **process / pending / wake.** `pending()` counts unsettled requests plus queued native events. While a map or
-  work-done is outstanding, a waiter thread blocks in `wgpuDevicePoll(wait)` (no spinning; a bounded 1–64 ms back-off
-  only if a poll completes nothing) and the facade calls `wake` when its event queue turns non-empty; the owner then
-  calls `process()`, which also does one non-blocking poll. With nothing outstanding the waiter sleeps on a condition
-  variable: zero polls, zero wakes (tested). A host that prefers polling may simply call `process()` per frame while
-  `pending() > 0`.
+- **process / pending / wake.** `pending()` counts unsettled requests, outstanding host fences and queued native
+  events. While a map, work-done or host fence is outstanding, a waiter thread polls `wgpuDevicePoll` *without
+  waiting* (every 250 µs, backing off to at most 2 ms while nothing completes) and the facade calls `wake` when its
+  event queue turns non-empty; the owner then calls `process()`, which also does one non-blocking poll. The waiter
+  never uses the blocking poll: wgpu-core holds the device fence lock for the whole GPU wait of a blocking poll and
+  `wgpuQueueSubmit` takes it exclusively, so a blocking waiter stalled the owner's next submission until the GPU had
+  finished (tested: a later submit is accepted and the fence is still pending while a long GPU job runs). With
+  nothing outstanding the waiter sleeps on a condition variable: zero polls, zero wakes (tested). A host that prefers
+  polling may simply call `process()` per frame while `pending() > 0`.
+- **Host fences (`ntgpu_executor_fence`).** Host-only (no guest operation, no protocol change): completes when the
+  GPU finished every queue submission of all earlier `submit` calls — the macOS bridge fences each guest frame after
+  its last flush and returns the frame credit only then. Accepted fences call `done(user, token, status)` exactly once,
+  in request order, from `process()` (`DONE`; `LOST` when the device was lost/released first) or from `destroy`
+  (`CANCELLED`), never inside `fence()`/`submit()` or on another thread. At most `NTGPU_EXECUTOR_MAX_FENCES` (16) are
+  outstanding; beyond that `fence()` returns 0 and nothing is queued. Without a device a fence is `DONE` (nothing can
+  be queued) but still delivered by `process()`. Completion events ride the facade's existing queue, bounded by the
+  outstanding operations (no new queue).
 - **Map-state serialization.** wgpu-core's poll-side mapping races with an unmap/map of the same buffer on another
   thread ("Buffer is already mapped" under load). Map, unmap, mapped-range access, buffer release/destroy and device
-  request/release therefore take the same mutex as the waiter's blocking poll; such a call can wait until
-  already-submitted GPU work finishes. Not measured; a performance follow-up if per-frame readbacks matter.
+  request/release therefore take the same mutex as the waiter's (non-blocking, short) poll.
 - **Submission guard.** wgpu-native's `wgpuQueueSubmit` turns *every* submit error into a Rust panic across
   `extern "C"`, i.e. a process abort (verified: an invalid recorded pipeline, a copy out of range, a destroyed buffer
   or texture — directly or behind a bind group — and a buffer mapped or pending a map all abort). WebGPU instead
@@ -70,8 +80,8 @@ header) have a handler and a schema change is a compile error. The JS host, `ops
   and writes RGBA8 rows top-left first (BGRA canvases are swizzled). Unavailable (returns 0 with an `ERROR` event
   carrying `capture: true`) without a device, before a canvas texture exists, with a `CAMetalLayer` surface, for
   formats other than (b|r)gba8unorm(-srgb), or with a short buffer (width/height are still written).
-- **destroy.** Joins the waiter (after in-flight GPU work), destroys every live resource, releases the surface, then
-  the device; no event is delivered from or after destroy.
+- **destroy.** Joins the waiter, completes outstanding host fences (`CANCELLED`; resolved ones keep their status),
+  destroys every live resource, releases the surface, then the device; no event is delivered from or after destroy.
 
 ## Parity with `gpu/host.js`
 

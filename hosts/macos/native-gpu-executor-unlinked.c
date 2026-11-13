@@ -22,3 +22,7 @@ int ntgpu_executor_capture_rgba(NtGpuExecutor *executor, uint8_t *rgba, size_t c
   (void)executor; (void)rgba; (void)capacity; (void)width; (void)height;
   return 0;
 }
+int ntgpu_executor_fence(NtGpuExecutor *executor, uint64_t token, NtGpuExecutorFenceFn done, void *user) {
+  (void)executor; (void)token; (void)done; (void)user;
+  return 0;
+}

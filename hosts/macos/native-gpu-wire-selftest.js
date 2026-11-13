@@ -2,7 +2,8 @@
 // Drives the production transport core (engine/native-gpu.js) and wire (engine/native-gpu-wire.js) from a
 // Worker against the real WKURLSchemeHandler bridge and the recording executor (native-gpu-recorder.c), which
 // hashes what it consumed and echoes upload bytes as MAP_READY readbacks. Proves byte-exact crossing in both
-// directions, ordering, device-epoch handling, native ticks and generation retirement. It executes no GPU work.
+// directions, ordering, device-epoch handling, native ticks, GPU-completion frame credits (the recorder holds its
+// fences while a "HOLD" submission is outstanding) and generation retirement. It executes no GPU work.
 import { createNativeGpuHost } from "/engine/native-gpu.js";
 import { createNativeGpuWire, WIRE_CHUNK_RESERVE } from "/engine/native-gpu-wire.js";
 
@@ -13,14 +14,16 @@ const heap = () => new Uint8Array(memory.buffer);
 const fill = (at, length, seed) => { const view = heap().subarray(at, at + length); for (let i = 0; i < length; i++) view[i] = (i * 31 + seed + (i >>> 13)) & 255; return view; };
 const tag = (at, text) => { for (let i = 0; i < 4; i++) heap()[at + i] = text.charCodeAt(i); };
 
-function engine(gen, native, checks) {
+function engine(gen, native, checks, hostOptions = {}) {
   const events = [], frames = [], waiters = [];
   let failure = null;
   const notify = () => { for (const w of [...waiters]) if (w.test()) { waiters.splice(waiters.indexOf(w), 1); w.resolve(); } };
   const until = (label, test, ms = 20000) => new Promise((resolve, reject) => {
     if (test()) { resolve(); return; }
     const w = { test, resolve }; waiters.push(w);
-    setTimeout(() => { const i = waiters.indexOf(w); if (i >= 0) { waiters.splice(i, 1); reject(new Error(`gen ${gen}: timed out waiting for ${label}; failure=${failure?.message}; events=${events.map((e) => `${e.type}:${e.requestId}:${e.status}`).join(",")}; wire=${JSON.stringify(wire.stats)}; queue=${JSON.stringify(host.queue)} device=${host.deviceGeneration}`)); } }, ms);
+    // Some conditions (a deferred frame tick) change without an event or frame: re-test while waiting.
+    const recheck = setInterval(() => { if (!waiters.includes(w)) clearInterval(recheck); else notify(); }, 10);
+    setTimeout(() => { clearInterval(recheck); const i = waiters.indexOf(w); if (i >= 0) { waiters.splice(i, 1); reject(new Error(`gen ${gen}: timed out waiting for ${label}; failure=${failure?.message}; events=${events.map((e) => `${e.type}:${e.requestId}:${e.status}`).join(",")}; wire=${JSON.stringify(wire.stats)}; queue=${JSON.stringify(host.queue)} device=${host.deviceGeneration}`)); } }, ms);
   });
   const wire = createNativeGpuWire({ endpoint: native.endpoint, session: native.session, engine: gen });
   let host;
@@ -29,8 +32,9 @@ function engine(gen, native, checks) {
     getMemory: () => memory.buffer, engineGeneration: gen, chunkHeaderBytes: WIRE_CHUNK_RESERVE,
     createScheduler: (mode) => wire.createScheduler(mode),
     onEvent: (event) => { events.push(event); notify(); },
-    onFrame: (time) => { frames.push(time); notify(); },
+    onFrame: (time) => { frames.push(time); result.frameWork?.(); notify(); },
     onFailure: (error) => { failure = error; notify(); },
+    ...hostOptions,
   });
   const submit = (commandAt, commandBytes, uploadAt, uploadBytes) => {
     const batch = new Uint8Array(memory.buffer, commandAt, commandBytes), uploads = new Uint8Array(memory.buffer, uploadAt, uploadBytes);
@@ -45,13 +49,14 @@ function engine(gen, native, checks) {
     checks.push({ name: `${name}: executor consumed byte-exact commands`, ok: done?.commandHash === entry.commandHash && done?.commandBytes === entry.commandBytes });
     checks.push({ name: `${name}: executor consumed byte-exact uploads`, ok: done?.uploadHash === entry.uploadHash && done?.uploadBytes === entry.uploadBytes });
   };
-  return { host, wire, events, frames, until, submit, workDone, verify, get failure() { return failure; } };
+  const result = { host, wire, events, frames, until, submit, workDone, verify, frameWork: null, get failure() { return failure; } };
+  return result;
 }
 
 async function run(native) {
   const checks = [], timings = {};
   // Generation 1.
-  const one = engine(1, native, checks);
+  const one = engine(1, native, checks, { maxFramesInFlight: 1 });
   fill(0, 4096, 1); tag(0, "SMAL");
   const small = one.submit(0, 64, 0, 0);
   await one.until("small WORK_DONE", () => one.workDone(small.sequence) || one.failure);
@@ -75,6 +80,20 @@ async function run(native) {
   const framed = one.submit(0, 64, 0, 0);
   await one.until("native tick", () => one.frames.length > 0 || one.failure);
   checks.push({ name: "executor frame request produced a native tick and a frame callback", ok: one.frames.length === 1 && one.workDone(framed.sequence) !== undefined });
+
+  // Frame credit follows GPU completion, not consumption: one frame of two flushes whose (recorded) GPU work is
+  // held keeps its credit after both flushes were acknowledged; the next frame waits until the work completes.
+  one.frameWork = () => { one.frameWork = null; tag(0, "HOLD"); one.submit(0, 64, 0, 0); tag(0, "SMAL"); one.submit(0, 96, 0, 0); };
+  one.host.requestFrame();
+  await one.until("held frame consumed", () => (one.frames.length === 2 && one.host.queue.submissions === 0) || one.failure);
+  checks.push({ name: "a consumed frame keeps its credit while its GPU work is pending", ok: one.host.queue.framesInFlight === 1 && one.host.stats.framesEnded === 1 && one.host.stats.framesCompleted === 0 });
+  one.host.requestFrame();
+  await one.until("next frame deferred", () => one.host.stats.frameDeferrals > 0 || one.failure);
+  checks.push({ name: "the next frame is deferred until GPU completion", ok: one.frames.length === 2 });
+  tag(0, "RELS");
+  one.submit(0, 64, 0, 0);
+  await one.until("frame completed on the GPU", () => one.frames.length === 3 || one.failure);
+  checks.push({ name: "FRAME_DONE after both flushes returned the credit and ran the deferred frame", ok: one.host.stats.framesCompleted === 1 && one.host.queue.framesInFlight === 0 && one.wire.stats.framesDone === 1 && !one.failure });
 
   // Device loss: the epoch advances; later traffic carries the new epoch and is accepted.
   tag(0, "LOST");

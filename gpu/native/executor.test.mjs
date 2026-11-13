@@ -784,3 +784,116 @@ test("submissions WebGPU would refuse are refused without reaching wgpu-native (
     assert.equal(d.terminal(99)[0].status, S.OK, name);
   }
 });
+
+// Host completion fences (ntgpu_executor_fence): frame credit follows real GPU completion, not consumption.
+const FENCE = { DONE: 0, LOST: 1, CANCELLED: 2 };
+const HEAVY_GROUPS = 1024, HEAVY_ITERATIONS = 1 << 22; // a few hundred ms of ALU work: GPU completion is observably later
+async function heavyDevice() {
+  const d = await connected();
+  const wgsl = `@group(0) @binding(0) var<storage, read_write> d: array<u32>;
+@compute @workgroup_size(64) fn main(@builtin(global_invocation_id) id: vec3<u32>) {
+  var x = id.x;
+  for (var i = 0u; i < ${HEAVY_ITERATIONS}u; i++) { x = x * 1664525u + 1013904223u; }
+  d[id.x] = x;
+}`;
+  assert.equal((await d.submit([
+    ["createShaderModule", h(1), 3, wgsl, "heavy"],
+    ["createBuffer", h(2), HEAVY_GROUPS * 64 * 4, C.BUFFER_USAGE_STORAGE | C.BUFFER_USAGE_COPY_SRC, false, "storage"],
+    ["createBindGroupLayout", h(3), bindGroupLayoutEntry(0, C.SHADER_STAGE_COMPUTE, C.BINDING_BUFFER, C.BUFFER_BINDING_STORAGE), "l"],
+    ["createPipelineLayout", h(4), [h(3)], "pl"],
+    ["createComputePipeline", h(5), h(4), h(1), "main", "heavy"],
+    ["createBindGroup", h(6), h(3), [0, C.BINDING_BUFFER, h(2), 0, 0], "g"],
+    ["createBuffer", h(7), 16, C.BUFFER_USAGE_COPY_SRC | C.BUFFER_USAGE_COPY_DST, false, "small a"],
+    ["createBuffer", h(8), 16, C.BUFFER_USAGE_COPY_SRC | C.BUFFER_USAGE_COPY_DST, false, "small b"],
+    ["createBuffer", h(9), 16, READBACK, false, "readback"],
+  ])).submit, 1);
+  await d.wait();
+  assert.deepEqual(quiet(d), []);
+  let next = 100;
+  // One guest flush: records and submits its own command buffer (`ops` adds commands to encoder `e`).
+  d.flush = (ops, extra = []) => {
+    const e = h(next++), c = h(next++);
+    return d.submit([["createCommandEncoder", e, "e"], ...ops(e), ["finishCommandEncoder", c, e, "cb"], ["queueSubmit", [c]], ...extra]);
+  };
+  d.heavy = (extra) => d.flush((e) => {
+    const p = h(next++);
+    return [["beginComputePass", p, e, 0, 0, 0, "heavy"], ["computeSetPipeline", p, h(5)], ["computeSetBindGroup", p, 0, h(6), []], ["computeDispatch", p, HEAVY_GROUPS, 1, 1], ["endComputePass", p]];
+  }, extra);
+  d.light = (extra) => d.flush((e) => [["copyBufferToBuffer", e, h(7), 0, h(8), 0, 16]], extra);
+  return d;
+}
+const lcg = (seed) => { let x = seed >>> 0; for (let i = 0; i < HEAVY_ITERATIONS; i++) x = (Math.imul(x, 1664525) + 1013904223) >>> 0; return x; };
+
+test("a host fence completes when the GPU finished every earlier flush, never on consumption, without stalling later submits", { skip, timeout: 60000 }, async () => {
+  const d = await heavyDevice();
+  // One frame of two flushes: a long GPU job, then a light one with a guest work-done request.
+  assert.equal((await d.heavy()).submit, 1);
+  assert.equal((await d.light([["onSubmittedWorkDone", 20]])).submit, 1, "both flushes were consumed (acknowledged) at once");
+  const fenced = await d.fence(41);
+  assert.equal(fenced.fenced, 1);
+  assert.equal(d.fences.length, 0, "never delivered inside the fence call");
+  await d.sleep(30); // the waiter polls in the background meanwhile
+  // A later flush (the next frame) is accepted while the GPU still runs the frame: the fence wait does not hold
+  // the device lock that wgpuQueueSubmit needs, so CPU recording and submission stay pipelined with the GPU.
+  assert.equal((await d.light()).submit, 1);
+  await d.process();
+  assert.equal(d.fences.length, 0, "the fence stays pending while the GPU still executes the frame");
+  assert.equal(d.terminal(20).length, 0);
+  assert.equal((await d.fence(42)).fenced, 1, "fences may overlap (several frames in flight)");
+  assert.equal((await d.wait(20000)).wait, "idle");
+  assert.deepEqual(d.fences.map(({ fence, status }) => [fence, status]), [[41, FENCE.DONE], [42, FENCE.DONE]]);
+  const workDone = d.events.indexOf(d.terminal(20)[0]);
+  assert.equal(d.terminal(20)[0].status, S.OK);
+  assert.ok(d.fences[0].at > workDone, "completes after the work-done of the frame's last flush");
+  // The frame's GPU results are complete when its fence completes.
+  await d.flush((e) => [["copyBufferToBuffer", e, h(2), 0, h(9), 0, 16]], [["mapAsync", 21, h(9), C.MAP_MODE_READ, 0, 16, { offset: 0, length: 16 }]]);
+  await d.wait();
+  const data = d.terminal(21)[0].payload.data;
+  assert.deepEqual([0, 1, 2, 3].map((i) => data.readUInt32LE(i * 4)), [0, 1, 2, 3].map(lcg));
+  // Idle afterwards: no polling once nothing is awaited.
+  const before = (await d.stats()).polls;
+  await d.sleep(100);
+  assert.equal((await d.stats()).polls, before);
+  assert.deepEqual(quiet(d), []);
+});
+
+test("host fences: deferred, ordered, exactly once, bounded; DONE without a device, LOST on loss, CANCELLED on destroy", { skip, timeout: 60000 }, async () => {
+  // Without a device nothing can be queued: DONE, but still only through process().
+  const bare = await start();
+  const early = await bare.fence(1);
+  assert.deepEqual([early.fenced, early.pending, bare.fences.length], [1, 1, 0]);
+  assert.equal((await bare.wait()).wait, "idle");
+  assert.deepEqual(bare.fences.map(({ fence, status }) => [fence, status]), [[1, FENCE.DONE]]);
+  // Bound: at most NTGPU_EXECUTOR_MAX_FENCES (16) outstanding; a refused fence never completes.
+  const d = await heavyDevice();
+  await d.heavy();
+  for (let token = 1; token <= 16; token++) assert.equal((await d.fence(token)).fenced, 1);
+  const refused = await d.fence(17);
+  assert.deepEqual([refused.fenced, refused.pending], [0, 16]);
+  assert.equal((await d.wait(20000)).wait, "idle");
+  assert.deepEqual(d.fences.map(({ fence, status }) => [fence, status]), Array.from({ length: 16 }, (_, i) => [i + 1, FENCE.DONE]));
+  // Device loss while the GPU runs a frame: LOST exactly once, delivered by process(); late native completions
+  // are dropped; a fence without a device afterwards is DONE.
+  await d.heavy();
+  assert.equal((await d.fence(30)).fenced, 1);
+  await d.lose();
+  assert.equal((await d.wait(20000)).wait, "idle");
+  const lost = d.fences.filter(({ fence }) => fence === 30);
+  assert.deepEqual(lost.map(({ status }) => status), [FENCE.LOST]);
+  const lossAt = d.events.findIndex((event) => event.type === E.DEVICE_LOST);
+  assert.ok(lossAt >= 0 && lost[0].at > lossAt, "delivered after the loss it reports");
+  await d.sleep(600);
+  await d.process();
+  assert.equal(d.fences.filter(({ fence }) => fence === 30).length, 1);
+  await d.fence(31);
+  await d.wait();
+  assert.deepEqual(d.fences.at(-1), { fence: 31, status: FENCE.DONE, at: d.fences.at(-1).at });
+  // Destroy with a frame still executing: CANCELLED exactly once, from destroy on the owner thread.
+  const x = await heavyDevice();
+  await x.heavy();
+  assert.equal((await x.fence(50)).fenced, 1);
+  const closed = new Promise((resolve) => x.child.on("close", resolve));
+  await x.quit();
+  await closed;
+  assert.deepEqual(x.fences.map(({ fence, status }) => [fence, status]), [[50, FENCE.CANCELLED]]);
+});

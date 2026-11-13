@@ -14,7 +14,9 @@ import QuartzCore
 //   GET  stats              instrumentation snapshot (capability required)
 // No loopback socket, no ATS/CSP/CORS change and no base64. Executor calls are serialized on one queue per
 // engine generation; executor callbacks only enqueue frames (never re-enter the guest, which lives in the
-// Worker anyway). Submissions are acknowledged only after ntgpu_executor_submit consumed the whole batch.
+// Worker anyway). Submissions are acknowledged only after ntgpu_executor_submit consumed the whole batch (that ack
+// releases the Worker's copies). Frame credits are separate: FRAME_END (after a frame's last flush) becomes an
+// ntgpu_executor_fence and FRAME_DONE goes back only when the GPU finished every flush of that frame.
 
 /// Function table for gpu/native/executor.h (linked artifact or unlinked stub) or the test recorder.
 struct NativeGPUExecutorAPI: @unchecked Sendable {
@@ -25,20 +27,23 @@ struct NativeGPUExecutorAPI: @unchecked Sendable {
   let process: (OpaquePointer) -> Void
   let resize: (OpaquePointer, UInt32, UInt32, Double) -> Void
   let capture: (OpaquePointer, UnsafeMutablePointer<UInt8>, Int, UnsafeMutablePointer<UInt32>, UnsafeMutablePointer<UInt32>) -> Int32
+  let fence: (OpaquePointer, UInt64, NtGpuExecutorFenceFn?, UnsafeMutableRawPointer?) -> Int32
 
   static let linkage = String(cString: nt_macos_gpu_executor_linkage())
   static let executor = NativeGPUExecutorAPI(
     name: linkage, create: { ntgpu_executor_create($0, $1) }, destroy: { ntgpu_executor_destroy($0) },
     submit: { ntgpu_executor_submit($0, $1, $2, $3, $4, $5) }, process: { ntgpu_executor_process($0) },
     resize: { ntgpu_executor_resize($0, $1, $2, $3) },
-    capture: { ntgpu_executor_capture_rgba($0, $1, $2, $3, $4) })
+    capture: { ntgpu_executor_capture_rgba($0, $1, $2, $3, $4) },
+    fence: { ntgpu_executor_fence($0, $1, $2, $3) })
   static let recorder = NativeGPUExecutorAPI(
     name: "recorder", create: { nt_recorder_executor_create($0, $1) },
     destroy: { nt_recorder_executor_destroy($0) },
     submit: { nt_recorder_executor_submit($0, $1, $2, $3, $4, $5) },
     process: { nt_recorder_executor_process($0) },
     resize: { nt_recorder_executor_resize($0, $1, $2, $3) },
-    capture: { nt_recorder_executor_capture_rgba($0, $1, $2, $3, $4) })
+    capture: { nt_recorder_executor_capture_rgba($0, $1, $2, $3, $4) },
+    fence: { nt_recorder_executor_fence($0, $1, $2, $3) })
 }
 
 /// Thread-safe counters for later measurement runs (bytes, copies, latency). No timing claims are made here.
@@ -234,7 +239,8 @@ struct NativeGPUBridgeOptions {
   func surfaceEvent(_ event: NativeGPUSurfaceEvent) {
     switch event {
     case .frame(let tick):
-      // Credit is held by the JS host until acknowledgement; the surface credit is returned on the next turn.
+      // The frame credit that bounds GPU work is the JS host's, held until FRAME_DONE (GPU completion of the whole
+      // frame); the surface scheduler's tick credit only paces ticks and is returned on the next turn.
       DispatchQueue.main.async { [weak self] in MainActor.assumeIsolated { self?.surface?.retire(tick.token) } }
       active?.deliverTicks(hostTime: tick.hostTime)
     case .resize(let resize): resized(width: resize.width, height: resize.height, dpr: resize.dpr)
@@ -310,6 +316,9 @@ final class NativeGPUEngineChannel: @unchecked Sendable {
   private var assembly: Assembly?
   private var lastSequence: UInt32 = 0
   private var queueFailed = false
+  private var lastFrameEnd: UInt32 = 0
+  /// Frames fenced and not yet completed; bounded by NTGPU_EXECUTOR_MAX_FENCES (the executor refuses beyond it).
+  private var framesAwaitingGPU = 0
   // shared (lock)
   private let lock = NSLock()
   private var outbox = Data()
@@ -424,7 +433,7 @@ final class NativeGPUEngineChannel: @unchecked Sendable {
       for frame in frames { mainFrame(frame) }
       guard !closed else { waiting.respond(410); bridge.forget(waiting); return }
       // The body is answered once the executor queue consumed it: this is the transport's backpressure.
-      let queued = frames.filter { [.open, .submit, .chunk].contains(NativeGPUWire.Kind(rawValue: $0.header.kind)) }
+      let queued = frames.filter { [.open, .submit, .chunk, .frameEnd].contains(NativeGPUWire.Kind(rawValue: $0.header.kind)) }
       let received = CACurrentMediaTime()
       queue.async { [self] in
         for frame in queued where !queueFailed { queueFrame(frame) }
@@ -659,8 +668,31 @@ final class NativeGPUEngineChannel: @unchecked Sendable {
         guard current.commands.complete, current.uploads.complete else { queueFail("native GPU submission incomplete"); return }
         submitAssembled()
       }
+    case .frameEnd:
+      // In body order after the frame's last chunk, so every flush of the frame was submitted (and acknowledged).
+      guard let executor else { queueFail("native GPU frame end before an executor exists"); return }
+      guard assembly == nil, h.sequence == lastSequence, h.a > lastFrameEnd,
+        framesAwaitingGPU < Int(NTGPU_EXECUTOR_MAX_FENCES)
+      else { queueFail("native GPU frame end violates the protocol (frame \(h.a), through \(h.sequence))"); return }
+      lastFrameEnd = h.a
+      framesAwaitingGPU += 1
+      stats.max("framesAwaitingGPUMax", Double(framesAwaitingGPU))
+      let user = Unmanaged.passUnretained(self).toOpaque()
+      let accepted = api.fence(executor, UInt64(h.a), { user, token, status in
+        guard let user else { return }
+        Unmanaged<NativeGPUEngineChannel>.fromOpaque(user).takeUnretainedValue().frameCompleted(UInt32(truncatingIfNeeded: token), status: status)
+      }, user)
+      if accepted == 0 { framesAwaitingGPU -= 1; queueFail("native GPU executor refused the completion fence of frame \(h.a)"); return }
+      stats.add("frameFences")
     default: break
     }
+  }
+
+  /// Executor queue, from ntgpu_executor_process/destroy: enqueue only (the executor is inside a call).
+  private func frameCompleted(_ frame: UInt32, status: Int32) {
+    framesAwaitingGPU -= 1
+    stats.add(status == 0 ? "framesCompleted" : "framesLost")
+    emitFrame(.frameDone, a: frame, b: UInt32(bitPattern: status))
   }
 
   /// ntgpu_executor_submit retains no pointer after it returns; the ACK follows only after it consumed the batch.

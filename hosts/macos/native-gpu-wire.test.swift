@@ -36,6 +36,14 @@ func rejects(_ body: Data, _ name: String) {
 var bad = upstream(.open); bad[0] ^= 1
 rejects(bad, "bad magic")
 rejects(upstream(.ack), "downstream kind upstream")
+rejects(upstream(.frameDone, a: 1), "frame completion is downstream only")
+do {
+  // FRAME_END rides with the frame's last chunk: a = frame, sequence = its last submission.
+  let frames = try NativeGPUWire.parseUpstream(upstream(.frameEnd, sequence: 12, a: 5))
+  check(frames.count == 1 && frames[0].header.kind == 8 && frames[0].header.a == 5 && frames[0].header.sequence == 12, "frame end parses")
+} catch { check(false, "frame end parses: \(error)") }
+let done = NativeGPUWire.frame(.frameDone, engine: 3, a: 5, b: 1)
+check(done.count == 32 && done[4] == 22 && done[16] == 5 && done[20] == 1, "frame done encodes frame and status")
 rejects(upstream(.event, payload: Data(count: 8)), "downstream event upstream")
 rejects(upstream(.frameMode, payload: Data(count: NativeGPUWire.maxControlPayload + 4)), "oversized control payload")
 rejects(upstream(.chunk, payload: Data(count: 100)).prefix(80), "truncated payload")

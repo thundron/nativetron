@@ -69,7 +69,10 @@ private func json(_ value: Any) -> String {
       let native = bridge.stats.snapshot()
       var all = checks.map { ($0["name"] as? String ?? "?", ($0["ok"] as? Bool) ?? false) }
       // Native side of the same crossing: what the bridge consumed and returned.
-      all.append(("native: 6 submissions consumed and acknowledged", native["submissions"] == 6 && native["acks"] == 6))
+      all.append(("native: 9 submissions consumed and acknowledged", native["submissions"] == 9 && native["acks"] == 9))
+      all.append((
+        "native: one multi-flush frame fenced and completed after its GPU work",
+        native["frameFences"] == 1 && native["framesCompleted"] == 1 && native["framesAwaitingGPUMax"] == 1))
       all.append(("native: >= 9 MiB uploads consumed", (native["uploadBytes"] ?? 0) >= Double(9 * 1_048_576 + 3)))
       all.append(("native: multi-chunk sections reassembled natively", (native["reassemblyCopies"] ?? 0) >= 3))
       all.append(("native: single-chunk sections passed without a copy", (native["zeroCopySections"] ?? 0) >= 6))

@@ -10,7 +10,11 @@ enum NativeGPUWire {
   static let readbackChunkBytes = 4 * 1_048_576
   enum Kind: UInt16 {
     case open = 1, submit = 2, chunk = 3, frameMode = 4, tickRequest = 5, tickCancel = 6, close = 7
+    /// a = frame, sequence = its last submission: fence that frame's GPU work (ntgpu_executor_fence).
+    case frameEnd = 8
     case ack = 16, event = 17, readback = 18, frameRequest = 19, failed = 20, tick = 21
+    /// a = frame, b = status (0 done, 1 lost, 2 cancelled): the GPU finished every flush of the frame.
+    case frameDone = 22
   }
   static let flagLast: UInt16 = 1
   static let flagThroughput: UInt16 = 1
