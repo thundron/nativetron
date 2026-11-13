@@ -42,7 +42,7 @@ for (const dir of runs) {
   const entry = { dir, engine: run.engine, executor: run.executor, ok: run.ok, poisoned: run.poisoned, panic: run.panic, counters: run.counters, captures: [] };
   for (const f of readdirSync(dir).filter((f) => f.endsWith('.json') && f !== 'run.json')) {
     const meta = JSON.parse(readFileSync(join(dir, f), 'utf8'));
-    if (!meta.width) continue;
+    if (!meta.width || !meta.source || !meta.name) continue; // capture metadata only (not panorama-compare.json etc.)
     const img = await load(dir, meta);
     writeFileSync(join(dir, `${meta.name}.png`), encodePng(img.width, img.height, img.rgba));
     const c = { name: meta.name, source: meta.source, width: img.width, height: img.height, mock: meta.executor.mock, png: join(dir, `${meta.name}.png`), compare: {} };

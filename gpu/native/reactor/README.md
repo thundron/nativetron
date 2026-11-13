@@ -119,7 +119,12 @@ Tolerance (from `scripts/golden.mjs`): a pixel differs when an RGB channel diffe
 when more than 0.5 % of pixels differ; the count of non-bit-identical pixels and the max/mean deltas are reported.
 Reproducibility: deterministic GI rays (`gidet`), forced desktop tier, synthetic frame clock, lockstep pump,
 request-ordered events; the recordings fix every UI input. GPU float differences between backends (Chrome's
-Dawn/Metal vs wgpu-native/Metal) are expected inside the tolerance, not bit-identity.
+Dawn/Metal vs wgpu-native/Metal) are expected inside the tolerance, not bit-identity. With a mock executor the
+whole crossing trace is deterministic (byte-identical across guests and runs). With a real GPU it is not: GPU
+readbacks (auto-exposure EV, GI statistics) differ in low float bits from run to run, the engine's E_STATUS
+offers carry them, and later batches can follow them; compare a real-GPU run by images (and `engine-log.txt`
+status lines), not by trace hashes. Native and wasm guests on the same executor gave bit-identical captures for
+the triangle, golden and still flows and differences inside the tolerance (same order as run-to-run) elsewhere.
 
 ## Tests
 

@@ -118,6 +118,9 @@ static void on_frame(App *A, const uint8_t *f, size_t n, const char *via) {
   } else if (kind == K_STATE && topic == E_STATUS && len >= STATUS_F64 * 8) {
     for (int i = 0; i < STATUS_F64; i++) A->status[i] = rdf64(p + 8 * i);
     A->states++;
+    fprintf(A->log, "%s status", via);
+    for (int i = 0; i < STATUS_F64; i++) fprintf(A->log, " %.17g", A->status[i]);
+    fputc('\n', A->log);
   } else if (kind == K_EVENT) {
     double k = len >= 8 ? rdf64(p) : -1;
     size_t i;
