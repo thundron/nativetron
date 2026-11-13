@@ -25,6 +25,7 @@
 #include <string>
 #include <thread>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -497,6 +498,24 @@ void release_object(Kind kind, void *value, bool destroy, std::mutex *serial = n
 enum MapState : uint8_t { UNMAPPED = 0, MAPPING = 1, MAPPED = 2 };
 enum Phase : uint8_t { OPEN = 0, LOCKED = 1, FINISHED = 2 };
 
+// Submission guard state. wgpu-native's wgpuQueueSubmit treats every queue_submit error as fatal (panic across
+// extern "C" → abort), where WebGPU reports a validation error and skips the submission. Guest-reachable causes are
+// an invalid command buffer, a destroyed buffer/texture/query set, and a buffer that is mapped or pending a map.
+// Each such resource has a Tracked record shared by every encoder, bind group, view and command buffer using it.
+struct Tracked {
+  const char *kind = "resource";
+  bool destroyed = false;
+  uint8_t map = 0;  // MapState for buffers
+};
+using TrackedPtr = std::shared_ptr<Tracked>;
+struct Uses {
+  std::vector<TrackedPtr> list;
+  std::unordered_set<const Tracked *> seen;
+  void add(const TrackedPtr &track) {
+    if (track && seen.insert(track.get()).second) list.push_back(track);
+  }
+};
+
 struct PassState {
   uint32_t encoder_slot = 0;
   uint64_t encoder_serial = 0;  // identity of the owning encoder entry
@@ -520,6 +539,14 @@ struct Entry {
   bool submitted = false;
   uint32_t query_type = 0, query_count = 0;
   std::unique_ptr<PassState> pass;
+  TrackedPtr track;                  // buffer, texture, query set; a texture view shares its texture's
+  std::vector<TrackedPtr> bound;     // bind group resources
+  std::shared_ptr<Uses> uses;        // encoder, its passes and its command buffer
+  std::string invalid;               // command buffer: the error its finish() reported
+  void set_map(uint8_t state) {
+    map = state;
+    if (track) track->map = state;
+  }
   void clear_state() {
     has_state = false;
     map = UNMAPPED;
@@ -612,6 +639,10 @@ class Handles {
     if (!entry || !entry->live || entry->generation != s.generation) fail("stale GPU handle");
     void *value = entry->value;
     const bool canvas = entry->canvas;
+    if (destroy && entry->track && !canvas &&
+        (entry->kind == Kind::Buffer || entry->kind == Kind::Texture || entry->kind == Kind::QuerySet)) {
+      entry->track->destroyed = true;
+    }
     entry->live = false;
     entry->value = nullptr;
     entry->clear_state();
@@ -807,6 +838,7 @@ struct NtGpuExecutor {
   uint32_t surface_width = 0, surface_height = 0;
   bool surface_configured = false;
   WGPUTexture acquired = nullptr;  // surface texture until presented
+  TrackedPtr canvas_track;          // the current canvas texture; a presented surface texture is destroyed
 
   // capture
   bool capture_done = false, capture_ok = false;
@@ -837,6 +869,28 @@ struct NtGpuExecutor {
   }
   void fail_event(const std::string &message, uint32_t request_id = 0, uint32_t handle = 0) {
     emit(E_ERROR, request_id, handle, S_ERROR, Json().str("message", message));
+  }
+  // An error WebGPU would raise as uncaptured, found by the executor itself: queued in order with wgpu-native's own,
+  // so it is delivered by process() like them.
+  void uncaught(const std::string &message) {
+    if (device) ntgpu_report_error(ctx, WGPUErrorType_Validation, message.c_str());
+  }
+  // Why wgpuQueueSubmit must not run for these command buffers (empty: submit; "lost": the device is gone and the
+  // loss is reported by process()). Mirrors the WebGPU submit validation that wgpu-native turns into an abort.
+  template <class Entries>
+  std::string submit_refusal(const Entries &entries) {
+    if (!ntgpu_device_alive(ctx)) return "lost";
+    for (const auto *entry : entries) {
+      if (!entry->invalid.empty()) return "GPU command buffer is invalid: " + entry->invalid;
+    }
+    for (const auto *entry : entries) {
+      if (!entry->uses) continue;
+      for (const auto &track : entry->uses->list) {
+        if (track->destroyed) return std::string("Destroyed ") + track->kind + " used in a GPU submission";
+        if (track->map != UNMAPPED) return "GPU buffer used in a submission while mapped or pending a map";
+      }
+    }
+    return std::string();
   }
 
   void bump() {
@@ -939,7 +993,7 @@ struct NtGpuExecutor {
         if (!entry || entry->request != id) break;
         entry->request = 0;
         if (entry->map == MAPPING) {
-          entry->map = UNMAPPED;
+          entry->set_map(UNMAPPED);
           if (status == S_CANCELLED && record.buffer) {
             std::lock_guard<std::mutex> serial(poll_mutex);
             wgpuBufferUnmap(record.buffer);
@@ -1104,11 +1158,11 @@ struct NtGpuExecutor {
       if (!mapped) wgpuBufferUnmap(op.buffer);
     }
     if (!mapped) {
-      if (entry && entry->request == op.id) entry->map = UNMAPPED;
+      if (entry && entry->request == op.id) entry->set_map(UNMAPPED);
       settle(op.id, op.serial, E_ERROR, S_ERROR, Json().str("message", "GPU mapped range has an unexpected length"));
       return;
     }
-    if (entry && entry->request == op.id) entry->map = UNMAPPED;
+    if (entry && entry->request == op.id) entry->set_map(UNMAPPED);
     // The bytes are borrowed by the embedding until event() returns; unmap afterwards.
     settle(op.id, op.serial, E_MAP_READY, S_OK, Json().num("offset", destination).num("length", static_cast<double>(length)),
            static_cast<const uint8_t *>(mapped), static_cast<size_t>(length));
@@ -1148,6 +1202,8 @@ struct NtGpuExecutor {
     descriptor.mipLevelCount = 1;
     descriptor.sampleCount = 1;
     canvas_texture = wgpuDeviceCreateTexture(ntgpu_device(ctx), &descriptor);
+    canvas_track = std::make_shared<Tracked>();
+    canvas_track->kind = "texture";
     canvas_width = width;
     canvas_height = height;
     if (!canvas_texture) fail("GPU canvas texture unavailable");
@@ -1189,6 +1245,7 @@ struct NtGpuExecutor {
     if (!acquired) return;
     if (submitted_after_acquire && surface) wgpuSurfacePresent(surface);
     if (!submitted_after_acquire) return;
+    if (canvas_track) canvas_track->destroyed = true;  // like a presented WebGPU canvas texture
     wgpuTextureRelease(acquired);
     acquired = nullptr;
     submitted_after_acquire = false;
@@ -1224,9 +1281,24 @@ struct NtGpuExecutor {
   uint64_t limit(const char *name, uint64_t fallback) const {
     return device ? limit_value(device_limits, name) : fallback;
   }
+  // Resources referenced while recording an encoder or pass are noted on it (see Tracked).
+  Uses *recording = nullptr;
+  void note(const Entry &entry) {
+    if (!recording) return;
+    recording->add(entry.track);
+    for (const auto &track : entry.bound) recording->add(track);
+  }
   template <class T>
   T ref(double handle, Kind kind) {
-    return handles.get<T>(handle, kind);
+    Entry &entry = handles.lookup(handle, kind);
+    note(entry);
+    return static_cast<T>(entry.value);
+  }
+  template <class T>
+  T tracked(double handle, Kind kind, std::vector<TrackedPtr> &out) {
+    Entry &entry = handles.lookup(handle, kind);
+    if (entry.track) out.push_back(entry.track);
+    return static_cast<T>(entry.value);
   }
   template <class T>
   T optional(double handle, Kind kind) {
@@ -1265,6 +1337,7 @@ struct NtGpuExecutor {
     Timestamp result;
     if (!query_set) return result;
     Entry &entry = handles.lookup(query_set, Kind::QuerySet);
+    note(entry);
     if (entry.has_state && entry.query_type != ng::constants::QUERY_TYPE_TIMESTAMP) {
       fail("GPU timestamp writes need a timestamp query set");
     }
@@ -1618,10 +1691,12 @@ struct NtGpuExecutor {
     Entry &entry = handles.lookup(handle, Kind::CommandEncoder);
     if (entry.phase == LOCKED) fail("GPU command encoder has an open pass");
     if (entry.phase == FINISHED) fail("GPU command encoder has finished");
+    recording = entry.uses.get();
     return entry;
   }
   Entry &pass(double handle, Kind kind) {
     Entry &entry = handles.lookup(handle, kind);
+    recording = entry.uses.get();
     if (!entry.pass) entry.pass = std::make_unique<PassState>();
     if (entry.pass->ended) fail(std::string("GPU ") + (kind == Kind::RenderPass ? "render" : "compute") + " pass has ended");
     return entry;
@@ -1637,6 +1712,7 @@ struct NtGpuExecutor {
     // Entries are heap objects; reserving another (necessarily different) slot never moves or frees the owner.
     Entry &entry = create(handle, kind, [&] { return make(owner_value); });
     entry.pass = std::move(state);
+    entry.uses = owner.uses;
     owner.phase = LOCKED;
   }
   void end_pass(double handle, Kind kind) {
@@ -1864,6 +1940,7 @@ struct NtGpuExecutor {
 
   template <class Fn>
   bool guard(Fn fn) {
+    recording = nullptr;
     try {
       fn();
       return true;
@@ -1926,7 +2003,9 @@ struct NtGpuExecutor {
           return static_cast<void *>(wgpuDeviceCreateBuffer(x.active(), &descriptor));
         });
         entry.size = bytes;
-        entry.map = op.mappedAtCreation ? MAPPED : UNMAPPED;
+        entry.track = std::make_shared<Tracked>();
+        entry.track->kind = "buffer";
+        entry.set_map(op.mappedAtCreation ? MAPPED : UNMAPPED);
       });
     }
     bool on(const ng::CreateTextureOp &op) {
@@ -1943,6 +2022,9 @@ struct NtGpuExecutor {
           descriptor.usage = op.usage;
           return static_cast<void *>(wgpuDeviceCreateTexture(x.active(), &descriptor));
         });
+        Entry *entry = x.handles.peek(hv(op.handle));
+        entry->track = std::make_shared<Tracked>();
+        entry->track->kind = "texture";
       });
     }
     bool on(const ng::CreateTextureViewOp &op) {
@@ -1957,9 +2039,12 @@ struct NtGpuExecutor {
         if (op.dimension) descriptor.dimension = pick(kViewDimensions, ng::enums::kView, op.dimension);
         if (op.mipCount) descriptor.mipLevelCount = op.mipCount;
         if (op.layerCount) descriptor.arrayLayerCount = op.layerCount;
-        WGPUTexture source = x.ref<WGPUTexture>(hv(op.texture), Kind::Texture);
-        x.create(hv(op.handle), Kind::TextureView,
-                 [&] { return static_cast<void *>(wgpuTextureCreateView(source, &descriptor)); });
+        Entry &texture = x.handles.lookup(hv(op.texture), Kind::Texture);
+        WGPUTexture source = static_cast<WGPUTexture>(texture.value);
+        TrackedPtr track = texture.track;
+        Entry &view = x.create(hv(op.handle), Kind::TextureView,
+                               [&] { return static_cast<void *>(wgpuTextureCreateView(source, &descriptor)); });
+        view.track = track;
       });
     }
     bool on(const ng::CreateSamplerOp &op) {
@@ -2066,19 +2151,20 @@ struct NtGpuExecutor {
         namespace rec = ng::record;
         const size_t count = x.records("bindGroup", rec::BindGroup::kWidth, op.entries, 0, SIZE_MAX);
         std::vector<WGPUBindGroupEntry> entries;
+        std::vector<TrackedPtr> bound;
         for (size_t i = 0; i < count; ++i) {
           const uint32_t base = static_cast<uint32_t>(i * rec::BindGroup::kWidth);
           auto f = [&](uint32_t field) { return op.entries[base + field]; };
           WGPUBindGroupEntry entry = WGPU_BIND_GROUP_ENTRY_INIT;
           const double kind = f(rec::BindGroup::kKind);
           if (kind == 1) {
-            entry.buffer = x.ref<WGPUBuffer>(f(rec::BindGroup::kResource), Kind::Buffer);
+            entry.buffer = x.tracked<WGPUBuffer>(f(rec::BindGroup::kResource), Kind::Buffer, bound);
             entry.offset = integer(f(rec::BindGroup::kOffset), "binding offset");
             if (f(rec::BindGroup::kSize) != 0) entry.size = integer(f(rec::BindGroup::kSize), "binding size");
           } else if (kind == 2) {
             entry.sampler = x.ref<WGPUSampler>(f(rec::BindGroup::kResource), Kind::Sampler);
           } else if (kind == 3 || kind == 4) {
-            entry.textureView = x.ref<WGPUTextureView>(f(rec::BindGroup::kResource), Kind::TextureView);
+            entry.textureView = x.tracked<WGPUTextureView>(f(rec::BindGroup::kResource), Kind::TextureView, bound);
           } else {
             fail("unsupported GPU binding resource");
           }
@@ -2095,6 +2181,7 @@ struct NtGpuExecutor {
           descriptor.entries = entries.data();
           return static_cast<void *>(wgpuDeviceCreateBindGroup(x.active(), &descriptor));
         });
+        x.handles.peek(hv(op.handle))->bound = std::move(bound);
       });
     }
     bool on(const ng::CreatePipelineLayoutOp &op) {
@@ -2182,6 +2269,8 @@ struct NtGpuExecutor {
         });
         entry.query_type = op.type;
         entry.query_count = op.count;
+        entry.track = std::make_shared<Tracked>();
+        entry.track->kind = "query set";
       });
     }
     bool on(const ng::CreateCommandEncoderOp &op) {
@@ -2193,6 +2282,7 @@ struct NtGpuExecutor {
           return static_cast<void *>(wgpuDeviceCreateCommandEncoder(x.active(), &descriptor));
         });
         entry.phase = OPEN;
+        entry.uses = std::make_shared<Uses>();
       });
     }
     bool on(const ng::BeginComputePassOp &op) {
@@ -2322,6 +2412,7 @@ struct NtGpuExecutor {
         uint32_t occlusion_count = 0;
         if (op.occlusionQuerySet != Handle{}) {
           Entry &set = x.handles.lookup(hv(op.occlusionQuerySet), Kind::QuerySet);
+          x.note(set);
           if (!set.has_state || set.query_type != ng::constants::QUERY_TYPE_OCCLUSION) {
             fail("GPU occlusion queries need an occlusion query set");
           }
@@ -2545,13 +2636,22 @@ struct NtGpuExecutor {
         void *encoder = owner.value;
         const uint64_t owner_serial = owner.serial;
         const uint32_t owner_slot = ng::handle_slot(op.encoder);
+        std::shared_ptr<Uses> uses = owner.uses;
+        std::string error;
         Entry &entry = x.create(hv(op.handle), Kind::CommandBuffer, [&] {
           WGPUCommandBufferDescriptor descriptor = WGPU_COMMAND_BUFFER_DESCRIPTOR_INIT;
           descriptor.label = view(label);
-          return static_cast<void *>(wgpuCommandEncoderFinish(static_cast<WGPUCommandEncoder>(encoder), &descriptor));
+          WGPUCommandBuffer buffer = nullptr;
+          // Recording errors surface here; an invalid command buffer must never reach wgpuQueueSubmit.
+          error = x.scoped([&] { buffer = wgpuCommandEncoderFinish(static_cast<WGPUCommandEncoder>(encoder), &descriptor); });
+          return static_cast<void *>(buffer);
         });
         entry.submitted = false;
+        entry.uses = uses;
+        entry.invalid = error;
         if (Entry *again = x.handles.by_serial(owner_slot, owner_serial)) again->phase = FINISHED;
+        // WebGPU reports the encoder's validation error as an uncaptured error at finish().
+        if (!error.empty()) x.uncaught(error);
       });
     }
     bool on(const ng::QueueSubmitOp &op) {
@@ -2571,7 +2671,12 @@ struct NtGpuExecutor {
         }
         std::vector<WGPUCommandBuffer> buffers;
         for (Entry *entry : entries) buffers.push_back(static_cast<WGPUCommandBuffer>(entry->value));
-        wgpuQueueSubmit(ntgpu_queue(x.ctx), buffers.size(), buffers.data());
+        const std::string refused = x.submit_refusal(entries);
+        if (refused.empty()) {
+          wgpuQueueSubmit(ntgpu_queue(x.ctx), buffers.size(), buffers.data());
+        } else if (refused != "lost") {
+          x.uncaught(refused);  // WebGPU: a validation error, and nothing of the submission executes
+        }
         for (Entry *entry : entries) entry->submitted = true;
         if (x.acquired) x.submitted_after_acquire = true;
       });
@@ -2616,7 +2721,7 @@ struct NtGpuExecutor {
           std::lock_guard<std::mutex> serial(x.poll_mutex);
           wgpuBufferUnmap(static_cast<WGPUBuffer>(entry.value));
         }
-        entry.map = UNMAPPED;
+        entry.set_map(UNMAPPED);
       });
     }
     bool on(const ng::WriteMappedBufferOp &op) {
@@ -2690,6 +2795,8 @@ struct NtGpuExecutor {
               }
               x.acquired = current.texture;
               x.submitted_after_acquire = false;
+              x.canvas_track = std::make_shared<Tracked>();
+              x.canvas_track->kind = "texture";
             }
             texture = x.acquired;
           } else {
@@ -2699,6 +2806,7 @@ struct NtGpuExecutor {
           return texture;
         });
         entry.canvas = true;
+        entry.track = x.canvas_track;
       });
     }
     bool on(const ng::DestroyOp &op) {
@@ -2745,7 +2853,7 @@ struct NtGpuExecutor {
         record.map_length = length;
         record.destination = op.destination.offset;
         record.native = true;
-        entry.map = MAPPING;
+        entry.set_map(MAPPING);
         entry.request = op.requestId;
         const uint32_t id = op.requestId;
         const uint64_t serial = record.serial;

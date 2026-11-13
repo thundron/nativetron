@@ -159,6 +159,10 @@ uint32_t ntgpu_pending(const NtGpuContext *ctx);
  * Returns the number still pending. Never polls when nothing is pending. */
 uint32_t ntgpu_process(NtGpuContext *ctx, int wait);
 
+/* Queues an UNCAPTURED_ERROR for the current device generation in order with the implementation's own, for errors a
+ * decoder detects itself (for example a submission it must not pass to wgpu-native). */
+NtGpuStatus ntgpu_report_error(NtGpuContext *ctx, WGPUErrorType type, const char *message);
+
 /* Pops the oldest event into *out; returns 0 when the queue is empty. */
 int ntgpu_next_event(NtGpuContext *ctx, NtGpuEvent *out);
 uint32_t ntgpu_queued_events(NtGpuContext *ctx);

@@ -757,3 +757,30 @@ test("captured shader corpus: every module and pipeline shape completes exactly 
   assert.equal(report.summary.deviceLost, 0);
   console.log(`corpus: ${report.summary.modulesOk}/${report.summary.modules} modules, ${report.summary.pipelinesOk}/${report.summary.pipelines} pipelines`);
 });
+
+test("submissions WebGPU would refuse are refused without reaching wgpu-native (whose submit aborts the process)", { skip }, async () => {
+  const CP = C.BUFFER_USAGE_COPY_SRC | C.BUFFER_USAGE_COPY_DST;
+  const encoder = (base, commands) => [["createCommandEncoder", h(base), "e"], ...commands(h(base)), ["finishCommandEncoder", h(base + 1), h(base), "c"]];
+  const storage = "@group(0) @binding(0) var<storage, read_write> d: array<u32>;\n@compute @workgroup_size(1) fn main() { d[0] = 1u; }";
+  const cases = {
+    "destroyed source buffer": [["createBuffer", h(1), 16, CP, false, "a"], ["createBuffer", h(2), 16, CP, false, "b"], ...encoder(50, (e) => [["copyBufferToBuffer", e, h(1), 0, h(2), 0, 16]]), ["destroy", h(1)], ["queueSubmit", [h(51)]]],
+    "buffer mapped at creation": [["createBuffer", h(1), 16, CP, false, "a"], ["createBuffer", h(2), 16, READBACK, true, "b"], ...encoder(50, (e) => [["copyBufferToBuffer", e, h(1), 0, h(2), 0, 16]]), ["queueSubmit", [h(51)]]],
+    "buffer pending a map": [["createBuffer", h(1), 16, CP, false, "a"], ["createBuffer", h(2), 16, READBACK, false, "b"], ...encoder(50, (e) => [["copyBufferToBuffer", e, h(1), 0, h(2), 0, 16]]), ["mapAsync", 9, h(2), C.MAP_MODE_READ, 0, 16, { offset: 0, length: 16 }], ["queueSubmit", [h(51)]]],
+    "destroyed render attachment": [["createTexture", h(1), 4, 4, 1, 1, 1, C.DIMENSION_2D, "rgba8unorm", C.TEXTURE_USAGE_RENDER_ATTACHMENT, "t"], ["createTextureView", h(2), h(1), "", 0, 0, 0, 0, 0, 0, "v"], ...encoder(50, (e) => [["beginRenderPassWith", h(60), e, colorAttachment(h(2), C.LOAD_CLEAR, C.STORE_STORE), [], 0, 0, 0, 0, "p"], ["endRenderPass", h(60)]]), ["destroy", h(1)], ["queueSubmit", [h(51)]]],
+    "invalid pipeline recorded": [["createShaderModule", h(1), 3, "fn x( {", "bad"], ["createComputePipeline", h(2), 0, h(1), "main", "p"], ...encoder(50, (e) => [["beginComputePass", h(60), e, 0, 0, 0, "c"], ["computeSetPipeline", h(60), h(2)], ["computeDispatch", h(60), 1, 1, 1], ["endComputePass", h(60)]]), ["queueSubmit", [h(51)]]],
+    "copy out of range": [["createBuffer", h(1), 16, CP, false, "a"], ["createBuffer", h(2), 16, CP, false, "b"], ...encoder(50, (e) => [["copyBufferToBuffer", e, h(1), 0, h(2), 8, 16]]), ["queueSubmit", [h(51)]]],
+    "destroyed buffer behind a bind group": [["createShaderModule", h(1), 3, storage, "m"], ["createBuffer", h(2), 16, C.BUFFER_USAGE_STORAGE, false, "s"], ["createBindGroupLayout", h(3), bindGroupLayoutEntry(0, C.SHADER_STAGE_COMPUTE, C.BINDING_BUFFER, C.BUFFER_BINDING_STORAGE), "l"], ["createPipelineLayout", h(4), [h(3)], "pl"], ["createComputePipeline", h(5), h(4), h(1), "main", "p"], ["createBindGroup", h(6), h(3), [0, C.BINDING_BUFFER, h(2), 0, 0], "g"], ...encoder(50, (e) => [["beginComputePass", h(60), e, 0, 0, 0, "c"], ["computeSetPipeline", h(60), h(5)], ["computeSetBindGroup", h(60), 0, h(6), []], ["computeDispatch", h(60), 1, 1, 1], ["endComputePass", h(60)]]), ["destroy", h(2)], ["queueSubmit", [h(51)]]],
+  };
+  for (const [name, operations] of Object.entries(cases)) {
+    const d = await connected();
+    assert.equal((await d.submit(operations)).submit, 1, name);
+    await d.wait();
+    const uncaught = d.events.filter((event) => event.type === E.UNCAUGHT_ERROR);
+    assert.ok(uncaught.length >= 1, `${name}: ${JSON.stringify(d.events)}`);
+    assert.ok(uncaught.some((event) => /Destroyed|mapped or pending|command buffer is invalid/.test(event.message)), `${name}: ${JSON.stringify(uncaught)}`);
+    // The executor is still alive and the device still works.
+    assert.equal((await d.submit([["createCommandEncoder", h(70), "after"], ["finishCommandEncoder", h(71), h(70), "after"], ["queueSubmit", [h(71)]], ["onSubmittedWorkDone", 99]])).submit, 1);
+    await d.wait();
+    assert.equal(d.terminal(99)[0].status, S.OK, name);
+  }
+});

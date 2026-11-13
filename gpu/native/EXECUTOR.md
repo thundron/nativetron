@@ -44,6 +44,17 @@ header) have a handler and a schema change is a compile error. The JS host, `ops
   thread ("Buffer is already mapped" under load). Map, unmap, mapped-range access, buffer release/destroy and device
   request/release therefore take the same mutex as the waiter's blocking poll; such a call can wait until
   already-submitted GPU work finishes. Not measured; a performance follow-up if per-frame readbacks matter.
+- **Submission guard.** wgpu-native's `wgpuQueueSubmit` turns *every* submit error into a Rust panic across
+  `extern "C"`, i.e. a process abort (verified: an invalid recorded pipeline, a copy out of range, a destroyed buffer
+  or texture — directly or behind a bind group — and a buffer mapped or pending a map all abort). WebGPU instead
+  raises a validation error and executes nothing of that submission. The executor therefore wraps `finish()` in an
+  error scope (an encoder error marks the command buffer invalid and is re-raised as `UNCAUGHT_ERROR`, as a browser
+  reports it at `finish()`), records the buffers, textures (through views and canvas textures), query sets and bind
+  group resources every encoder and pass uses, and before `wgpuQueueSubmit` refuses a submission containing an
+  invalid command buffer, a destroyed resource or a mapped/map-pending buffer: one `UNCAUGHT_ERROR`, nothing executed,
+  command buffers marked submitted. A submission on a device the facade already knows to be lost is dropped silently
+  (the loss arrives through `process()`). Synthesized uncaptured errors are queued through `ntgpu_report_error`, in
+  order with wgpu-native's own.
 - **Frames.** `requestFrame` (ignored without a device, as in the JS host) calls `frame_requested` once at the end of
   the submit; the embedding coalesces until it runs the guest's frame export.
 - **Resize.** `resize(width, height, pixel_ratio)` takes drawable *device pixels* (the macOS host's
@@ -106,14 +117,15 @@ NTGPU_WGPU_LIB=/path/to/patched/libwgpu_native.a gpu/native/build-executor.sh   
 ## Tests and evidence (this Mac: macOS 27.0.1, Apple M4 Max, Metal, wgpu-native v29.0.1.1)
 
 ```sh
-node --test gpu/native/executor.test.mjs                       # 18 tests, real device
+node --test gpu/native/executor.test.mjs                       # 20 tests, real device (NTGPU_SHADER_CORPUS=dir adds the corpus run)
 SCRIPTC=… node --test gpu/native/executor-conformance.test.mjs # conformance reactor, native, real device
 NTGPU_EXECUTOR_SANITIZE=address node --test gpu/native/executor.test.mjs gpu/native/executor-conformance.test.mjs
 NTGPU_EXECUTOR_SANITIZE=thread  node --test gpu/native/executor.test.mjs gpu/native/executor-conformance.test.mjs
 node gpu/native/executor-corpus.mjs --corpus <dir with manifest.json and wgsl/> --driver <build>/ntgpu-executor-driver --out report.json
 ```
 
-- `executor.test.mjs`: fatal/rejected batches, skipped requests, generation retirement at 4095, stale/wrong-kind/
+- `executor.test.mjs`: the submission guard (seven cases that abort a bare wgpu-native process stay alive, report
+  `UNCAUGHT_ERROR` and keep the device usable), fatal/rejected batches, skipped requests, generation retirement at 4095, stale/wrong-kind/
   failed handles, readback bounds and leases, guest and external loss, restart, map cancellation by
   `cancelRequest`/`unmap`/`destroy`, async pipeline cancel/release/failure, duplicate ids and the 1024 limit,
   negotiation statuses and clamping, Naga diagnostics, the recording state machine, record validation, a 16 MiB
@@ -134,8 +146,15 @@ node gpu/native/executor-corpus.mjs --corpus <dir with manifest.json and wgsl/> 
   `gi.merge` pipelines with override `0 = 4` ("ConstantEvaluatorError(InvalidAccessIndex)"). Both are front-end
   issues of the consumer's shaders on Naga, not executor issues; `NTGPU_WGPU_LIB` links a fixed wgpu-native.
 
+- house-planner engine smoke (outside the repository, `/tmp/nt-native-gpu-executor-1/hp`): the reactor lane's
+  native `hp-engine.lib.a` linked with `libntgpu-executor.a`, fed that lane's recorded inputs (T_DEVICE, one-triangle
+  scene bulk, camera) and the executor's real events in `engine/reactor.js`'s delivery order: 288 presents, 285 frames,
+  no protocol `ERROR`, no abort, and a 640×400 capture showing the shaded triangle. Every frame's GI command buffer
+  holds the Naga-rejected `gi.insert` pipeline, so those submissions are refused (190 `UNCAUGHT_ERROR`s, the engine
+  reports them as `ENGINE_GPU_ERROR`); without the submission guard the first one aborted the process.
+
 ## Not done / not claimed
 
 No timings, memory or power numbers (machine shared with other agents). No on-screen composition (the surface test
-uses a window-less layer). No platform other than macOS arm64. No house-planner engine run on the executor in this
-lane (its native reactor is the reactor lane's; the conformance reactor is the protocol proof here).
+uses a window-less layer). No platform other than macOS arm64. The house-planner run above is a smoke run of the
+reactor lane's artifacts, not an image-equality check (the house-planner goldens and Bresso scene were not used).

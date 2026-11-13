@@ -107,6 +107,8 @@ device re-request/destroy and `ntgpu_context_destroy` are not concurrent with it
 - **Error scopes**: `ntgpu_scope_push/pop` are balanced and complete synchronously. Underflow returns
   `NTGPU_ERR_ARGUMENT` (wgpu-native would abort). `WGPUErrorFilter_Internal` is emulated (wgpu-native aborts on it and
   never raises internal errors), so it always pops clean.
+- **Decoder-detected errors**: `ntgpu_report_error(type, message)` queues an UNCAPTURED_ERROR in order with the
+  implementation's own (the executor uses it for submissions it must not pass to wgpu-native).
 - **Event bound**: only UNCAPTURED_ERROR events are dropped (then reported as one OVERFLOW) when the queue holds
   `event_capacity` events; ADAPTER/DEVICE/DEVICE_LOST/MAP/WORK_DONE are bounded by their outstanding operations and are
   never dropped, so no request can lose its completion.
@@ -154,7 +156,9 @@ Calling any of these aborts the process (Rust `unimplemented!()`/`panic!` across
 `wgpuBufferWriteMappedRange`, `wgpuGetProcAddress`, `wgpuInstanceGetWGSLLanguageFeatures`,
 `wgpuInstanceHasWGSLLanguageFeature`, `wgpuGetInstanceFeatures`, `wgpuHasInstanceFeature`, every `*SetLabel`,
 `wgpuExternalTexture*`, `wgpuTextureGetTextureBindingViewDimension`; also `wgpuDevicePushErrorScope(Internal)`,
-`wgpuDevicePopErrorScope` on an empty stack and the default uncaptured-error/device-lost handlers. Callbacks
+`wgpuDevicePopErrorScope` on an empty stack and the default uncaptured-error/device-lost handlers. `wgpuQueueSubmit`
+aborts on any submit error (invalid command buffer, destroyed or mapped resource), and `wgpuQuerySetDestroy` followed
+by `wgpuQuerySetRelease` aborts ("Cannot remove a vacant resource"); see EXECUTOR.md for the guards. Callbacks
 (`requestAdapter`, `requestDevice`, `popErrorScope`) complete inside the call; map/work-done complete inside
 `wgpuDevicePoll`/`wgpuInstanceProcessEvents`.
 

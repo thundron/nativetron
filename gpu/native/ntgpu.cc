@@ -697,6 +697,13 @@ uint32_t ntgpu_process(NtGpuContext *ctx, int wait) {
   return ctx->pending.load();
 }
 
+NtGpuStatus ntgpu_report_error(NtGpuContext *ctx, WGPUErrorType type, const char *message) {
+  if (!ctx || !ctx->device) return NTGPU_ERR_ARGUMENT;
+  ctx->Push(NTGPU_EVENT_UNCAPTURED_ERROR, StatusOfError(type), static_cast<uint32_t>(type), ctx->generation.load(), 0,
+            message ? message : "");
+  return NTGPU_OK;
+}
+
 int ntgpu_next_event(NtGpuContext *ctx, NtGpuEvent *out) {
   if (!ctx || !out) return 0;
   std::lock_guard<std::mutex> lock(ctx->mutex);
