@@ -9,7 +9,8 @@
 //                                 cpu_ns = user + system (proc_pid_rusage V4, same-user processes);
 //                                 gpu_ns = sum of AppUsage.accumulatedGPUTime of the pid's AGXDeviceUserClient(s)
 //                                 (IORegistry, the kernel's per-client GPU time, all GPU work of that process);
-//                                 gpu_all = every Metal client process (for contention checks).
+//                                 gpu_all = every Metal client process (for contention checks), gpu_names = their
+//                                 process names (clients with GPU time).
 // Build: swiftc -O -o <out>/nt-bench-probe gpu/native/benchmark/probe.swift -framework IOKit
 import Darwin
 import Foundation
@@ -119,9 +120,9 @@ case "serve":
       u["gpu_ns"] = gpu[pid] ?? 0
       procs[String(pid)] = u
     }
-    var all: [String: Any] = [:]
-    for (pid, ns) in gpu { all[String(pid)] = ns }
-    print(json(["t_ns": clock_gettime_nsec_np(CLOCK_UPTIME_RAW), "procs": procs, "gpu_all": all]))
+    var all: [String: Any] = [:], names: [String: Any] = [:]
+    for (pid, ns) in gpu { all[String(pid)] = ns; if ns > 0 { names[String(pid)] = name(pid) } }
+    print(json(["t_ns": clock_gettime_nsec_np(CLOCK_UPTIME_RAW), "procs": procs, "gpu_all": all, "gpu_names": names]))
   }
 default:
   FileHandle.standardError.write("usage: nt-bench-probe power | serve\n".data(using: .utf8)!)

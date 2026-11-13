@@ -22,6 +22,9 @@ const OUT = resolve(opt('--out', join(ROOT, 'runs')));
 const APP = opt('--app'), REACTOR = opt('--reactor'), EXEC = opt('--executor-lib'), COMMIT = opt('--nativetron-commit', 'unknown');
 const MODES = opt('--modes', 'ac-high').split(','), RUNS = Number(opt('--runs', 3)), CLI_RUNS = Number(opt('--cli-runs', 3));
 const PATHS = opt('--paths', 'wk-native,wk-native-overlay,chrome').split(',');
+const FIRST = Number(opt('--first-index', 0)); // supplementary sessions continue the run numbering (index 0 = cold)
+const QUIET = opt('--wait-quiet'); // forwarded: wait for other GPU clients ≤ this ms/s before each run
+const QW = QUIET ? ['--wait-quiet', QUIET] : [];
 const ALLOW_PMSET = argv.includes('--allow-pmset');
 const CORPUS_DRIVER = opt('--corpus-driver'), CORPUS = opt('--corpus', '/tmp/nt-native-gpu-shaders-20261113'), CORPUS_RUNS = Number(opt('--corpus-runs', 3));
 const PROBE = join(ROOT, 'bin/nt-bench-probe');
@@ -42,6 +45,7 @@ const node = (script, args, label) => {
 };
 
 // ---- environment + provenance
+const ENV_FILE = join(OUT, FIRST ? `environment-from-${FIRST}.json` : 'environment.json');
 const env = {
   startedAt: new Date().toISOString(), nativetronCommit: COMMIT, argv,
   host: { sw: sh('sw_vers', []).out, hw: sh('sysctl', ['-n', 'machdep.cpu.brand_string', 'hw.memsize', 'hw.ncpu']).out, gpu: sh('system_profiler', ['SPDisplaysDataType']).out.slice(0, 2000) },
@@ -51,7 +55,7 @@ const env = {
     engineWasm: { path: join(ROOT, 'bundle/engine/hp-engine.wasm'), sha256: sha(join(ROOT, 'bundle/engine/hp-engine.wasm')) } },
   power: power(), pmsetCustom: sh('pmset', ['-g', 'custom']).out, pmset: sh('pmset', ['-g']).out, therm: sh('pmset', ['-g', 'therm']).out,
 };
-writeFileSync(join(OUT, 'environment.json'), JSON.stringify(env, null, 1));
+writeFileSync(ENV_FILE, JSON.stringify(env, null, 1));
 log(`environment: lowPower=${env.power.isLowPowerModeEnabled} thermal=${env.power.thermalState} source=${env.power.providingPowerSource}`);
 
 // ---- power-mode handling (restored in finally / on signals)
@@ -101,8 +105,8 @@ try {
     } else if (power().isLowPowerModeEnabled) { st.blocker = 'Low Power Mode is on before an ac-high run'; log(st.blocker); continue; }
     const app = join(OUT, mode, 'app'), cli = join(OUT, mode, 'cli');
     // interleaved: run i of every path before run i+1 (drift / thermal spread across paths, not into one)
-    for (let i = 0; i < RUNS; i++) for (const p of PATHS) node('run.mjs', ['--root', ROOT, '--out', app, '--path', p, '--runs', '1', '--first-index', String(i), '--label', mode, ...(p.startsWith('wk') ? ['--app', APP] : []), ...Q], `${mode} ${p} #${i}`);
-    node('cli-bench.mjs', ['--root', ROOT, '--recording', RECORDING, '--reactor', REACTOR, '--executor-lib', EXEC, '--out', cli, '--runs', String(CLI_RUNS), '--label', mode], `${mode} cli`);
+    for (let i = FIRST; i < FIRST + RUNS; i++) for (const p of PATHS) node('run.mjs', ['--root', ROOT, '--out', app, '--path', p, '--runs', '1', '--first-index', String(i), '--label', mode, ...(p.startsWith('wk') ? ['--app', APP] : []), ...Q, ...QW], `${mode} ${p} #${i}`);
+    if (CLI_RUNS > 0) node('cli-bench.mjs', ['--root', ROOT, '--recording', RECORDING, '--reactor', REACTOR, '--executor-lib', EXEC, '--out', cli, '--runs', String(CLI_RUNS), '--first-index', String(FIRST), '--label', mode, ...QW], `${mode} cli`);
     if (CORPUS_DRIVER) {
       const corpus = join(OUT, mode, 'corpus'); mkdirSync(corpus, { recursive: true });
       const times = [];
@@ -121,7 +125,7 @@ try {
   restore('finally');
   status.finishedAt = new Date().toISOString();
   status.powerEnd = power();
-  writeFileSync(join(OUT, 'status.json'), JSON.stringify(status, null, 1));
-  writeFileSync(join(OUT, 'power-evidence.json'), JSON.stringify({ ...evidence, end: { acPowermode: acPowermode(), power: status.powerEnd, customIdentical: sh('pmset', ['-g', 'custom']).out === original.custom } }, null, 1));
+  writeFileSync(join(OUT, FIRST ? `status-from-${FIRST}.json` : 'status.json'), JSON.stringify(status, null, 1));
+  writeFileSync(join(OUT, FIRST ? `power-evidence-from-${FIRST}.json` : 'power-evidence.json'), JSON.stringify({ ...evidence, end: { acPowermode: acPowermode(), power: status.powerEnd, customIdentical: sh('pmset', ['-g', 'custom']).out === original.custom } }, null, 1));
   node('summarize.mjs', ['--runs', OUT, '--out', OUT], 'summary');
 }

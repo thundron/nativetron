@@ -36,6 +36,7 @@ const QUERY = opt('--query', 'gidet&tier=desktop') + (QUICK ? '&ntQuick' : '');
 const [VW, VH, VD] = (/^(\d+)x(\d+)@([\d.]+)$/.exec(opt('--viewport', '1100x760@2')) ?? []).slice(1).map(Number);
 const PROFILE_MODE = opt('--chrome-profile', 'fresh-then-warm');
 const LABEL = opt('--label', 'adhoc');
+const QUIET = Number(opt('--wait-quiet', 0));
 const BUNDLE = join(ROOT, 'bundle');
 const PROBE = join(ROOT, 'bin/nt-bench-probe');
 const TIMEOUT_MS = Number(opt('--timeout-ms', QUICK ? 300000 : 1200000));
@@ -65,7 +66,7 @@ const sample = (pids) => new Promise((r) => { probeWait.push(r); probe.stdin.wri
 /** GPU-time of every Metal client over `ms` (contention: who else used the GPU), and the top CPU processes. */
 async function contention(ms = 2000) {
   const a = await sample([]); await new Promise((r) => setTimeout(r, ms)); const b = await sample([]);
-  const gpu = Object.entries(b.gpu_all).map(([pid, ns]) => ({ pid: +pid, gpuMsPerS: (ns - (a.gpu_all[pid] ?? ns)) / 1e6 / (ms / 1000) })).filter((x) => x.gpuMsPerS > 0.5).sort((x, y) => y.gpuMsPerS - x.gpuMsPerS);
+  const gpu = Object.entries(b.gpu_all).map(([pid, ns]) => ({ pid: +pid, gpuMsPerS: Math.max(0, ns - (a.gpu_all[pid] ?? ns)) / 1e6 / (ms / 1000) })).filter((x) => x.gpuMsPerS > 0.5).sort((x, y) => y.gpuMsPerS - x.gpuMsPerS);
   const names = new Map(procTable().map((p) => [p.pid, p.comm]));
   for (const g of gpu) g.comm = names.get(g.pid) ?? '?';
   const cpu = sh('ps', ['-A', '-r', '-o', 'pid=,pcpu=,comm=']).split('\n').slice(0, 8).map((l) => l.trim()).filter(Boolean);
@@ -91,6 +92,17 @@ async function oneRun(index) {
   const run = { schema: 'nt-bench-run/1', label: LABEL, path: PATH, index, quick: QUICK, query: QUERY, startedAt: new Date().toISOString(),
     viewport: { width: VW, height: VH, dpr: VD }, bundleManifestSha256: bundleHash, app: PATH.startsWith('wk') ? APP : null, power: {}, contention: {}, samples: [], lines: [] };
   run.power.before = power(); run.power.thermBefore = sh('pmset', ['-g', 'therm']).trim(); run.power.pmsetBefore = sh('pmset', ['-g']).trim();
+  // --wait-quiet <ms/s>: start only once the OTHER Metal clients (WindowServer excluded) used ≤ that GPU time per second
+  // over 3 s (bounded at 10 min; the wait and the last sample are recorded). Contention inside the run is derived later
+  // from the probe's gpu_all at every mark (summarize.mjs foreignGpuMsPerSec).
+  if (QUIET > 0) {
+    const w0 = Date.now(); let c;
+    for (;;) {
+      c = await contention(3000);
+      const foreign = c.gpuClients.filter((g) => !/WindowServer/.test(g.comm)).reduce((x, g) => x + g.gpuMsPerS, 0);
+      if (foreign <= QUIET || Date.now() - w0 > 600000) { run.quietWait = { thresholdMsPerS: QUIET, waitedMs: Date.now() - w0, foreignMsPerS: foreign, met: foreign <= QUIET }; break; }
+    }
+  }
   run.contention.before = await contention();
   let pids = [], target = null, browser = null, chromeProfile = null;
   const parts = []; let done = null, failed = null, boot = null;
@@ -136,6 +148,7 @@ async function oneRun(index) {
     run.cache = { metalCacheBefore: metalCache() };
     const args = [`--benchmark-viewport=${VW}x${VH}`, ...(PATH === 'wk-webgpu' ? [] : ['--native-gpu'])];
     if (PATH === 'wk-native-overlay') args.push('--native-gpu-composition=overlay');
+    if (argv.includes('--no-activate')) args.push('--no-activate'); // window ordered back, no key focus (input isolation)
     args.push('--url', pathToFileURL(join(BUNDLE, 'bench.html')).href);
     run.appArgs = args;
     target = spawn(APP, args, { stdio: ['ignore', 'pipe', 'pipe'] });

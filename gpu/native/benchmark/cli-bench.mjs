@@ -28,7 +28,10 @@ const DYLIB = opt('--engine-dylib', '/tmp/nt-native-reactor-1/bin/libhp-engine.d
 const WASM = opt('--engine-wasm', '/tmp/nt-native-reactor-1/out/wasm');
 const SRC = resolve(opt('--reactor-src', new URL('../reactor', import.meta.url).pathname));
 const LABEL = opt('--label', 'adhoc');
+const QUIET = Number(opt('--wait-quiet', 0));
+const FIRST = Number(opt('--first-index', 0));
 const PROBE = join(ROOT, 'bin/nt-bench-probe');
+const WS = (/^\s*(\d+)\s+\S*WindowServer/m.exec(execFileSync('ps', ['-A', '-o', 'pid=,comm='], { encoding: 'utf8' })) ?? [])[1] ?? '595';
 for (const f of [join(REC, 'recording.json'), REACTOR, EXEC, PROBE, join(SRC, 'scenario.mjs')]) if (!existsSync(f)) throw new Error(`missing ${f}`);
 mkdirSync(OUT, { recursive: true });
 
@@ -49,22 +52,36 @@ async function oneRun(guest, index) {
   const dir = join(OUT, `${guest}-${String(index).padStart(2, '0')}`);
   const spec = guest === 'native' ? `native:${DYLIB}` : `wasm:${WASM}`;
   const args = ['run', '--engine', spec, '--executor-lib', EXEC, '--script', join(scenarioDir, 'script.txt'), '--out', dir, '--width', String(rec.viewport.width), '--height', String(rec.viewport.height), '--dpr', String(rec.viewport.dpr), '--event-order', 'request', '--timeout-ms', '300000'];
-  const run = { schema: 'nt-bench-cli/1', label: LABEL, guest, index, args: [REACTOR, ...args], recording: REC, powerBefore: power(), samples: [] };
+  const run = { schema: 'nt-bench-cli/1', foreignPerPid: true, label: LABEL, guest, index, args: [REACTOR, ...args], recording: REC, powerBefore: power(), samples: [] };
   // 20 Hz probe of nt-reactor and its children (the wasm guest's Node), same clock as timepoints.csv (mach absolute)
   const probe = spawn(PROBE, ['serve'], { stdio: ['pipe', 'pipe', 'inherit'] });
   const lines = createInterface({ input: probe.stdout });
   let waiting = null; lines.on('line', (l) => { const w = waiting; waiting = null; w?.(JSON.parse(l)); });
   const ask = (pids) => new Promise((r) => { waiting = r; probe.stdin.write(pids.join(',') + '\n'); });
+  if (QUIET > 0) { // as run.mjs --wait-quiet: other Metal clients (WindowServer excluded) ≤ QUIET ms/s over 3 s, ≤ 10 min
+    const w0 = Date.now();
+    for (;;) {
+      const a = await ask([]); await new Promise((r) => setTimeout(r, 3000)); const b = await ask([]);
+      const foreign = Object.entries(b.gpu_all).filter(([pid]) => pid !== WS).reduce((x, [pid, ns]) => x + Math.max(0, ns - (a.gpu_all[pid] ?? ns)), 0) / 1e6 / 3;
+      if (foreign <= QUIET || Date.now() - w0 > 600000) { run.quietWait = { thresholdMsPerS: QUIET, waitedMs: Date.now() - w0, foreignMsPerS: foreign, met: foreign <= QUIET }; break; }
+    }
+  }
   const child = spawn(REACTOR, args, { stdio: ['ignore', 'pipe', 'pipe'] });
   let log = ''; child.stdout.on('data', (d) => { log += d; }); child.stderr.on('data', (d) => { log += d; });
   let alive = true; const exited = new Promise((r) => child.on('exit', (code) => { alive = false; run.exit = code; r(); }));
   const last = new Map(); // pid → last counters: cumulative sums never drop when a process exits
+  let prevAll = {}, foreignTotal = 0;
   while (alive) {
     const s = await ask(psTree(child.pid));
     for (const [pid, p] of Object.entries(s.procs)) if (!p.gone) last.set(pid, p);
     const live = Object.values(s.procs).filter((p) => !p.gone);
     run.samples.push({ t_ns: s.t_ns, cpu_ns: [...last.values()].reduce((a, p) => a + p.cpu_ns, 0), gpu_ns: [...last.values()].reduce((a, p) => a + p.gpu_ns, 0),
-      footprint: live.reduce((a, p) => a + p.phys_footprint, 0), names: live.map((p) => p.name) });
+      footprint: live.reduce((a, p) => a + p.phys_footprint, 0), names: live.map((p) => p.name),
+      // every other Metal client's GPU ns since the previous sample, accumulated (WindowServer and this run's processes
+      // excluded; per pid, only increases: a client that closes or a process that exits never subtracts)
+      foreign_ns: (foreignTotal += Object.entries(s.gpu_all).filter(([pid]) => !(pid in s.procs) && pid !== WS && prevAll[pid] !== undefined)
+        .reduce((a, [pid, ns]) => a + Math.max(0, ns - prevAll[pid]), 0)) });
+    prevAll = s.gpu_all;
     await Promise.race([exited, new Promise((r) => setTimeout(r, 50))]);
   }
   probe.stdin.end(); probe.kill();
@@ -86,7 +103,8 @@ async function oneRun(guest, index) {
     const w = tp.slice(i + 1).find((x) => x.op === 'wait-result');
     if (!w) continue;
     const wall = (w.t1 - s.t0) / 1e6, cpu = at(w.t1, 'cpu_ns') - at(s.t0, 'cpu_ns'), gpu = at(w.t1, 'gpu_ns') - at(s.t0, 'gpu_ns');
-    run.bench.push({ rid: m.rid, frames: m.benchFrames, move: (m.benchFlags & 1) === 1, wallMs: wall, frameMs: wall / m.benchFrames, cpuMsPerFrame: cpu / 1e6 / m.benchFrames, gpuMsPerFrame: gpu / 1e6 / m.benchFrames, chromeHeadlessRecordMs: m.chromeHeadlessMs ?? null });
+    const foreign = (at(w.t1, 'foreign_ns') - at(s.t0, 'foreign_ns')) / 1e6 / ((w.t1 - s.t0) / 1e9);
+    run.bench.push({ foreignGpuMsPerSec: foreign, t0: s.t0, t1: w.t1, rid: m.rid, frames: m.benchFrames, move: (m.benchFlags & 1) === 1, wallMs: wall, frameMs: wall / m.benchFrames, cpuMsPerFrame: cpu / 1e6 / m.benchFrames, gpuMsPerFrame: gpu / 1e6 / m.benchFrames, chromeHeadlessRecordMs: m.chromeHeadlessMs ?? null });
   }
   const first = tp.find((x) => x.op === 'receive' && byFile.get(basename(script[x.line - 1]?.split('@')[1] ?? ''))?.benchFrames !== undefined);
   run.preamble = first ? { wallMs: (first.t0 - tp[0].t0) / 1e6, maxStepMs: Math.max(...tp.filter((x) => x.t0 < first.t0).map((x) => (x.t1 - x.t0) / 1e6)), note: 'replay of scene load / settle up to the first T_BENCH (frame-synchronous, includes executor pipeline creation)' } : null;
@@ -99,5 +117,5 @@ async function oneRun(guest, index) {
 }
 
 let failed = 0;
-for (let i = 0; i < RUNS; i++) for (const g of GUESTS) { const r = await oneRun(g, i); if (!r.ok) failed++; }
+for (let i = FIRST; i < FIRST + RUNS; i++) for (const g of GUESTS) { const r = await oneRun(g, i); if (!r.ok) failed++; }
 process.exit(failed ? 1 : 0);

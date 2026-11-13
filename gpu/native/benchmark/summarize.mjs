@@ -3,6 +3,7 @@
 //   node gpu/native/benchmark/summarize.mjs --runs <dir with <mode>/{app,cli}/*.json> --out <dir>
 import { existsSync, readdirSync, readFileSync, writeFileSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { execFileSync } from 'node:child_process';
 
 const argv = process.argv.slice(2);
 const opt = (k, d) => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : d; };
@@ -11,6 +12,8 @@ const OUT = resolve(opt('--out', RUNS));
 const sorted = (a) => [...a].filter((x) => x !== null && x !== undefined && !Number.isNaN(x)).sort((x, y) => x - y);
 const med = (a) => { const s = sorted(a); return s.length ? (s.length % 2 ? s[s.length >> 1] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2) : null; };
 const min = (a) => sorted(a)[0] ?? null, max = (a) => sorted(a).at(-1) ?? null;
+const LIVING = [[19.0, 1.6, -13.0], [16.0, 1.0, -15.5]];
+const windowServer = Number((/^\s*(\d+)\s+WindowServer$/m.exec(execFileSync('ps', ['-A', '-o', 'pid=,comm=']).toString().replace(/\/\S*\//g, '')) ?? [])[1] ?? 595);
 const r2 = (x) => (x === null || x === undefined ? null : Math.round(x * 100) / 100);
 
 const klass = (name = '') => /^Nativetron$/.test(name) ? 'app'
@@ -43,8 +46,18 @@ function appRow(mode, file, run) {
   const phase = (from, to, frames) => {
     const a = sampleOf(from), b = sampleOf(to); if (!a || !b) return null;
     const dd = delta(a.probe, b.probe), secs = (b.mark.t - a.mark.t) / 1000;
+    // GPU time of every OTHER Metal client in the same window (WindowServer excluded: it composites this run's window)
+    const mine = new Set(Object.keys(b.probe.procs ?? {}));
+    let foreign = 0; const foreignTop = [];
+    for (const [pid, ns] of Object.entries(b.probe.gpu_all ?? {})) {
+      if (mine.has(pid) || pid === String(windowServer) || a.probe.gpu_all?.[pid] === undefined) continue;
+      const ms = Math.max(0, ns - a.probe.gpu_all[pid]) / 1e6;
+      foreign += ms;
+      if (ms / secs > 20) foreignTop.push({ pid: +pid, name: b.probe.gpu_names?.[pid] ?? null, msPerSec: r2(ms / secs) });
+    }
+    const foreignGpuMsPerSec = foreign / secs;
     const nd = nativeDelta(markOf(from)?.native, markOf(to)?.native);
-    return { secs, frames, cpuMsPerFrame: total(dd, 'cpuMs') / frames, gpuMsPerFrame: total(dd, 'gpuMs') / frames, byClass: dd,
+    return { secs, frames, cpuMsPerFrame: total(dd, 'cpuMs') / frames, gpuMsPerFrame: total(dd, 'gpuMs') / frames, foreignGpuMsPerSec, foreignTop, byClass: dd,
       native: nd && { submissionsPerFrame: nd.submissions / frames, bodyBytesPerFrame: nd.bodyBytes / frames, uploadBytesPerFrame: nd.uploadBytes / frames, commandBytesPerFrame: nd.commandBytes / frames,
         readbackBytesPerFrame: nd.readbackBytes / frames, downBytesPerFrame: nd.downBytes / frames, reassemblyBytesPerFrame: nd.reassemblyBytes / frames, readbackCopyBytesPerFrame: nd.readbackCopyBytes / frames,
         pollsPerFrame: nd.polls / frames, submitMsPerSubmission: nd.submitMs / Math.max(1, nd.submissions), bodyQueueMsPerBody: nd.bodyQueueMs / Math.max(1, nd.bodies), raw: nd } };
@@ -54,11 +67,15 @@ function appRow(mode, file, run) {
   const idleA = sampleOf('idle-start'), idleB = sampleOf('idle-end');
   const idle = idleA && idleB ? (() => { const dd = delta(idleA.probe, idleB.probe), s = (idleB.mark.t - idleA.mark.t) / 1000; return { secs: s, cpuMsPerSec: total(dd, 'cpuMs') / s, gpuMsPerSec: total(dd, 'gpuMs') / s, wakeupsPerSec: total(dd, 'wakeups') / s, byClass: dd }; })() : null;
   const startupNative = markOf('startup-done')?.native ?? null;
+  // the camera must be the driver's LIVING view from the first stats to the last (bench moves jitter it by 1e-4):
+  // anything else is input from outside the driver (a key / scroll reaching the app window) and voids the run
+  const near = (v, w) => Array.isArray(v) && v.every((x, i) => Math.abs(x - w[i]) < 0.01);
+  const cameraOk = near(d.stats0?.eye, LIVING[0]) && near(d.stats0?.target, LIVING[1]) && near(d.statsEnd?.eye, LIVING[0]) && near(d.statsEnd?.target, LIVING[1]);
   return {
-    mode, kind: 'app', path: run.path, index: run.index, file, ok: run.ok, error: run.error ?? null,
+    mode, kind: 'app', path: run.path, index: run.index, file, ok: run.ok && cameraOk, error: run.error ?? (cameraOk ? null : `camera left the LIVING view (stats0 eye ${d.stats0?.eye?.map((x) => x.toFixed(2))}, end eye ${d.statsEnd?.eye?.map((x) => x.toFixed(2))}): outside input, run excluded`), cameraOk,
     cache: run.path === 'chrome' ? `chrome-profile-${run.cache?.chromeProfile}` : `metal-cache-${run.cache?.metalCacheBefore?.exists ? 'present' : 'absent'}`,
     lowPowerBefore: run.power?.before?.isLowPowerModeEnabled, lowPowerAfter: run.power?.after?.isLowPowerModeEnabled,
-    thermalBefore: run.power?.before?.thermalState, thermalAfter: run.power?.after?.thermalState, source: run.power?.before?.providingPowerSource,
+    thermalBefore: run.power?.before?.thermalState, thermalAfter: run.power?.after?.thermalState, source: run.power?.before?.providingPowerSource, sourceAfter: run.power?.after?.providingPowerSource,
     native: d.engineNative ?? null, composition: d.boot?.composition ?? null, canvas: d.canvas ? `${d.canvas.width}x${d.canvas.height}` : null, tier: d.canvas?.tier ?? null,
     viewport: d.window ? `${d.window.innerWidth}x${d.window.innerHeight}@${d.window.devicePixelRatio}` : null, hostViewport: run.hostViewport ?? null,
     startupLaneMs: d.startup?.lane, startupUploadedMs: d.startup?.uploaded, firstImageMs: d.startup?.firstFrame, firstConvergedMs: d.startup?.converged,
@@ -87,18 +104,20 @@ function compareThumbs(a, b) {
 function cliRows(mode, file, run) {
   const b = run.bench ?? [];
   // the driver's order: still warm-up, still ×N, moving warm-up, moving ×M, timing warm-up, timed moving ×K, timed still ×K
-  const still = b.filter((x, i) => !x.move && i > 0 && i < b.findIndex((y) => y.move));
+  // (warm-ups have 5 frames, samples 10: a sample run ends at the next warm-up)
   const firstMove = b.findIndex((x) => x.move);
-  const moving = []; for (let i = firstMove + 1; i < b.length && b[i].move; i++) moving.push(b[i]);
+  const still = []; for (let i = 1; i < firstMove && b[i].frames > b[0].frames; i++) still.push(b[i]);
+  const moving = []; for (let i = firstMove + 1; i < b.length && b[i].move && b[i].frames > b[firstMove].frames; i++) moving.push(b[i]);
   return [{
     mode, kind: 'cli', path: `cli-${run.guest}`, index: run.index, file, ok: run.ok, lowPowerBefore: run.powerBefore?.isLowPowerModeEnabled, lowPowerAfter: run.powerAfter?.isLowPowerModeEnabled,
-    thermalBefore: run.powerBefore?.thermalState, thermalAfter: run.powerAfter?.thermalState, source: run.powerBefore?.providingPowerSource,
+    thermalBefore: run.powerBefore?.thermalState, thermalAfter: run.powerAfter?.thermalState, source: run.powerBefore?.providingPowerSource, sourceAfter: run.powerAfter?.providingPowerSource,
     stillFrameMs: med(still.map((x) => x.frameMs)), movingFrameMs: med(moving.map((x) => x.frameMs)),
     stillCpuMsPerFrame: med(still.map((x) => x.cpuMsPerFrame)), movingCpuMsPerFrame: med(moving.map((x) => x.cpuMsPerFrame)),
     stillGpuMsPerFrame: med(still.map((x) => x.gpuMsPerFrame)), movingGpuMsPerFrame: med(moving.map((x) => x.gpuMsPerFrame)),
     stillFrameMsAll: still.map((x) => x.frameMs), movingFrameMsAll: moving.map((x) => x.frameMs),
     preambleWallMs: run.preamble?.wallMs, preambleMaxStepMs: run.preamble?.maxStepMs, peakFootprintMB: run.totals?.peakFootprintMB,
     frameSyncDivergences: run.reactorRun?.frameSyncDivergences ?? null, executor: run.reactorRun?.executor ?? null,
+    foreignGpuMsPerSec: b.some((x) => x.foreignGpuMsPerSec !== undefined) ? max([...still, ...moving].map((x) => x.foreignGpuMsPerSec)) : null,
   }];
 }
 
@@ -113,10 +132,27 @@ for (const mode of readdirSync(RUNS).filter((d) => statSync(join(RUNS, d)).isDir
   }
 }
 
+// contention: other Metal clients' GPU time (WindowServer excluded) inside the measured phases; the user's resident
+// apps (Slack, terminal) idle at ≈ 60–140 ms/s here. Above CONTENDED ms/s, or unknown, a run is not "clean".
+const CONTENDED = Number(opt('--contended-ms-per-s', 200));
+for (const r of rows) {
+  const f = r.kind === 'app' ? max([r.still?.foreignGpuMsPerSec, r.moving?.foreignGpuMsPerSec]) : r.foreignGpuMsPerSec;
+  r.foreignGpuMsPerSecMax = f === null || f === undefined ? null : r2(f);
+  r.contended = r.foreignGpuMsPerSecMax === null ? null : r.foreignGpuMsPerSecMax > CONTENDED;
+  // power: a run belongs to its mode only if source / Low Power Mode / thermal state are the same before and after.
+  // Runs entirely on battery with Low Power Mode on (the charger was unplugged by the machine's user, not by this
+  // harness) are regrouped as an OBSERVED mode; transitions inside a run void it.
+  const lp = [r.lowPowerBefore, r.lowPowerAfter], src = [r.source, r.sourceAfter], th = [r.thermalBefore, r.thermalAfter];
+  const steady = lp[0] === lp[1] && src[0] === src[1] && th[0] === 'nominal' && th[1] === 'nominal';
+  r.powerState = `${src[0]}${src[1] !== src[0] ? '→' + src[1] : ''} lowPower=${lp[0]}${lp[1] !== lp[0] ? '→' + lp[1] : ''} thermal=${th[0]}${th[1] !== th[0] ? '→' + th[1] : ''}`;
+  if (steady && lp[0] === true && src[0] === 'Battery Power') r.mode = `${r.mode}~observed-battery-lowpower`;
+  else if (!steady || lp[0] !== false || src[0] !== 'AC Power') r.powerChanged = true;
+  r.clean = r.ok && r.contended === false && !r.powerChanged;
+}
 // image check: every app run vs the first ok Chrome run of its mode (Chrome vs Chrome = run-to-run noise)
 for (const r of rows) {
   if (r.kind !== 'app') continue;
-  const ref = rows.find((x) => x.mode === r.mode && x.path === 'chrome' && x.ok && x.check && x !== r) ?? null;
+  const ref = rows.find((x) => x.mode === r.mode && x.path === 'chrome' && x.ok && x.check && x !== r) ?? rows.find((x) => x.path === 'chrome' && x.ok && x.check && x !== r) ?? null;
   r.checkVsChrome = ref ? { ref: ref.file, ...compareThumbs(r.check, ref.check) } : null;
 }
 // medians per (mode, path) over ok runs; startup split cold (index 0) / warm (index > 0)
@@ -124,10 +160,10 @@ const groups = new Map();
 for (const r of rows) { const k = `${r.mode}|${r.path}`; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(r); }
 const summary = [];
 for (const [k, rs] of groups) {
-  const [mode, path] = k.split('|'), ok = rs.filter((r) => r.ok), warm = ok.filter((r) => r.index > 0), cold = ok.find((r) => r.index === 0);
+  const [mode, path] = k.split('|'), ok = rs.filter((r) => r.clean), warm = ok.filter((r) => r.index > 0), cold = ok.find((r) => r.index === 0);
   const m = (f) => r2(med(ok.map(f)));
   summary.push({
-    mode, path, runs: rs.length, ok: ok.length, canvas: [...new Set(ok.map((r) => r.canvas).filter(Boolean))].join(' ') || null,
+    mode, path, runs: rs.length, ok: ok.length, excluded: rs.filter((r) => !r.clean).map((r) => `#${r.index}: ${!r.ok ? (r.error ?? 'failed') : r.powerChanged ? `power state not steady AC/LPM-off/nominal: ${r.powerState}` : r.contended === null ? 'contention not recorded' : `other GPU clients ${r.foreignGpuMsPerSecMax} ms/s`}`), canvas: [...new Set(ok.map((r) => r.canvas).filter(Boolean))].join(' ') || null,
     lowPower: [...new Set(rs.flatMap((r) => [r.lowPowerBefore, r.lowPowerAfter]))].join('/'), thermal: [...new Set(rs.flatMap((r) => [r.thermalBefore, r.thermalAfter]))].join('/'),
     stillFrameMs: m((r) => r.stillFrameMs), stillFrameMsRange: [r2(min(ok.map((r) => r.stillFrameMs))), r2(max(ok.map((r) => r.stillFrameMs)))],
     movingFrameMs: m((r) => r.movingFrameMs), movingFrameMsRange: [r2(min(ok.map((r) => r.movingFrameMs))), r2(max(ok.map((r) => r.movingFrameMs)))],
@@ -157,7 +193,7 @@ const cols = [...new Set(flatRows.flatMap((r) => Object.keys(r)))];
 const esc = (v) => (v === null || v === undefined ? '' : /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(typeof v === 'number' ? r2(v) : v));
 writeFileSync(join(OUT, 'results.csv'), [cols.join(','), ...flatRows.map((r) => cols.map((c) => esc(r[c])).join(','))].join('\n') + '\n');
 writeFileSync(join(OUT, 'summary.json'), JSON.stringify({ generatedAt: new Date().toISOString(), runsDir: RUNS, summary, rows }, null, 1));
-const scols = ['mode', 'path', 'ok', 'canvas', 'lowPower', 'thermal', 'stillFrameMs', 'movingFrameMs', 'stillCpuMsPerFrame', 'movingCpuMsPerFrame', 'stillGpuMsPerFrame', 'movingGpuMsPerFrame', 'gpuTsMovingFrameMs',
+const scols = ['mode', 'path', 'runs', 'ok', 'canvas', 'lowPower', 'thermal', 'stillFrameMs', 'movingFrameMs', 'stillCpuMsPerFrame', 'movingCpuMsPerFrame', 'stillGpuMsPerFrame', 'movingGpuMsPerFrame', 'gpuTsMovingFrameMs',
   'firstImageMsCold', 'firstImageMsWarm', 'convergedMsCold', 'convergedMsWarm', 'idleEngineFrames', 'idleCpuMsPerSec', 'idleGpuMsPerSec', 'trackedMemoryMB', 'movingWireBytesPerFrame', 'movingReadbackBytesPerFrame', 'movingSubmitMsPerSubmission', 'checkVsChromeMaxPctOver'];
 const md = ['| ' + scols.join(' | ') + ' |', '|' + scols.map(() => '---').join('|') + '|', ...summary.map((s) => '| ' + scols.map((c) => (s[c] === null || s[c] === undefined ? '—' : String(s[c]))).join(' | ') + ' |')];
 writeFileSync(join(OUT, 'summary.md'), md.join('\n') + '\n');

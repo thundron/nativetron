@@ -88,6 +88,17 @@ this engine on this executor; they are never reported as the app path.
   source, `pmset -g` / `pmset -g therm`, before and after every run; GPU clients and top CPU processes for 2 s before
   and after each run (contention evidence).
 
+## Validity gates (summarize.mjs)
+
+A run is **clean** only when it finished, the camera stayed on the driver's LIVING view from the first to the last
+stats, power source / Low Power Mode / thermal state were AC / off / nominal both before and after, and every other
+Metal client (WindowServer excluded) used at most 200 ms/s of GPU time inside the measured phases
+(`--contended-ms-per-s`). Medians use clean runs only; every excluded run is listed with its reason. A run spent
+entirely on battery with Low Power Mode on is regrouped as `<mode>~observed-battery-lowpower`, never mixed in.
+`run.mjs` / `cli-bench.mjs --wait-quiet <ms/s>` wait (at most 10 min) until the other clients are below that before
+starting. `--first-index N` continues a mode's run numbering (index 0 is the cold run). `run.mjs --no-activate`
+passes the host's `--no-activate` (window ordered back, no key focus).
+
 ## Commands
 
 ```sh
