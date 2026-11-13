@@ -1,5 +1,6 @@
 import { createStreams } from "./streams.js";
 import { EngineError, ENGINE_INBOUND_LIMIT, createRateWindow, errorText, instantiateReactor, prepareReactor } from "./reactor.js";
+import { reportNativeGeometry } from "./native-gpu-wire.js";
 import { decodeEngineMessage, ENGINE_MAX_RATE, ENGINE_STATE, ENGINE_BULK, LANE_ENGINE, LANE_NATIVE, LANE_UI } from "../ipc/engine.generated.mjs";
 
 export { EngineError };
@@ -88,6 +89,10 @@ export function createEngine(options) {
   const waiters = new Set();
   let state = "starting", mode = null, reason = "", generation = 0, canvas = options.canvas, transferred = false;
   let worker = null, workerAlive = false, reactor = null, prepared = null, watcher = null, failure = null, gpu = null;
+  // Explicit native GPU selection ({ endpoint, session, postGeometry? } from claimNativeGpu): the reactor's op stream
+  // goes to the native executor over the binary wire; the canvas is never transferred or given a context.
+  const nativeGpu = options.nativeGpu ? Object.freeze({ endpoint: String(options.nativeGpu.endpoint), session: String(options.nativeGpu.session) }) : null;
+  const postGeometry = options.nativeGpu?.postGeometry ?? null;
   let inFlight = 0, restarting = null, closing = null, abortError = null, notedAt = new Map();
 
   const later = (fn) => queueMicrotask(() => { try { fn(); } catch (error) { console.error(error); } });
@@ -252,7 +257,8 @@ export function createEngine(options) {
       onError: error => engineFailed(new EngineError("stream-failed", errorText(error))),
     });
     inFlight = 0; failure = null;
-    if (mode === "worker") { watcher ??= watchViewport(scope, canvas, resized); }
+    if (nativeGpu) { if (canvas && postGeometry) watcher ??= reportNativeGeometry(scope, canvas, (report) => safe(postGeometry, report)); }
+    else if (mode === "worker") { watcher ??= watchViewport(scope, canvas, resized); }
     setState("ready");
     watcher?.refresh();
     flushStartup();
@@ -272,14 +278,14 @@ export function createEngine(options) {
     return fresh;
   };
   const probeWorker = async () => {
-    if (!scope.Worker || typeof canvas?.transferControlToOffscreen !== "function") return { available: false, reason: "Worker or OffscreenCanvas unavailable" };
+    if (!scope.Worker || (!nativeGpu && typeof canvas?.transferControlToOffscreen !== "function")) return { available: false, reason: nativeGpu ? "Worker unavailable" : "Worker or OffscreenCanvas unavailable" };
     let target;
     try { target = new scope.Worker(new URL("./worker.js", import.meta.url), { type: "module" }); }
     catch (error) { return { available: false, reason: `module Worker could not start: ${errorText(error)}` }; }
     worker = target; workerAlive = true; attach(target);
     try {
       const probed = expect(["probe"], undefined, timeouts.probeMs, "probe-timeout", "worker probe timed out");
-      target.postMessage({ type: "probe", frameMode });
+      target.postMessage({ type: "probe", frameMode, native: nativeGpu ?? undefined });
       const result = await guard(probed);
       if (!result.available) throw new EngineError("probe-failed", result.reason || "worker probe failed");
       const ready = expect(["prepared"], undefined, timeouts.prepareMs, "prepare-timeout", "worker engine preparation timed out");
@@ -298,7 +304,7 @@ export function createEngine(options) {
     const gen = ++generation;
     const current = () => gen === generation && !abortError;
     const created = await guard(instantiateReactor(prepared, {
-      canvas, scope, now, frameMode, pixelRatio: scope.devicePixelRatio ?? 1,
+      canvas, scope, now, frameMode, pixelRatio: scope.devicePixelRatio ?? 1, nativeGpu, engineGeneration: gen,
       setTimer: clock.setTimeout, clearTimer: clock.clearTimeout,
       cancelled: () => !current(),
       report: (text) => { if (current()) safe(report, text); },
@@ -311,6 +317,15 @@ export function createEngine(options) {
     reactor = created; mode = "main";
   };
   const startWorker = async () => {
+    if (nativeGpu) {
+      const gen = ++generation;
+      const started = expect(["ready", "error"], gen, timeouts.startMs, "start-timeout", "engine worker startup timed out (native GPU)");
+      worker.postMessage({ type: "start", generation: gen, native: nativeGpu, options: { pixelRatio: scope.devicePixelRatio ?? 1, frameMode } });
+      const result = await guard(started);
+      if (result.type === "error") throw new EngineError(result.code ?? "start-failed", String(result.message), { canvasTransferred: false });
+      mode = "worker";
+      return null;
+    }
     let offscreen;
     try { offscreen = canvas.transferControlToOffscreen(); }
     catch (error) { kill(worker); return `canvas transfer failed: ${errorText(error)}`; }
@@ -326,7 +341,7 @@ export function createEngine(options) {
   // Full sequence: probe (no canvas side effects) → transfer → start; or main thread on an untransferred canvas.
   const boot = async () => {
     checkAbort();
-    if (!canvas) throw new EngineError("invalid-options", "engine canvas is required");
+    if (!canvas && !nativeGpu) throw new EngineError("invalid-options", "engine canvas is required");
     let capability;
     try { capability = options.forceMain ? { available: false, reason: "main thread requested" } : await probeWorker(); }
     catch (error) { if (abortError) throw error; capability = { available: false, reason: errorText(error) }; }
@@ -359,7 +374,7 @@ export function createEngine(options) {
       if (options.signal?.aborted) abort(new EngineError("aborted", "engine start aborted", { name: "AbortError", cause: options.signal.reason }));
       await boot();
       checkAbort();
-      say(`ENGINE_MODE ${mode}${reason ? " (" + reason + ")" : ""}`);
+      say(`ENGINE_MODE ${mode}${nativeGpu ? " native-gpu" : ""}${reason ? " (" + reason + ")" : ""}`);
       becomeReady();
     } catch (error) {
       if (abortError) {
@@ -437,6 +452,7 @@ export function createEngine(options) {
     get canvas() { return canvas; },
     get reactor() { return mode === "main" ? reactor ?? undefined : undefined; },
     get gpu() { return gpu; },
+    get nativeGpu() { return Boolean(nativeGpu); },
     get failure() { return failure; },
     get stats() { return { ...stats, streams: inputStreams?.stats, inFlight, startupQueued: startupQueue.length, workerAlive }; },
     ready,

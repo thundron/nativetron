@@ -5,6 +5,8 @@ import { EngineError, errorText, instantiateReactor, prepareReactor } from "./re
 // Every post-start message carries the generation it belongs to; anything for another generation is ignored.
 const scope = self;
 let prepared = null, preparing = null, reactor = null, canvas = null, generation = 0, pixelRatio = 1, stopping = false;
+// Native GPU backend ({ endpoint, session }), selected by the page before probe/start; no canvas is transferred.
+let nativeGpu = null;
 let credits = 0, creditQueued = false, frameMode = "display";
 const streamLeases = new Map();
 let nextStream = 1;
@@ -21,6 +23,18 @@ const credit = (gen, count) => {
     if (count && gen === generation) send({ type: "credit", generation: gen, count });
   });
 };
+
+// Native backend probe: no navigator.gpu, OffscreenCanvas or rAF; only the native wire must answer.
+async function probeNative(native) {
+  try {
+    if (!scope.WebAssembly || !scope.fetch || !scope.ReadableStream) throw new Error("worker WebAssembly, fetch or streams absent");
+    if (!native || typeof native.endpoint !== "string" || typeof native.session !== "string") throw new Error("native GPU session missing");
+    const response = await scope.fetch(`${native.endpoint}ping`, { headers: { "X-NT-GPU-Session": native.session }, cache: "no-store" });
+    if (!response.ok) throw new Error(`native GPU endpoint refused the session: HTTP ${response.status}`);
+    const info = await response.json();
+    send({ type: "probe", available: true, native: info });
+  } catch (error) { send({ type: "probe", available: false, reason: errorText(error) }); }
+}
 
 async function probe(mode = "display") {
   let device;
@@ -50,10 +64,10 @@ async function prepare(options) {
 async function launch(gen) {
   if (preparing) await preparing.catch(() => {});
   if (!prepared) throw new EngineError("not-prepared", "engine worker was not prepared");
-  if (!canvas) throw new EngineError("no-canvas", "engine worker has no OffscreenCanvas");
+  if (!canvas && !nativeGpu) throw new EngineError("no-canvas", "engine worker has no OffscreenCanvas");
   const current = () => gen === generation && !stopping;
   const created = await instantiateReactor(prepared, {
-    canvas, pixelRatio, scope, frameMode,
+    canvas, pixelRatio, scope, frameMode, nativeGpu, engineGeneration: gen,
     cancelled: () => !current(),
     report: (message) => { if (current()) send({ type: "report", generation: gen, message }); },
     post: (bytes) => { if (current()) send({ type: "message", generation: gen, bytes }, [bytes.buffer]); },
@@ -94,11 +108,12 @@ scope.onmessage = ({ data }) => {
   if (stopping || !data || typeof data.type !== "string") return;
   try {
     switch (data.type) {
-      case "probe": probe(data.frameMode); break;
+      case "probe": if (data.native) probeNative(data.native); else probe(data.frameMode); break;
       case "prepare": prepare(data.options); break;
       case "start":
-        if (canvas) { send({ type: "error", generation: data.generation, code: "already-started", message: "engine worker already owns a canvas" }); break; }
+        if (canvas || nativeGpu) { send({ type: "error", generation: data.generation, code: "already-started", message: "engine worker already started" }); break; }
         canvas = data.canvas ?? null; pixelRatio = data.options?.pixelRatio ?? 1;
+        nativeGpu = data.native ? Object.freeze({ endpoint: String(data.native.endpoint), session: String(data.native.session) }) : null;
         frameMode = data.options?.frameMode ?? frameMode;
         begin(data.generation);
         break;

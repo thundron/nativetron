@@ -38,7 +38,7 @@ Run `hosts/windows/acceptance.ps1 -Package build` on Windows with WebView2/WebGP
 
 ## macOS WKWebView and page services
 
-`hosts/macos/build.sh` builds an unsigned WKWebView application at `build/macos/Nativetron.app`; `NT_MACOS_SKIP_ENGINE=1` reuses the staged web bundle. The host uses the same offline asset policy and [page-facing service contract](SERVICES.md) as iOS/Android. No Dawn or bundled browser is added. The legacy desktop entry remains available.
+`hosts/macos/build.sh` builds an unsigned WKWebView application at `build/macos/Nativetron.app`; `NT_MACOS_SKIP_ENGINE=1` reuses the staged web bundle. The host uses the same offline asset policy and [page-facing service contract](SERVICES.md) as iOS/Android. No Dawn or bundled browser is added. The legacy desktop entry remains available. `NT_MACOS_BUILD_DIR` moves the output (for example under `/tmp`), `NT_MACOS_WASM_ROOT` stages the engine assets from a read-only tree's prebuilt Wasm, and `NT_GPU_EXECUTOR_LIBS` links a native GPU executor; `--native-gpu` opts into running the engine Worker's GPU stream natively (see [macos/NATIVE-GPU-APP.md](macos/NATIVE-GPU-APP.md)). WebView WebGPU stays the default.
 
 ## Cross-platform checks
 

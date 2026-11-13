@@ -24,6 +24,14 @@
       "mime": "text/javascript"
     },
     {
+      "path": "engine/native-gpu.js",
+      "mime": "text/javascript"
+    },
+    {
+      "path": "engine/native-gpu-wire.js",
+      "mime": "text/javascript"
+    },
+    {
       "path": "engine/.scriptc/ui.mjs",
       "mime": "text/javascript"
     },

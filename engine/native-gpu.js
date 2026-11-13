@@ -47,6 +47,10 @@ export function createNativeGpuHost(options) {
   const scope = options.scope ?? globalThis;
   const chunkBytes = options.chunkBytes ?? NATIVE_GPU_DEFAULT_CHUNK_BYTES;
   if (!Number.isSafeInteger(chunkBytes) || chunkBytes < 4096 || chunkBytes % 4) throw new NativeGpuError("invalid-options", "chunkBytes must be a multiple of 4 and at least 4096");
+  // Bytes reserved in front of every owned chunk (inside the same ArrayBuffer) so a wire transport can
+  // write its frame headers there and send header+payload as one body without a second copy.
+  const chunkHeaderBytes = options.chunkHeaderBytes ?? 0;
+  if (!Number.isSafeInteger(chunkHeaderBytes) || chunkHeaderBytes < 0 || chunkHeaderBytes > 4096 || chunkHeaderBytes % 4) throw new NativeGpuError("invalid-options", "chunkHeaderBytes must be a multiple of 4 in 0..4096");
   // Bounds may be raised, never lowered below one maximal guest flush: narrowing would refuse batches
   // the guest encoder legitimately produces.
   const maxQueuedBytes = options.maxQueuedBytes ?? MAX_SUBMISSION_BYTES;
@@ -246,7 +250,13 @@ export function createNativeGpuHost(options) {
       let index = 1;
       const copy = (source, section) => {
         for (let offset = 0; offset < source.byteLength; offset += chunkBytes) {
-          const owned = source.slice(offset, Math.min(source.byteLength, offset + chunkBytes));
+          const end = Math.min(source.byteLength, offset + chunkBytes);
+          let owned;
+          if (chunkHeaderBytes) {
+            const backing = new Uint8Array(chunkHeaderBytes + end - offset);
+            backing.set(source.subarray(offset, end), chunkHeaderBytes);
+            owned = backing.subarray(chunkHeaderBytes);
+          } else owned = source.slice(offset, end);
           messages.push({ kind: "chunk", engine, sequence: seq, index: index++, section, offset, bytes: owned, last: false });
         }
       };

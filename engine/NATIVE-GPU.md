@@ -1,8 +1,11 @@
 # Native GPU transport core (`engine/native-gpu.js`)
 
-Status: transport core only. It is not wired into `engine/reactor.js`, `engine/worker.js` or any platform
-host, and no native crossing exists yet. The tests use recording doubles; they prove ownership, bounds and
-ordering on the JavaScript side, not a native executor, a wire bridge or performance.
+Status: integrated on macOS. `engine/reactor.js` selects this host when the embedder passes `nativeGpu`
+(`engine/worker.js` and `engine/host.js` forward it; `engine/page.html` selects it only when the macOS host offers
+it), and `engine/native-gpu-wire.js` carries the messages over a binary channel to `hosts/macos`, which runs them
+through the `gpu/native/executor.h` C API. See [hosts/macos/NATIVE-GPU-APP.md](../hosts/macos/NATIVE-GPU-APP.md)
+for the app side, self-tests and measured results. The tests in this directory still use doubles
+(`native-gpu.test.mjs`, `native-gpu-wire.test.mjs`); the in-app self-tests are the crossing proof.
 
 ## Purpose
 
@@ -38,6 +41,7 @@ constructor refuses smaller values.
 | `onFailure(error)` | Fatal `NativeGpuError` for this generation (microtask). The reactor must wire this to its `fail`. |
 | `frameMode`, `createScheduler(mode)` | Frame pacing. Default `gpu/frame-scheduler.js`; a platform injects a display-link scheduler with the same `request/cancel/dispose` shape. |
 | `chunkBytes` | Wire chunk size, default 4 MiB (multiple of 4, ≥ 4096). |
+| `chunkHeaderBytes` | Bytes reserved in front of every owned chunk in the same `ArrayBuffer` (default 0; the wire uses 256) so a transport can prepend frame headers without copying. `message.bytes` is a view after the reserve. |
 | `maxQueuedBytes` / `maxQueuedSubmissions` / `maxQueuedChunks` | Unacknowledged bounds. Defaults 528 MiB / 8 / derived. |
 | `maxFramesInFlight` | Frame credits, default 2. |
 | `maxReadbackBytes` | Readback reassembly bound, default (and minimum) 16 MiB. |
@@ -96,22 +100,21 @@ later `apply` throws the same error. Other fatal codes: `transport-failed`, `pro
 event, `false`, nothing queued). `dispose()` releases everything, suppresses queued event deliveries and
 makes `apply` return `false`.
 
-## Integration still required
+## Integration (done)
 
-1. **Reactor** (`engine/reactor.js`, owned by the parent): choose the host factory per instance and pass
-   `engineGeneration`, `transport`, `onFailure: fail`, `getMemory`, `onFrame`, `onEvent` exactly as for
-   `createGpuHost`; `resize`/RESIZE events must come from native presentation (the JS host derives them from
-   the canvas on frames). `host.handles/device/adapter` are `null`.
-2. **Worker/page** (`engine/worker.js`, `engine/host.js`): the reactor runs in a Worker; chunks must reach
-   the native process without crossing the 64 KiB control bridge and without base64. A transport in the
-   Worker can transfer chunks to the page (`postMessage` with the transfer list) or post them directly to a
-   binary channel if one is reachable from a Worker. Route inbound messages by `engine` generation to the
-   live host; drop others.
-3. **Platform binary channel** (not implemented, not verified here): candidates on macOS are a
-   `WKURLSchemeHandler` receiving POST bodies (`fetch` with `ArrayBuffer` bodies), or a native-hosted
-   `WKScriptMessageHandler` only if it carries binary data without encoding. It must report acceptance
-   (`send` → `false` + later `resume()`), preserve order per generation, and deliver native → page bytes
-   (readback chunks) without base64. Measure copies per hop; the core performs exactly one copy out of Wasm.
-4. **Native executor** (other lane): honour the message contract above, acknowledge only after consuming a
-   whole submission, emit per-request completion exactly once, stamp the device epoch, send `frame-request`
-   on decoded `requestFrame`, and expose a display-link driven scheduler for `createScheduler`.
+1. **Reactor**: `instantiateReactor(prepared, { nativeGpu: { endpoint, session }, engineGeneration, ... })` builds a
+   `createNativeGpuWire` and this host with `chunkHeaderBytes: WIRE_CHUNK_RESERVE` and the wire's tick scheduler.
+   Without `nativeGpu` the WebGPU host (`gpu/host.js`) is used exactly as before. In native mode `resize()` is a
+   no-op: RESIZE events come from the native side (page geometry or the CAMetalLayer surface plan).
+2. **Worker/page**: `createEngine({ nativeGpu: { endpoint, session, postGeometry } })` probes the Worker without
+   `navigator.gpu`, `OffscreenCanvas` or rAF (it pings the native endpoint), never transfers the canvas, and
+   reports canvas geometry with `reportNativeGeometry` (layout/mutation driven, deduplicated) instead of resizing it.
+3. **Binary channel** (`engine/native-gpu-wire.js`): Worker `fetch` to the page's own `app://` origin, served by a
+   `WKURLSchemeHandler`. Upstream POST bodies carry 32-byte-header frames; every command/upload chunk is its own body
+   whose header (and any pending control frames) is written into bytes reserved in front of the owned chunk, so the
+   transport adds no copy. At most 3 bodies are in flight; the host answers a body only after its executor queue
+   consumed it, which is the backpressure (`send` → `false`, `resume()` on completion). Downstream is one held
+   long-poll per generation (no timers or loops while idle). Messages for other generations are ignored.
+4. **Executor**: `hosts/macos/NativeGPUBridge.swift` reassembles submissions (single-chunk sections are passed
+   without a copy, multi-chunk sections are copied once into an exact-size buffer), calls
+   `ntgpu_executor_submit` on a serial queue per generation, then acknowledges. Executor callbacks only enqueue.

@@ -1,10 +1,10 @@
 # Native GPU presentation (macOS) — design notes
 
-Status: tested component, **not integrated**. `NativeGPUSurface.swift` is not in
-`build.sh` yet; the parent wires it in once the native executor (wgpu-native lane)
-exists. This file owns presentation only. It creates no `MTLDevice`, never
-configures the layer for rendering, never calls a GPU API, and uses no
-private WebKit API.
+Status: integrated into the app (`build.sh`, `Main.swift`, `NativeGPUBridge.swift`); see
+[NATIVE-GPU-APP.md](NATIVE-GPU-APP.md) for flags, the executor wiring and the **measured** composition results
+(public API keeps WKWebView opaque; underlay needs private SPI and is quarantined behind
+`--native-gpu-composition=underlay-spi`). This file still owns presentation only: it creates no `MTLDevice`,
+never configures the layer for rendering and calls no GPU API.
 
 Tests: `hosts/macos/native-gpu-surface-test.sh` typechecks the file for arm64 and
 x86_64 (Swift 5 with `-warnings-as-errors`, plus Swift 6), then builds and runs
@@ -204,49 +204,21 @@ Limits:
   During live resize, scene and DOM can differ by about a frame.
   Transactional presentation would block the main thread and is not
   attempted.
-- **Not verified.** Pixels of the composited result, the color-space match
-  between the page and the layer (sRGB vs Display P3) and EDR were not
-  checked. An automated check needs a screen capture, which needs the Screen
-  Recording permission, a global setting this lane may not change.
+- **Verified since** (NATIVE-GPU-APP.md): composited pixels of both modes via
+  own-window capture, which needs no Screen Recording permission on the tested
+  system. The colour-space match (sRGB vs Display P3) and EDR remain unverified.
 
-## Parent integration steps
+## Integration (done, see NATIVE-GPU-APP.md)
 
-1. **Build.** Add `hosts/macos/NativeGPUSurface.swift` to the `swiftc` list in
-   `build.sh`. Hook `native-gpu-surface-test.sh` into the host test target.
-2. **Main.swift.** Put the `WKWebView` inside a plain container
-   `NSView` (the controller's view). Keep the web view's frame equal to the
-   container bounds with autoresizing. Then create
-   `NativeGPUSurfaceHost(webView:composition:.overlay, pageZoom:{ web.pageZoom },
-   magnification:{ web.magnification }, enqueue:)` and call `attach()` after
-   the window exists.
-3. **Page → host.** Register a script message handler (for example
-   `ntGpuSurface`). Accept only `message.webView === web` and the main frame.
-   Call `host.update(NativeGPUCanvasReport(message: body))`; on nil, report
-   a protocol error and keep the JS host. The page posts its reports
-   coalesced into one per animation frame.
-4. **Host → reactor.** `enqueue` forwards `.frame` to the reactor's
-   `frame(timeMs)` export, `.resize` as GPU event 8 RESIZE
-   (`{width,height,dpr}`), `.presentation(_, fallback)` to the
-   executor-selection policy and `.invalidated` to the executor's surface
-   teardown.
-5. **Executor (wgpu-native lane).** On device creation: `makeLease()` →
-   `wgpuInstanceCreateSurface` → configure from the latest `.resize`, then set
-   `host.maxDimension` to the device limit. Map the guest's
-   `requestFrame`/`setFrameMode` to `host.requestFrame()`/`setFrameMode()`,
-   and call `host.retire(token)` when a frame's work completes. On device
-   loss, call `host.deviceLost()`. Ignore `requestFrame` while there is no
-   device, as `gpu/host.js` does.
-6. **Teardown.** Call `host.invalidate()` in `windowShouldClose` before
-   `__nt_engine_dispose`. The executor releases its surface and then the
-   lease.
+The web view sits in a plain container view when a composition is selected; `NativeGPUSurfaceHost` is attached
+after the window exists, fed by the `ntGpuSurface` script message (main frame, page origin, ≤ 240/s), and its
+events go to `NativeGPUBridge.surfaceEvent` (ticks → TICK frames, resize → executor resize + RESIZE event,
+presentation → evidence). The executor gets `lease.layerPointer` as `NtGpuExecutorOptions.metal_layer`; the
+generation's queue destroys the executor and then releases the lease. `invalidate()` runs before page disposal on
+window close.
 
 ## Not done here
 
-- No frame was presented. No GPU device exists in this lane.
-- No WKWebView transparency or composited pixels were captured (needs the
-  Screen Recording permission).
-- No ProMotion, Low Power Mode or real display-link timing measurements
-  (other agents are contending for the machine).
-- No iOS `UIView` twin. The geometry and scheduler types are
-  platform-neutral apart from `CGRect`. Only the AppKit host class would need
-  a UIKit variant using `CADisplayLink(target:selector:)`.
+- Presentation fallback only logs; it does not switch an executing generation back to WebGPU.
+- No ProMotion, Low Power Mode or display-link timing measurements (deferred).
+- No iOS `UIView` twin.

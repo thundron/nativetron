@@ -1,4 +1,6 @@
 import { createGpuHost } from "../gpu/host.js";
+import { createNativeGpuHost } from "./native-gpu.js";
+import { createNativeGpuWire, WIRE_CHUNK_RESERVE } from "./native-gpu-wire.js";
 import { createStreams } from "./streams.js";
 import { decodeEngineMessage, encodeEngineMessage, ENGINE_MAX_PAYLOAD, ENGINE_MAX_RATE, ENGINE_REPORT, ENGINE_STATE, ENGINE_BULK, LANE_ENGINE, LANE_NATIVE, LANE_UI } from "../ipc/engine.generated.mjs";
 
@@ -145,16 +147,41 @@ export async function instantiateReactor(prepared, options) {
     },
   });
   const streams = createStreams({ deliver: options.postStream ?? post, onError: error => fail(error) });
-  const host = createGpuHost({
+  const gpuEvent = (event) => {
+    if (disposed || failure) return;
+    if (inboxEvents >= ENGINE_EVENT_LIMIT) { fail(new EngineError("event-overflow", "engine GPU event queue overflow")); return; }
+    inbox.push({ event }); inboxEvents++; schedule();
+  };
+  // GPU backend is chosen explicitly by the embedder before anything touches a canvas: `nativeGpu`
+  // ({ endpoint, session }) runs the op stream in a native executor over the binary wire; otherwise the
+  // webview WebGPU host draws into `canvas`. The guest import contract is identical.
+  const native = options.nativeGpu ?? null;
+  let host;
+  if (native) {
+    let wire;
+    try {
+      wire = createNativeGpuWire({ endpoint: native.endpoint, session: native.session, engine: options.engineGeneration, fetch: native.fetch ?? options.fetch, maxInflight: native.maxInflight });
+      host = createNativeGpuHost({
+        transport: wire.connect({
+          receive: (message) => host?.receive(message),
+          resume: () => host?.resume(),
+          fail: (error) => fail(new EngineError("native-gpu-transport", errorText(error), { cause: error })),
+        }),
+        getMemory: () => api.__memory(), engineGeneration: options.engineGeneration, scope, frameMode: options.frameMode,
+        chunkHeaderBytes: WIRE_CHUNK_RESERVE, createScheduler: (mode) => wire.createScheduler(mode),
+        onFrame: (time) => call("frame", time), onEvent: gpuEvent, onFailure: (error) => fail(error),
+      });
+    } catch (error) {
+      try { wire?.transport.close({ reason: "setup-failed" }); } catch {}
+      throw new EngineError("native-gpu-unavailable", `native GPU backend could not start: ${errorText(error)}`, { cause: error });
+    }
+    host.wire = wire;
+  } else host = createGpuHost({
     canvas, scope, frameMode: options.frameMode,
     getPixelRatio: () => canvas.clientWidth === undefined ? pixelRatio : (scope.devicePixelRatio ?? 1),
     getMemory: () => api.__memory(),
     onFrame: (time) => call("frame", time),
-    onEvent: (event) => {
-      if (disposed || failure) return;
-      if (inboxEvents >= ENGINE_EVENT_LIMIT) { fail(new EngineError("event-overflow", "engine GPU event queue overflow")); return; }
-      inbox.push({ event }); inboxEvents++; schedule();
-    },
+    onEvent: gpuEvent,
   });
   const fail = (error) => {
     if (failure || disposed) return;
@@ -267,6 +294,8 @@ export async function instantiateReactor(prepared, options) {
       if (disposed || failure) return;
       if (![width, height, dpr].every(Number.isFinite) || width < 1 || height < 1 || dpr <= 0) return;
       width = Math.round(width); height = Math.round(height);
+      // Native presentation sizes its surface itself and delivers RESIZE through the wire.
+      if (native) return;
       canvas.width = width; canvas.height = height; pixelRatio = dpr;
       if (inboxEvents >= ENGINE_EVENT_LIMIT) { fail(new EngineError("event-overflow", "engine GPU event queue overflow")); return; }
       inbox.push({ event: { type: 8, requestId: 0, handle: 0, status: 0, width, height, dpr } }); inboxEvents++; schedule();

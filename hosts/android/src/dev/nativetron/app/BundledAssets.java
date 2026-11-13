@@ -12,6 +12,8 @@ final class BundledAssets {
     files.put("engine/host.js", "text/javascript");
     files.put("engine/worker.js", "text/javascript");
     files.put("engine/reactor.js", "text/javascript");
+    files.put("engine/native-gpu.js", "text/javascript");
+    files.put("engine/native-gpu-wire.js", "text/javascript");
     files.put("engine/.scriptc/ui.mjs", "text/javascript");
     files.put("engine/.scriptc/ui.wasm", "application/wasm");
     files.put("gpu/.scriptc/demo.mjs", "text/javascript");

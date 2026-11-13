@@ -1,0 +1,17 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>native GPU wire self-test</title></head><body>
+<!-- TEST-ONLY page for --native-gpu-selftest=wire; never part of the bundled asset catalog. -->
+<script type="module">
+import { claimNativeGpu } from "/engine/native-gpu-wire.js";
+window.__ntWireSelftest = (async () => {
+  const native = await claimNativeGpu(window);
+  if (!native) throw new Error("native GPU was not offered by the host");
+  const worker = new Worker("/__ntgpu/selftest-worker.js", { type: "module" });
+  try {
+    return await new Promise((resolve, reject) => {
+      worker.onmessage = ({ data }) => data.ok ? resolve({ ...data.result, executor: native.executor }) : reject(new Error(data.error));
+      worker.onerror = (event) => reject(new Error("self-test worker failed: " + (event.message || "error")));
+      worker.postMessage({ endpoint: native.endpoint, session: native.session });
+    });
+  } finally { worker.terminate(); }
+})();
+</script></body></html>

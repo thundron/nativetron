@@ -9,6 +9,8 @@ static const NtBundledAsset NT_ASSETS[] = {
   {"engine/host.js", "text/javascript"},
   {"engine/worker.js", "text/javascript"},
   {"engine/reactor.js", "text/javascript"},
+  {"engine/native-gpu.js", "text/javascript"},
+  {"engine/native-gpu-wire.js", "text/javascript"},
   {"engine/.scriptc/ui.mjs", "text/javascript"},
   {"engine/.scriptc/ui.wasm", "application/wasm"},
   {"gpu/.scriptc/demo.mjs", "text/javascript"},

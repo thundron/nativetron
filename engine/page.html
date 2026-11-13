@@ -1,18 +1,19 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><title>nativetron engine lane</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<style>body{font:15px system-ui;margin:16px;background:#101822;color:#ddd}canvas{width:640px;max-width:100%;height:400px}button{padding:8px}pre{white-space:pre-wrap}</style></head>
+<style>body{font:15px system-ui;margin:16px;background:#101822;color:#ddd}canvas{width:640px;max-width:100%;height:400px}button{padding:8px}pre{white-space:pre-wrap}html.nt-native-underlay,html.nt-native-underlay body{background:transparent}</style></head>
 <body><div id="nt-root"></div><canvas id="surface" width="640" height="400"></canvas><pre id="report"></pre>
 <script type="module">
 import { installHostServices } from "../host/services.js";
 window.nativetronHost = installHostServices(window);
 import { createEngine } from "./host.js";
+import { claimNativeGpu } from "./native-gpu-wire.js";
 import { instantiateFromBytes } from "./.scriptc/ui.mjs";
 import { bindEventCallbacks } from "../host/event.generated.mjs";
 import { decodeEngineMessage, encodeEngineMessage, ENGINE_REPORT, LANE_ENGINE, LANE_UI, LANE_NATIVE } from "../ipc/engine.generated.mjs";
 import { engineEnvelope, engineFromBase64 } from "../ipc/engine-bridge.generated.mjs";
 const native = window.__nt_ipc || (window.webkit?.messageHandlers?.ntEngine ? (text) => window.webkit.messageHandlers.ntEngine.postMessage(text) : window.ntEngine ? (text) => window.ntEngine.postMessage(text) : null);
 if (!window.__nt) { window.__nt_send = native || (() => {}); await import("../host/dom-host.js"); }
-const reports = [], events = [], pending = [], uiInbox = [];
+const reports = [], events = [], pending = [], uiInbox = [], reportWaiters = new Set();
 const textEncoder = new TextEncoder();
 let lane, ui, uiScheduled = false, uiFailed = false;
 const remember = (list, value) => { if (list.length === 256) list.shift(); list.push(value); };
@@ -32,6 +33,7 @@ const deliverUi = (bytes) => {
 const report = (line) => {
   line = String(line); if (line.length > 16384) line = line.slice(0, 16383) + "…";
   remember(reports, line);
+  for (const waiter of reportWaiters) if (line.startsWith(waiter.prefix)) { reportWaiters.delete(waiter); waiter.resolve(line); }
   const target = document.getElementById("report");
   target.textContent = (target.textContent + line + "\n").slice(-32768);
   const payload = textEncoder.encode(line);
@@ -56,7 +58,15 @@ try {
   });
   bindEventCallbacks(window, () => ui, "nt");
   ui.nt_start();
+  // Native GPU is selected only when the host offered it (window.__ntNativeGpuOffer); a refused claim is an
+  // explicit failure, never a silent switch to the webview WebGPU path.
+  const nativeGpu = await claimNativeGpu(window);
+  if (nativeGpu) {
+    report("ENGINE_NATIVE_GPU " + JSON.stringify({ executor: nativeGpu.executor, composition: nativeGpu.composition, presentation: nativeGpu.presentation }));
+    if (nativeGpu.composition === "underlay") document.documentElement.classList.add("nt-native-underlay");
+  }
   lane = createEngine({
+    nativeGpu: nativeGpu && { ...nativeGpu, postGeometry: (geometry) => window.webkit?.messageHandlers?.ntGpuSurface?.postMessage(geometry) },
     canvas: document.getElementById("surface"),
     moduleUrl: new URL("../gpu/.scriptc/demo.mjs", location.href).href,
     wasmUrl: new URL("../gpu/.scriptc/demo.wasm", location.href).href,
@@ -66,7 +76,14 @@ try {
     postUi: deliverUi,
     onEvent: (event) => { remember(events, event); if (event.type === 1) report("GPU_CAPABILITIES " + JSON.stringify(event)); },
   });
-  window.engineDemo = { lane, ui, reports, events };
+  window.engineDemo = { lane, ui, reports, events, nativeGpu: Boolean(nativeGpu),
+    waitReport: (prefix, ms = 30000) => new Promise((resolve, reject) => {
+      const found = reports.find((line) => line.startsWith(prefix));
+      if (found) { resolve(found); return; }
+      const waiter = { prefix, resolve };
+      reportWaiters.add(waiter);
+      setTimeout(() => { if (reportWaiters.delete(waiter)) reject(new Error("timed out waiting for " + prefix)); }, ms);
+    }) };
   await lane.ready;
   for (const bytes of pending) lane.send(bytes, LANE_NATIVE);
   pending.length = 0;
