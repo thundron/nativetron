@@ -86,13 +86,15 @@ final class MacHostDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
           "for(const key of ['log','info','warn','error']){const original=console[key].bind(console);console[key]=(...args)=>{original(...args);try{webkit.messageHandlers.ntConsole.postMessage(args.map(String).join(' ').slice(0,4096))}catch{}}}",
         injectionTime: .atDocumentStart, forMainFrameOnly: true))
     let view = WKWebView(
-      frame: CGRect(x: 0, y: 0, width: 1100, height: 760), configuration: configuration)
+      frame: CGRect(origin: .zero, size: flags.benchmarkViewport ?? CGSize(width: 1100, height: 760)),
+      configuration: configuration)
     let controller = NSViewController()
     if flags.nativeGPU && flags.composition != .none {
       // The surface sits next to the web view inside a plain container; the web view tracks its bounds.
       let container = NSView(frame: view.frame)
       view.autoresizingMask = [.width, .height]
       container.addSubview(view)
+      if let size = flags.benchmarkViewport { NativeGPUBenchmark.pin(view, size: size, in: container) }
       controller.view = container
       if flags.composition == .underlaySPI {
         // QUARANTINED: private WebKit SPI (KVC drawsBackground -> _setDrawsBackground:). Public macOS API keeps
@@ -108,7 +110,8 @@ final class MacHostDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
           "overlay: native layer above the web view masked by reported DOM rects; rounded/translucent DOM over the canvas does not blend with the scene")
       }
     } else {
-      controller.view = view
+      controller.view =
+        flags.benchmarkViewport.map { NativeGPUBenchmark.container(pinning: view, size: $0) } ?? view
       if flags.nativeGPU {
         Evidence.emit(
           "NT_MACOS_NATIVE_GPU_PRESENTATION_BLOCKED",
@@ -290,6 +293,7 @@ final class MacHostDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
   }
   func webView(_ view: WKWebView, didFinish navigation: WKNavigation!) {
     Evidence.emit("NT_MACOS_PAGE_LOADED", view.url?.absoluteString ?? "")
+    if flags.benchmarkViewport != nil { NativeGPUBenchmark.report(view, window: window) }
     if let hook = nextLoad {
       nextLoad = nil
       hook()
@@ -335,6 +339,7 @@ final class MacHostDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
 ///   --native-gpu-selftest=e2e|wire|composition   opt-in self-tests (implies --native-gpu)
 ///   --url file:///tmp/<dir>/<page>.html  owner-local read-only content served as app://dev
 ///   --no-activate                        keep the window behind others without taking focus (measurement runs)
+///   --benchmark-viewport=WxH             fixed web view size in points (benchmark runs; NativeGPUBenchmark.swift)
 struct MacHostFlags {
   enum Composition: Equatable {
     case none, overlay, underlaySPI
@@ -344,6 +349,7 @@ struct MacHostFlags {
   var composition = Composition.none
   var selftest: String?
   var devURL: String?
+  var benchmarkViewport: CGSize?
   var problem: String?
   init(_ arguments: [String]) {
     var index = 1
@@ -362,6 +368,10 @@ struct MacHostFlags {
         guard let value, ["e2e", "wire", "composition"].contains(value) else { problem = "unknown --native-gpu-selftest"; break }
         selftest = value; nativeGPU = true
       } else if argument == "--url", index + 1 < arguments.count { devURL = arguments[index + 1]; index += 1 }
+      else if argument.hasPrefix(NativeGPUBenchmark.flag) {
+        benchmarkViewport = NativeGPUBenchmark.parseViewport(value)
+        if benchmarkViewport == nil { problem = "bad \(argument) (WxH, 200...8192 points)" }
+      }
       index += 1
     }
     if selftest == "composition" && composition == .none { problem = "--native-gpu-selftest=composition needs --native-gpu-composition" }

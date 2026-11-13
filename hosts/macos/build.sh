@@ -63,7 +63,7 @@ xcrun clang -std=c11 -O2 -Wall -Wextra -Werror -target "$TARGET" -c "$LINKAGE" -
 xcrun clang -std=c11 -O2 -Wall -Wextra -Werror -target "$TARGET" -c hosts/macos/native-gpu-recorder.c -o "$BUILD/obj/native-gpu-recorder.o"
 swiftc -swift-version 5 -O -target "$TARGET" -import-objc-header hosts/macos/NativeGPU-Bridging.h \
   -module-cache-path "$BUILD/swift-module-cache" \
-  hosts/macos/{Main,SelfTest,NativeGPUSurface,NativeGPUWire,NativeGPUBridge,MacSchemeRouter,NativeGPUSelfTest}.swift \
+  hosts/macos/{Main,SelfTest,NativeGPUSurface,NativeGPUWire,NativeGPUBridge,MacSchemeRouter,NativeGPUSelfTest,NativeGPUBenchmark}.swift \
   hosts/apple/{ArchiveStore,HostFileNames,HostMediaResource,HostPowerState,HostPDFLayout,HostServices,HostPDFJob}.swift \
   hosts/ios/Sources/{AssetCatalog,AssetSchemeHandler,BundledAssets.generated,EngineProtocol.generated,Evidence}.swift \
   "$BUILD/obj/native-gpu-linkage.o" "$BUILD/obj/native-gpu-recorder.o" ${EXECUTOR[@]+"${EXECUTOR[@]}"} \
