@@ -80,7 +80,9 @@ struct NtGpuContext {
     bool was_empty = false;
     {
       std::lock_guard<std::mutex> lock(mutex);
-      if (events.size() >= capacity) {
+      // Only uncaptured errors are droppable: completion and loss events are bounded by the outstanding
+      // operations that produce them, and dropping one would leave a request without its completion.
+      if (events.size() >= capacity && kind == NTGPU_EVENT_UNCAPTURED_ERROR) {
         ++dropped;
         return;
       }
@@ -527,6 +529,12 @@ NtGpuStatus ntgpu_device_destroy(NtGpuContext *ctx) {
   if (!ctx || !ctx->device) return NTGPU_ERR_ARGUMENT;
   ctx->Lost(ctx->generation.load(), WGPUDeviceLostReason_Destroyed, "device destroyed");
   wgpuDeviceDestroy(ctx->device);
+  return NTGPU_OK;
+}
+
+NtGpuStatus ntgpu_device_release(NtGpuContext *ctx) {
+  if (!ctx || !ctx->device) return NTGPU_ERR_ARGUMENT;
+  ctx->ReleaseDevice();
   return NTGPU_OK;
 }
 

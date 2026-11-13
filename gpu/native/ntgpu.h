@@ -65,7 +65,7 @@ typedef void (*NtGpuWakeFn)(void *user);
 
 typedef struct NtGpuContextOptions {
   uint32_t api_version;     /* NTGPU_API_VERSION */
-  uint32_t event_capacity;  /* bounded queue length; 0 = 256 */
+  uint32_t event_capacity;  /* bounded length for UNCAPTURED_ERROR events (completions are never dropped); 0 = 256 */
   uint32_t message_limit;   /* bytes kept per event message; 0 = 4096 */
   NtGpuWakeFn wake;         /* optional; called when the queue turns non-empty; must not call ntgpu_* */
   void *wake_user;
@@ -115,6 +115,10 @@ NtGpuStatus ntgpu_request_device(NtGpuContext *ctx, uint64_t token, const WGPUFe
 NtGpuStatus ntgpu_device_capabilities(NtGpuContext *ctx, NtGpuCapabilities *out);
 /* Explicit device.destroy(): marks the generation lost and emits DEVICE_LOST(Destroyed) once. */
 NtGpuStatus ntgpu_device_destroy(NtGpuContext *ctx);
+/* Destroys (DEVICE_LOST(Destroyed) once, if still alive) and releases the current device, so a lost device does
+ * not pin the adapter. Outstanding map/work-done callbacks complete during the release and are queued as events of
+ * the old generation. A new adapter and device may be requested afterwards. */
+NtGpuStatus ntgpu_device_release(NtGpuContext *ctx);
 int ntgpu_device_alive(const NtGpuContext *ctx);
 uint32_t ntgpu_device_generation(const NtGpuContext *ctx);
 

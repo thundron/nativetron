@@ -3,9 +3,9 @@
 This directory is the native-GPU backend lane of the native GPU spike: a pinned wgpu-native dependency, a small C ABI
 facade (`ntgpu.h`) that owns the instance/adapter/device lifecycle, error scopes, WGSL diagnostics and asynchronous
 completions, and a probe CLI (`ntgpu-probe`) that reports real capabilities, validates WGSL files and runs GPU
-correctness proofs. It does **not** contain the protocol decoder: the decoder generated from `gpu/ops.json` takes the
-raw `webgpu.h` handles from the facade and issues every other WebGPU call itself. The JS host, `ops.json`, the guest
-API and `gpu/generate.mjs` are untouched. No Dawn.
+correctness proofs. The protocol-3 executor built on it (`executor.h`/`executor.cc`: the generated decoder's visitor,
+which takes the raw `webgpu.h` handles from the facade and issues every other WebGPU call itself) is documented in
+[EXECUTOR.md](EXECUTOR.md). The JS host, `ops.json`, the guest API and `gpu/generate.mjs` are untouched. No Dawn.
 
 ## Dependency
 
@@ -107,10 +107,15 @@ device re-request/destroy and `ntgpu_context_destroy` are not concurrent with it
 - **Error scopes**: `ntgpu_scope_push/pop` are balanced and complete synchronously. Underflow returns
   `NTGPU_ERR_ARGUMENT` (wgpu-native would abort). `WGPUErrorFilter_Internal` is emulated (wgpu-native aborts on it and
   never raises internal errors), so it always pops clean.
+- **Event bound**: only UNCAPTURED_ERROR events are dropped (then reported as one OVERFLOW) when the queue holds
+  `event_capacity` events; ADAPTER/DEVICE/DEVICE_LOST/MAP/WORK_DONE are bounded by their outstanding operations and are
+  never dropped, so no request can lose its completion.
 - **Device loss**: `ntgpu_device_destroy` (and destruction by a re-request or teardown) emits DEVICE_LOST(Destroyed)
   once per generation — wgpu-native does not call the lost callback for `destroy()`. A real loss reported by the
   implementation goes through the same once-per-generation gate. After loss the helpers refuse with
-  `NTGPU_ERR_DEVICE_LOST` without touching the device; `ntgpu_request_device` starts a new generation. The facade
+  `NTGPU_ERR_DEVICE_LOST` without touching the device; `ntgpu_request_device` starts a new generation.
+  `ntgpu_device_release` destroys (if needed) and releases a lost device right away, completing its outstanding
+  callbacks, so the next `ntgpu_request_adapter` can pick a fresh adapter. The facade
   always installs lost and uncaptured-error callbacks (wgpu-native's defaults abort the process).
 - **Shader/pipeline helpers**: `ntgpu_compile_wgsl` (module stage), `ntgpu_create_compute_pipeline`,
   `ntgpu_create_render_pipeline` (pipeline stage) wrap creation in validation + out-of-memory scopes and return
@@ -160,7 +165,7 @@ when requested. `timestamp-query` is available.
 
 ## Missing
 
-- The protocol decoder and its run against `gpu/verify.mjs`/the conformance reactor (another lane).
+- (Done since: the executor and its native conformance run, see [EXECUTOR.md](EXECUTOR.md).)
 - House-planner shader fixtures (the shader lane supplies them; the CLI accepts them as they are).
 - Presentation under a transparent WKWebView, display-link pacing, `frameMode`, resize/DPR and occlusion; the surface
   probe uses a window-less layer.
