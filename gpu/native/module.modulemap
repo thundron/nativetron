@@ -1,0 +1,6 @@
+// Swift/Clang module for the ntgpu facade. Compile with -I gpu/native -I <wgpu-native prefix>/include.
+module NtGpu {
+  header "ntgpu.h"
+  link "c++"
+  export *
+}

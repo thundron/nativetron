@@ -1,0 +1,38 @@
+# Pinned wgpu-native prebuilt for the native GPU backend. Sourced by fetch-deps.sh and build.sh.
+# Every value was checked against the upstream release API and the tagged source tree on 2026-11-13:
+#   - archive digest equals the GitHub release asset digest;
+#   - include/webgpu/wgpu.h equals gfx-rs/wgpu-native@COMMIT:ffi/wgpu.h;
+#   - include/webgpu/webgpu.h and webgpu.yml equal webgpu-native/webgpu-headers@HEADERS_COMMIT (the ffi/webgpu-headers
+#     submodule pointer of COMMIT);
+#   - the commit-sha release asset names COMMIT.
+WGPU_NATIVE_TAG=v29.0.1.1
+WGPU_NATIVE_COMMIT=6aed50955d934ac36049ba8d002034841633ae02
+WGPU_CORE_VERSION=29.0.1
+WEBGPU_HEADERS_COMMIT=673658bc2bd70ec39fc55ebe6bb0173cf6d0a603
+WGPU_NATIVE_RELEASE_URL=https://github.com/gfx-rs/wgpu-native/releases/download/v29.0.1.1
+
+# macOS arm64, release profile (only verified platform).
+MACOS_AARCH64_ASSET=wgpu-macos-aarch64-release.zip
+MACOS_AARCH64_SHA256=a5797a37b1adf720bcd5dcffb291edbbd5b7b14be0a3874c28e6393a655a7a3e
+MACOS_AARCH64_SIZE=13733288
+
+# Release-asset digests recorded for the other targets (not downloaded, not verified to run).
+MACOS_X86_64_SHA256=8e2f7378548ddd0e2cf21e7d864dda46e953f0af724855a33778b85ead206d41
+IOS_AARCH64_SHA256=e36c9913b9e5095a530fa9121c50b16a4e3dd020e1eebf601f2f47ce24d56941
+IOS_AARCH64_SIMULATOR_SHA256=750e706765bef3744313745194774d095c916fc21d2a0e7d4d7b0bc4d0c92789
+ANDROID_AARCH64_SHA256=721741f1b05a20c1738166bedf7a5efb2ba4b382da689526d3fc33de22bdd573
+WINDOWS_X86_64_MSVC_SHA256=7e67d7445c42aeb85e30f88930fd8d7d83ee769e3390aeb1ada75ebf3cf78132
+
+# Extracted file digests (macOS arm64 archive).
+WGPU_H_SHA256=7bd23656d394f620a804b1f174444ea17082b6d330a2fca0c0e6b1121ec4b284
+WEBGPU_H_SHA256=a483031c3fed05ea5dd1c74082a71676c46c5b2b820ccca10da515c033efc997
+LIBWGPU_NATIVE_A_SHA256=7d8b688a6b55f0728c847e1c3b028d07ccb1009d8cea4833a6186a5775384248
+LIBWGPU_NATIVE_DYLIB_SHA256=e72e8f1777dd0315bfee91c6b7e7b105234d5c1cc1621db4cf92ffee2ac2ae32
+WEBGPU_YML_SHA256=f9e2ef6f1b5f91ad1c077c15c6fba5f55e6f52935af2adef40bc5597b06bb5ca
+COMMIT_SHA_ASSET_SHA256=50eb8721ddb2d4ee9339d55113866db73c84785c886022bb4640358c36a6c46f
+
+# Licences and the crate lock fetched from the tagged source trees.
+LICENSE_APACHE_SHA256=a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9
+LICENSE_MIT_SHA256=c7fea58d1cfe49634cd92e54fc10a9d871f4b275321a4cd8c09e449122caaeb4
+WEBGPU_HEADERS_LICENSE_SHA256=17420d366df90c474bd70ad474694956cdb7fc64be70387a49a45458c4152d22
+CARGO_LOCK_SHA256=9f780c3e7e792c19ae22e708cf899eb177b5696c9ab61215c6ae235adcecbdb0
