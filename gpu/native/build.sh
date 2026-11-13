@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Builds the ntgpu facade (libntgpu.a) and the ntgpu-probe CLI against the pinned wgpu-native (macOS arm64 only).
-#   gpu/native/build.sh [--link static|dynamic] [--sanitize address|thread]
+#   gpu/native/build.sh [--link static|dynamic] [--sanitize address|thread] [--wgpu official|patched]
+#   --wgpu (default $NTGPU_WGPU_VARIANT, else official) selects the wgpu-native prefix from fetch-deps.sh --variant;
+#   the patched variant's products go to their own build directory (suffix -<variant name>).
 # Products: libntgpu.a, ntgpu-probe, swift-smoke (last line of stdout is the ntgpu-probe path).
 # Output: $NTGPU_BUILD_DIR (default /tmp/nt-native-gpu-deps/build/macos-arm64-<link>), never inside the worktree.
 #   static : libwgpu_native.a linked into the executable with -dead_strip (default; what an app host would ship)
@@ -10,17 +12,22 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 LINK=static
 SANITIZE=
+VARIANT="${NTGPU_WGPU_VARIANT:-official}"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --link) LINK="$2"; shift 2 ;;
     --sanitize) SANITIZE="$2"; shift 2 ;;
+    --wgpu) VARIANT="$2"; shift 2 ;;
     *) echo "build: unknown argument $1" >&2; exit 2 ;;
   esac
 done
 [[ "$LINK" == static || "$LINK" == dynamic ]] || { echo "build: --link static|dynamic" >&2; exit 2; }
-PREFIX="$("$HERE/fetch-deps.sh")"
+PREFIX="$("$HERE/fetch-deps.sh" --variant "$VARIANT")"
 DEPS="${NT_NATIVE_GPU_DEPS:-/tmp/nt-native-gpu-deps}"
 SUFFIX="$LINK${SANITIZE:+-$SANITIZE}"
+if [[ "$VARIANT" == patched ]]; then
+  SUFFIX="$SUFFIX-$(sed -n 's/^PATCHED_VARIANT=//p' "$HERE/compiler/wgpu-native-patched.lock")"
+fi
 OUT="${NTGPU_BUILD_DIR:-$DEPS/build/macos-arm64-$SUFFIX}"
 mkdir -p "$OUT/obj"
 TARGET=arm64-apple-macos14.0

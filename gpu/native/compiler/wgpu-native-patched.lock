@@ -1,0 +1,25 @@
+# Patched wgpu-native build: the pinned wgpu-native (../wgpu-native.lock) rebuilt from source with two Naga patches.
+# Sourced by build-patched-wgpu.sh and ../fetch-deps.sh (--variant patched). Values checked on 2026-11-13:
+#   - NAGA_CRATE_SHA256 is the crates.io checksum of naga 29.0.3 recorded in wgpu-native@WGPU_NATIVE_COMMIT's Cargo.lock;
+#   - the crate's src/ is byte-identical to gfx-rs/wgpu@NAGA_GIT_COMMIT:naga/src (its .cargo_vcs_info.json commit);
+#   - the patches apply, in order, to both (crate root -p1, or -p1 --directory=naga in the wgpu tree).
+PATCHED_VARIANT=naga-wgsl-compat.1
+NAGA_VERSION=29.0.3
+NAGA_CRATE_SHA256=0dd91265cc2454558f659b3b4b9640f0ddb8cc6521277f166b8a8c181c898079
+NAGA_GIT_COMMIT=4cbe6232b2d7c289b6e1a38416a6ae1461a22e81
+# "file sha256" pairs, applied in this order.
+NAGA_PATCHES="patches/0001-naga-wgsl-behavior-analysis-for-function-ends.patch a1004ceebf67341508fae5c008aa79f55cc99938f40fd0bd25b6153c4b231798
+patches/0002-naga-let-bound-overrides-stay-runtime.patch 53da5ae1718c8a1396688434dd3a0c1d37bd9f5c8b0a2f89291f76ea233283e3"
+
+# Toolchain. Upstream's release CI used Rust 1.91 (rust-toolchain.toml says 1.93); neither is installed here, and
+# installing one would be a global change, so the build pins the stable toolchain that is installed. The build refuses
+# another rustc unless NTGPU_RUSTC_ANY=1 (the output digests below then do not apply).
+RUSTC_VERSION="rustc 1.97.1 (8bab26f4f 2026-07-14)"
+# Same environment as upstream's macOS release job (.github/workflows/cd.yml): deployment target, install name and the
+# version string baked into wgpuGetVersion().
+MACOSX_DEPLOYMENT_TARGET_PIN=10.13
+
+# Output digests of a clean build with RUSTC_VERSION, Xcode 27 ld (ld-27037.1) on macOS 27.0.1 arm64; paths are
+# remapped, so the cache location does not change them. Two builds in different target dirs gave these digests.
+PATCHED_LIBWGPU_NATIVE_A_SHA256=7a3d459a329647d375c384a667228c5a008e1ae0590f2dd5ecb40d56e4a19a83
+PATCHED_LIBWGPU_NATIVE_DYLIB_SHA256=b4e597050ac7d8a70da8b8a0b91ff3d49c1214f4fa3a8b04971551034106e367

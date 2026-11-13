@@ -2,18 +2,29 @@
 # Fetches and verifies the pinned wgpu-native prebuilt into a cache outside any worktree.
 #   gpu/native/fetch-deps.sh            download if missing, verify, print the prefix
 #   gpu/native/fetch-deps.sh --offline  verify an existing cache only (no network), print the prefix
+#   gpu/native/fetch-deps.sh --variant official|patched   (default $NTGPU_WGPU_VARIANT, else official)
+#     official: the pinned upstream release archive (the baseline);
+#     patched:  the same commit built from source with the Naga patch in compiler/ (compiler/build-patched-wgpu.sh)
 # Cache root: $NT_NATIVE_GPU_DEPS (default /tmp/nt-native-gpu-deps). Nothing is installed globally.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=wgpu-native.lock
 source "$HERE/wgpu-native.lock"
 OFFLINE=0
-for arg in "$@"; do
-  case "$arg" in
-    --offline) OFFLINE=1 ;;
-    *) echo "fetch-deps: unknown argument $arg" >&2; exit 2 ;;
+VARIANT="${NTGPU_WGPU_VARIANT:-official}"
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --offline) OFFLINE=1; shift ;;
+    --variant) VARIANT="${2:-}"; shift 2 ;;
+    *) echo "fetch-deps: unknown argument $1" >&2; exit 2 ;;
   esac
 done
+case "$VARIANT" in
+  official) ;;
+  patched) if [[ "$OFFLINE" == 1 ]]; then exec "$HERE/compiler/build-patched-wgpu.sh" --offline; fi
+           exec "$HERE/compiler/build-patched-wgpu.sh" ;;
+  *) echo "fetch-deps: --variant official|patched, not '$VARIANT'" >&2; exit 2 ;;
+esac
 if [[ "$(uname -s)-$(uname -m)" != Darwin-arm64 ]]; then
   echo "fetch-deps: only macOS arm64 is pinned and verified; $(uname -s)-$(uname -m) is not" >&2
   exit 2

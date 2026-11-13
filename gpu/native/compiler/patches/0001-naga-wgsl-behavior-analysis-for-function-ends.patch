@@ -1,0 +1,509 @@
+naga 29.0.3: decide "missing return" with WGSL 9.7 behavior analysis (gfx-rs/wgpu#9501)
+
+--- a/src/proc/terminator.rs
++++ b/src/proc/terminator.rs
+@@ -5,18 +5,28 @@
+ /// to the end, because it may be either redundant or invalid,
+ /// e.g. when the user already has returns in if/else branches.
+ pub fn ensure_block_returns(block: &mut crate::Block) {
++    ensure_block_returns_with(block, &mut || crate::Statement::Return { value: None });
++}
++
++/// Like [`ensure_block_returns`], but every statement that [`ensure_block_returns`] would
++/// append is produced by `make_return` instead of being a value-less `Return`.
++///
++/// The structural walk (which tail positions receive a statement) is identical, so the
++/// result differs from [`ensure_block_returns`] only in the statements appended.
++pub(crate) fn ensure_block_returns_with(
++    block: &mut crate::Block,
++    make_return: &mut dyn FnMut() -> crate::Statement,
++) {
+     use crate::Statement as S;
+     match block.last_mut() {
+-        Some(&mut S::Block(ref mut b)) => {
+-            ensure_block_returns(b);
+-        }
++        Some(&mut S::Block(ref mut b)) => ensure_block_returns_with(b, make_return),
+         Some(&mut S::If {
+             condition: _,
+             ref mut accept,
+             ref mut reject,
+         }) => {
+-            ensure_block_returns(accept);
+-            ensure_block_returns(reject);
++            ensure_block_returns_with(accept, make_return);
++            ensure_block_returns_with(reject, make_return);
+         }
+         Some(&mut S::Switch {
+             selector: _,
+@@ -24,7 +34,7 @@
+         }) => {
+             for case in cases.iter_mut() {
+                 if !case.fall_through {
+-                    ensure_block_returns(&mut case.body);
++                    ensure_block_returns_with(&mut case.body, make_return);
+                 }
+             }
+         }
+@@ -47,6 +57,140 @@
+             | S::CooperativeStore { .. }
+             | S::RayPipelineFunction(_)),
+         )
+-        | None => block.push(S::Return { value: None }, Default::default()),
++        | None => block.push(make_return(), Default::default()),
+     }
+ }
++
++bitflags::bitflags! {
++    /// A statement behavior: the set of ways in which execution can leave a statement.
++    ///
++    /// See [WGSL §9.7 "Statements Behavior Analysis"](https://www.w3.org/TR/WGSL/#behaviors).
++    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
++    pub(crate) struct Behavior: u8 {
++        /// Execution falls through to the next statement.
++        const NEXT = 1 << 0;
++        /// Execution leaves through `break` (or `break if`) to the enclosing loop or switch.
++        const BREAK = 1 << 1;
++        /// Execution leaves through `continue` to the enclosing loop.
++        const CONTINUE = 1 << 2;
++        /// Execution leaves the function through `return`.
++        const RETURN = 1 << 3;
++    }
++}
++
++/// Compute the behavior of `block` according to the rules of
++/// [WGSL §9.7](https://www.w3.org/TR/WGSL/#behaviors), applied to Naga IR.
++///
++/// Returns `None` when the rules give some statement (reachable or not) an empty
++/// behavior, or give a `continuing` block a behavior containing `Continue` or `Return`:
++/// such programs are invalid under §9.7, so callers must not draw conclusions from them.
++///
++/// The WGSL front end lowers every construct that §9.7 desugars into an IR construct
++/// with the same behavior: `for` and `while` become a [`Loop`] whose body starts with
++/// an [`If`] containing [`Break`], `break if` becomes [`Loop::break_if`], a clause
++/// with several selectors becomes [`fall_through`] cases with empty bodies, and
++/// `discard` becomes [`Kill`], which has behavior {Next} as in §9.7. Statements that
++/// do not affect control flow, and calls (whose callee behavior is {Next} in every
++/// valid module), have behavior {Next}.
++///
++/// The result is sound for reachability: if `Next` is not in the behavior, execution
++/// can never fall through the end of `block`.
++///
++/// [`Loop`]: crate::Statement::Loop
++/// [`Loop::break_if`]: crate::Statement::Loop
++/// [`If`]: crate::Statement::If
++/// [`Break`]: crate::Statement::Break
++/// [`Kill`]: crate::Statement::Kill
++/// [`fall_through`]: crate::SwitchCase::fall_through
++pub(crate) fn block_behavior(block: &crate::Block) -> Option<Behavior> {
++    // `s1 s2`: (B1 \ {Next}) ∪ B2 when Next ∈ B1, else B1. Every statement must have a
++    // non-empty behavior even when it is statically unreachable, so all are analyzed.
++    let mut behavior = Behavior::NEXT;
++    for statement in block.iter() {
++        let b = statement_behavior(statement)?;
++        if behavior.contains(Behavior::NEXT) {
++            behavior = (behavior - Behavior::NEXT) | b;
++        }
++    }
++    Some(behavior)
++}
++
++fn statement_behavior(statement: &crate::Statement) -> Option<Behavior> {
++    use crate::Statement as S;
++    let behavior = match *statement {
++        S::Block(ref block) => block_behavior(block)?,
++        // A missing `else` is an empty block, whose behavior is {Next}.
++        S::If {
++            condition: _,
++            ref accept,
++            ref reject,
++        } => block_behavior(accept)? | block_behavior(reject)?,
++        S::Switch {
++            selector: _,
++            ref cases,
++        } => {
++            let mut all = Behavior::empty();
++            for case in cases {
++                let b = block_behavior(&case.body)?;
++                // A fall-through case is one selector of a multi-selector clause: it
++                // continues into the next case, whose behavior is counted there.
++                all |= if case.fall_through {
++                    b - Behavior::NEXT
++                } else {
++                    b
++                };
++            }
++            if all.contains(Behavior::BREAK) {
++                (all | Behavior::NEXT) - Behavior::BREAK
++            } else {
++                all
++            }
++        }
++        S::Loop {
++            ref body,
++            ref continuing,
++            break_if,
++        } => {
++            let b1 = block_behavior(body)?;
++            let mut b2 = block_behavior(continuing)?;
++            // `break if e;` ends the continuing block and has behavior {Break, Next}.
++            if break_if.is_some() && b2.contains(Behavior::NEXT) {
++                b2 |= Behavior::BREAK;
++            }
++            if b2.intersects(Behavior::CONTINUE | Behavior::RETURN) {
++                return None;
++            }
++            if b1 == Behavior::RETURN {
++                Behavior::RETURN
++            } else if (b1 | b2).contains(Behavior::BREAK) {
++                (b1 | b2 | Behavior::NEXT) - (Behavior::BREAK | Behavior::CONTINUE)
++            } else {
++                (b1 | b2) - (Behavior::CONTINUE | Behavior::NEXT)
++            }
++        }
++        S::Break => Behavior::BREAK,
++        S::Continue => Behavior::CONTINUE,
++        S::Return { .. } => Behavior::RETURN,
++        S::Kill
++        | S::Emit(_)
++        | S::Store { .. }
++        | S::ImageStore { .. }
++        | S::Call { .. }
++        | S::RayQuery { .. }
++        | S::Atomic { .. }
++        | S::ImageAtomic { .. }
++        | S::WorkGroupUniformLoad { .. }
++        | S::SubgroupBallot { .. }
++        | S::SubgroupCollectiveOperation { .. }
++        | S::SubgroupGather { .. }
++        | S::ControlBarrier(_)
++        | S::MemoryBarrier(_)
++        | S::CooperativeStore { .. }
++        | S::RayPipelineFunction(_) => Behavior::NEXT,
++    };
++    if behavior.is_empty() {
++        None
++    } else {
++        Some(behavior)
++    }
++}
+--- a/src/proc/mod.rs
++++ b/src/proc/mod.rs
+@@ -23,6 +23,7 @@
+ pub use namer::{EntryPointIndex, ExternalTextureNameKey, NameKey, Namer};
+ pub use overloads::{Conclusion, MissingSpecialType, OverloadSet, Rule};
+ pub use terminator::ensure_block_returns;
++pub(crate) use terminator::{block_behavior, ensure_block_returns_with, Behavior};
+ use thiserror::Error;
+ pub use type_methods::{
+     concrete_int_scalars, min_max_float_representable_by, vector_size_str, vector_sizes,
+--- a/src/front/wgsl/lower/mod.rs
++++ b/src/front/wgsl/lower/mod.rs
+@@ -1623,7 +1623,35 @@
+             global_expression_kind_tracker: ctx.global_expression_kind_tracker,
+         };
+         let mut body = self.block(&f.body, false, &mut stmt_ctx)?;
+-        proc::ensure_block_returns(&mut body);
++        // Naga marks every place where control can fall off the end of the function with a
++        // value-less `return`; the validator rejects such a `return` in a function with a
++        // return type ("missing return"). Placing it is purely structural, so a function
++        // whose end is unreachable only because of WGSL §9.7 behavior analysis (e.g. it ends
++        // in a `loop` that is left only through `return`) would be rejected although it is
++        // valid. When the body's behavior is exactly {Return}, as §9.7 requires of a
++        // function with a return type, every such place is unreachable: give it a
++        // `return` of the zero value instead, which is never executed but keeps every
++        // path of the IR ending in a typed `return` (back ends that bound loops, such as
++        // MSL, can leave a loop that WGSL never leaves). Any other body gets exactly the
++        // statements it got before, so modules that validated before are unchanged.
++        match function.result {
++            Some(ir::FunctionResult { ty, .. })
++                if proc::block_behavior(&body) == Some(proc::Behavior::RETURN) =>
++            {
++                let mut zero = None;
++                proc::ensure_block_returns_with(&mut body, &mut || {
++                    let value = *zero.get_or_insert_with(|| {
++                        let handle = function
++                            .expressions
++                            .append(ir::Expression::ZeroValue(ty), Span::default());
++                        local_expression_kind_tracker.insert(handle, proc::ExpressionKind::Const);
++                        handle
++                    });
++                    ir::Statement::Return { value: Some(value) }
++                });
++            }
++            _ => proc::ensure_block_returns(&mut body),
++        }
+ 
+         function.body = body;
+         function.named_expressions = named_expressions
+--- a/src/front/wgsl/tests.rs
++++ b/src/front/wgsl/tests.rs
+@@ -1113,3 +1113,268 @@
+         );
+     }
+ }
++
++/// WGSL §9.7 behavior analysis decides whether the end of a function with a return type
++/// is reachable ("missing return"). <https://github.com/gfx-rs/wgpu/issues/9501>
++mod behavior_analysis {
++    use alloc::{format, string::String};
++
++    use super::parse_str;
++    use crate::valid::{Capabilities, ValidationFlags, Validator};
++    use crate::{Expression, Statement};
++
++    fn validate(source: &str) -> Result<crate::Module, String> {
++        let module = parse_str(source).map_err(|e| e.emit_to_string(source))?;
++        Validator::new(ValidationFlags::all(), Capabilities::default())
++            .validate(&module)
++            .map_err(|e| format!("{:?}", e.into_inner()))?;
++        Ok(module)
++    }
++
++    #[track_caller]
++    fn valid(source: &str) -> crate::Module {
++        match validate(source) {
++            Ok(module) => module,
++            Err(e) => panic!("expected a valid module, got {e}\n{source}"),
++        }
++    }
++
++    /// The function still ends where control can fall off its end: the validator rejects
++    /// the value-less `return` that marks it, exactly as before.
++    #[track_caller]
++    fn missing_return(source: &str) {
++        match validate(source) {
++            Ok(_) => panic!("expected a missing-return error\n{source}"),
++            Err(e) => assert!(
++                e.contains("InvalidReturnType") && e.contains("expression: None"),
++                "unexpected error {e}\n{source}"
++            ),
++        }
++    }
++
++    const PRELUDE: &str = "@group(0) @binding(0) var<storage, read_write> buf: array<u32, 4>;\n";
++
++    fn with_prelude(body: &str) -> String {
++        format!("{PRELUDE}{body}")
++    }
++
++    #[test]
++    fn loop_left_only_through_return() {
++        // The repro from gfx-rs/wgpu#9501.
++        valid(
++            "fn f(n: u32) -> u32 {
++                var i = 0u;
++                loop {
++                    if i >= n { return i; }
++                    i = i + 1u;
++                }
++            }",
++        );
++        // `continue`, nested `if`s and an atomic retry loop, as in open-addressing hash
++        // table inserts.
++        valid(&with_prelude(
++            "var<workgroup> tbl: array<atomic<u32>, 64>;
++            fn insert(key: u32) -> vec3u {
++                var i = 0u;
++                loop {
++                    if i >= 64u { return vec3u(0xffffffffu, 0u, 0u); }
++                    let k = atomicLoad(&tbl[i]);
++                    if k == key { return vec3u(i, 0u, 0u); }
++                    if k == 0u {
++                        let r = atomicCompareExchangeWeak(&tbl[i], 0u, key);
++                        if r.exchanged { return vec3u(i, 1u, 0u); }
++                        if r.old_value == key { return vec3u(i, 0u, 0u); }
++                        if r.old_value == 0u { continue; }
++                    }
++                    i += 1u;
++                }
++            }",
++        ));
++        valid("fn f(c: bool) -> i32 { for (;;) { if c { return 1; } } }");
++        valid("fn f(c: bool) -> i32 { for (var i = 0; ; i++) { if c { return i; } } }");
++        // The body always returns, so the continuing block (and its `break if`) is never reached.
++        valid("fn f() -> i32 { loop { return 1; continuing { break if true; } } }");
++    }
++
++    #[test]
++    fn break_of_an_inner_construct_does_not_leave_the_loop() {
++        valid(
++            "fn f(x: u32) -> u32 {
++                loop {
++                    switch x { case 0u: { break; } default: { return 1u; } }
++                }
++            }",
++        );
++        valid(
++            "fn f(x: u32) -> u32 {
++                loop {
++                    loop { if x > 2u { break; } return 2u; }
++                    if x == 7u { return 1u; }
++                }
++            }",
++        );
++    }
++
++    #[test]
++    fn unreachable_end_in_nested_tails() {
++        valid(
++            "fn f(c: bool) -> f32 {
++                if c { loop { if c { return 1.0; } } } else { return 2.0; }
++            }",
++        );
++        valid(
++            "fn f(x: i32) -> i32 {
++                switch x {
++                    case 0, 1: { loop { if x == 0 { return 3; } } }
++                    default: { return 2; }
++                }
++            }",
++        );
++        valid("fn f(c: bool) -> i32 { { if c { return 1; } loop { return 2; } } }");
++    }
++
++    #[test]
++    fn statically_unreachable_code_after_return() {
++        // The examples of WGSL §9.7.3.
++        valid("fn simple() -> i32 { var a: i32; return 0; a = 1; return 2; }");
++        valid("fn simple() -> i32 { var a: i32; return 0; a = 1; }");
++        valid("fn nested() -> i32 { var a: i32; { a = 2; return 1; } a = 1; }");
++        valid("fn f(c: bool) -> i32 { loop { if c { return 1; } } var a = 0; a = 1; }");
++    }
++
++    #[test]
++    fn reachable_end_is_still_a_missing_return() {
++        missing_return("fn f() -> u32 { }");
++        missing_return("fn f(c: bool) -> u32 { if c { return 1u; } }");
++        // The loop has a `break`.
++        missing_return("fn f(c: bool) -> u32 { loop { if c { break; } return 1u; } }");
++        missing_return("fn f(c: bool) -> u32 { loop { if c { return 1u; } if !c { break; } } }");
++        // `while` and `for` with a condition leave the loop when it is false.
++        missing_return("fn f(c: bool) -> u32 { while c { return 1u; } }");
++        missing_return("fn f(n: u32) -> u32 { for (var i = 0u; i < n; i++) { return i; } }");
++        // `break if` leaves the loop when the body can reach the continuing block.
++        missing_return(
++            "fn f(c: bool) -> u32 { loop { if c { return 1u; } continuing { break if !c; } } }",
++        );
++        // Only one branch ends in a loop that never completes.
++        missing_return("fn f(c: bool) -> u32 { if c { loop { return 1u; } } }");
++        missing_return(
++            "fn f(c: bool) -> u32 { if c { loop { return 1u; } } else { var a = 0; a = 1; } }",
++        );
++    }
++
++    #[test]
++    fn loops_with_empty_behavior_are_not_trusted() {
++        // §9.7 gives these loops an empty behavior, which makes the module invalid; they
++        // must not count as proof that the end of the function is unreachable.
++        missing_return("fn f() -> u32 { loop { } }");
++        missing_return("fn f() -> u32 { loop { continue; } }");
++        missing_return("fn f() -> f32 { loop { discard; } }");
++        missing_return("fn f(x: u32) -> u32 { loop { switch x { default: { break; } } } }");
++        missing_return("fn f(c: bool) -> u32 { if c { loop { } } loop { return 1u; } }");
++        missing_return("fn f(c: bool) -> u32 { for (;;) { } }");
++    }
++
++    #[test]
++    fn behaviors_follow_the_specification_table() {
++        use crate::proc::{block_behavior, Behavior as B};
++        let cases: &[(&str, Option<B>)] = &[
++            ("{ }", Some(B::NEXT)),
++            ("{ return; }", Some(B::RETURN)),
++            ("{ return; buf[0] = 1u; }", Some(B::RETURN)),
++            ("if c { return; }", Some(B::NEXT | B::RETURN)),
++            ("if c { return; } else { return; }", Some(B::RETURN)),
++            ("loop { if c { break; } }", Some(B::NEXT)),
++            ("loop { if c { return; } }", Some(B::RETURN)),
++            (
++                "loop { if c { return; } if !c { continue; } }",
++                Some(B::RETURN),
++            ),
++            (
++                "loop { if c { return; } continuing { break if c; } }",
++                Some(B::NEXT | B::RETURN),
++            ),
++            (
++                "loop { return; continuing { break if true; } }",
++                Some(B::RETURN),
++            ),
++            ("loop { loop { break; } return; }", Some(B::RETURN)),
++            ("while c { return; }", Some(B::NEXT | B::RETURN)),
++            ("for (;;) { return; }", Some(B::RETURN)),
++            (
++                "switch x { case 0: { return; } default: { break; } }",
++                Some(B::NEXT | B::RETURN),
++            ),
++            (
++                "switch x { case 0, 1: { return; } default: { return; } }",
++                Some(B::RETURN),
++            ),
++            (
++                "loop { switch x { default: { break; } } if c { return; } }",
++                Some(B::RETURN),
++            ),
++            ("discard;", Some(B::NEXT)),
++            ("loop { }", None),
++            ("loop { continue; }", None),
++            ("{ return; loop { } }", None),
++        ];
++        for &(construct, expected) in cases {
++            let source = alloc::format!("{PRELUDE}fn f(c: bool, x: i32) {{ {construct} return; }}");
++            let module = parse_str(&source).unwrap();
++            let (_, f) = module.functions.iter().next().unwrap();
++            let first = crate::Block::from_vec(alloc::vec![f.body[0].clone()]);
++            assert_eq!(block_behavior(&first), expected, "{construct}");
++        }
++    }
++
++    #[test]
++    fn void_functions_and_previously_valid_functions_are_unchanged() {
++        // A void function always gets the value-less return, as before.
++        let module = valid("fn f(c: bool) { loop { if c { return; } } }");
++        let (_, f) = module.functions.iter().next().unwrap();
++        assert!(matches!(
++            f.body.last(),
++            Some(&Statement::Return { value: None })
++        ));
++        assert!(!f
++            .expressions
++            .iter()
++            .any(|(_, e)| matches!(*e, Expression::ZeroValue(_))));
++        // A function that already validated gets nothing appended.
++        let module = valid("fn f(c: bool) -> u32 { if c { return 1u; } else { return 2u; } }");
++        let (_, f) = module.functions.iter().next().unwrap();
++        assert!(matches!(f.body.last(), Some(&Statement::If { .. })));
++        assert!(!f
++            .expressions
++            .iter()
++            .any(|(_, e)| matches!(*e, Expression::ZeroValue(_))));
++    }
++
++    #[test]
++    fn unreachable_end_gets_a_typed_return() {
++        let module = valid("fn f(c: bool) -> vec2u { loop { if c { return vec2u(1u); } } }");
++        let (_, f) = module.functions.iter().next().unwrap();
++        let ty = f.result.as_ref().unwrap().ty;
++        let mut statements = f.body.iter().rev();
++        match statements.next() {
++            Some(&Statement::Return { value: Some(v) }) => {
++                assert!(matches!(f.expressions[v], Expression::ZeroValue(t) if t == ty));
++            }
++            other => panic!("expected a zero-value return, got {other:?}"),
++        }
++        assert!(matches!(statements.next(), Some(&Statement::Loop { .. })));
++        // One shared expression, however many tails need it.
++        let module = valid(
++            "fn f(c: bool) -> i32 {
++                if c { loop { if c { return 1; } } } else { loop { return 2; } }
++            }",
++        );
++        let (_, f) = module.functions.iter().next().unwrap();
++        let zeros = f
++            .expressions
++            .iter()
++            .filter(|&(_, e)| matches!(*e, Expression::ZeroValue(_)))
++            .count();
++        assert_eq!(zeros, 1);
++    }
++}

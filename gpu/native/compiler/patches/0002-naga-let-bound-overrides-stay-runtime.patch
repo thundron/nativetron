@@ -1,0 +1,135 @@
+naga 29.0.3: expressions that refer to a let stay runtime after override substitution (gfx-rs/wgpu#9002)
+
+--- a/src/proc/constant_evaluator.rs
++++ b/src/proc/constant_evaluator.rs
+@@ -1094,6 +1094,15 @@
+         }
+     }
+ 
++    /// Treat `value`, and so every expression that uses it, as a runtime
++    /// expression from now on, whatever its form.
++    ///
++    /// See [`ExpressionKindTracker::force_non_const`].
++    #[cfg(any(hlsl_out, msl_out, spv_out, glsl_out))]
++    pub(crate) fn force_non_const(&mut self, value: Handle<Expression>) {
++        self.expression_kind_tracker.force_non_const(value);
++    }
++
+     /// Try to evaluate `expr` at compile time.
+     ///
+     /// The `expr` argument can be any sort of Naga [`Expression`] you like. If
+--- a/src/back/pipeline_constants.rs
++++ b/src/back/pipeline_constants.rs
+@@ -425,6 +425,18 @@
+     let mut local_expression_kind_tracker = crate::proc::ExpressionKindTracker::new();
+ 
+     let mut expressions = mem::take(&mut function.expressions);
++
++    // In WGSL, an expression that refers to a `let` declaration is a runtime
++    // expression even when the `let`'s initializer is a const- or
++    // override-expression (WGSL §8.1, §8.16): evaluating it here would turn its
++    // runtime behavior (say, an out-of-bounds index in code that never runs)
++    // into a pipeline-creation error. The WGSL front end keeps every `let` out of
++    // constant evaluation with `force_non_const` and records it in
++    // `named_expressions` (which otherwise holds only function arguments and
++    // phony assignments, which are runtime expressions or have no users). Do
++    // the same here; the `let` initializers themselves are still evaluated.
++    // <https://github.com/gfx-rs/wgpu/issues/9002>
++    let named: HashSet<Handle<Expression>> = function.named_expressions.keys().copied().collect();
+ 
+     // Dummy `emitter` and `block` for the constant evaluator.
+     // We can ignore the concept of emitting expressions here since
+@@ -452,6 +464,9 @@
+         }
+         adjust_expr(&adjusted_local_expressions, &mut expr);
+         let h = evaluator.try_eval_and_append(expr, span)?;
++        if named.contains(&old_h) {
++            evaluator.force_non_const(h);
++        }
+         adjusted_local_expressions.insert(old_h, h);
+     }
+ 
+@@ -1188,4 +1203,83 @@
+         map_value_to_literal(f64::MAX, Scalar::F64),
+         Ok(Literal::F64(f64::MAX))
+     );
++}
++
++/// Expressions that refer to a `let` are runtime expressions, also after
++/// override substitution. <https://github.com/gfx-rs/wgpu/issues/9002>
++#[cfg(all(test, feature = "wgsl-in"))]
++mod let_bound_overrides {
++    use alloc::{format, string::String};
++
++    use super::{process_overrides, PipelineConstantError};
++    use crate::{
++        back::PipelineConstants,
++        proc::ConstantEvaluatorError,
++        valid::{Capabilities, ValidationFlags, Validator},
++        Expression,
++    };
++
++    const PRELUDE: &str = "
++        const A = array<u32, 2>(10u, 20u);
++        @id(0) override O: u32 = 0u;
++        @group(0) @binding(0) var<storage, read_write> out: array<u32>;
++    ";
++
++    fn pipeline(body: &str, value: f64) -> Result<crate::Module, PipelineConstantError> {
++        let source = format!("{PRELUDE}\n@compute @workgroup_size(1) fn main() {{ {body} }}");
++        let module = crate::front::wgsl::parse_str(&source).unwrap();
++        let info = Validator::new(ValidationFlags::all(), Capabilities::default())
++            .validate(&module)
++            .unwrap();
++        let mut constants = PipelineConstants::default();
++        constants.insert(String::from("0"), value);
++        process_overrides(&module, &info, None, &constants).map(|(m, _)| m.into_owned())
++    }
++
++    fn entry_has_runtime_access(module: &crate::Module) -> bool {
++        module.entry_points[0]
++            .function
++            .expressions
++            .iter()
++            .any(|(_, e)| matches!(*e, Expression::Access { .. }))
++    }
++
++    #[test]
++    fn out_of_bounds_index_through_a_let_is_a_runtime_access() {
++        // `c + 1u` refers to a `let`, so it is a runtime expression: the access
++        // is guarded and never runs, and must not fail pipeline creation.
++        let body = "let c = O; if c + 1u < 2u { out[0] = A[c + 1u]; }";
++        let module = pipeline(body, 1.0).unwrap();
++        assert!(entry_has_runtime_access(&module));
++        pipeline(body, 0.0).unwrap();
++        // Also through a chain of `let`s.
++        pipeline(
++            "let c = O; let d = c * 2u; if d < 2u { out[0] = A[d]; }",
++            1.0,
++        )
++        .unwrap();
++    }
++
++    #[test]
++    fn division_by_zero_through_a_let_is_a_runtime_division() {
++        pipeline("let d = O; out[0] = 10u / d;", 0.0).unwrap();
++    }
++
++    #[test]
++    fn override_expressions_are_still_evaluated() {
++        // No `let`: these are override-expressions, evaluated (and rejected)
++        // at pipeline creation.
++        assert_eq!(
++            pipeline("if O + 1u < 2u { out[0] = A[O + 1u]; }", 1.0).unwrap_err(),
++            PipelineConstantError::ConstantEvaluatorError(
++                ConstantEvaluatorError::InvalidAccessIndex
++            )
++        );
++        assert!(pipeline("out[0] = 10u / O;", 0.0).is_err());
++        // A `let` initializer is an override-expression too.
++        assert!(pipeline("let d = 10u / O; out[0] = d;", 0.0).is_err());
++        // In-bounds override-expressions are folded as before.
++        let module = pipeline("out[0] = A[O];", 1.0).unwrap();
++        assert!(!entry_has_runtime_access(&module));
++    }
+ }

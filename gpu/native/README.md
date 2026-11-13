@@ -23,6 +23,11 @@ Windows x64 archives (recorded, not downloaded). `fetch-deps.sh` downloads once,
 renames atomically; later runs (and `--offline`) re-verify the cached files and print the prefix. Nothing is installed
 globally.
 
+**Patched variant.** The official prebuilt's Naga rejects valid WGSL that house-planner uses. It fails on two defects,
+gfx-rs/wgpu#9501 and #9002. `compiler/` rebuilds the same commit from source with two Naga patches, pinned in
+`compiler/wgpu-native-patched.lock`. `fetch-deps.sh --variant patched` and `build.sh --wgpu patched` select it, and so
+does `NTGPU_WGPU_VARIANT=patched`. The official prebuilt stays the default. See `compiler/README.md`.
+
 ## Build and test
 
 ```sh
@@ -32,6 +37,8 @@ gpu/native/build.sh --link dynamic        # → …/macos-arm64-dynamic/ (absolu
 gpu/native/build.sh --sanitize address    # ASan+UBSan; --sanitize thread for TSan
 node gpu/native/probe.test.mjs            # builds, then checks everything below on the real adapter
 NTGPU_LINK=dynamic node gpu/native/probe.test.mjs
+gpu/native/build.sh --wgpu patched        # against the patched build → …/macos-arm64-static-naga-wgsl-compat.1/
+node gpu/native/compiler/compiler.test.mjs   # official vs patched WGSL front end (compiler/README.md)
 ```
 
 Build outputs never land in the worktree (`$NTGPU_BUILD_DIR` overrides the directory). Compile line: `clang++
@@ -169,8 +176,8 @@ when requested. `timestamp-query` is available.
 
 ## Missing
 
-- (Done since: the executor and its native conformance run, see [EXECUTOR.md](EXECUTOR.md).)
-- House-planner shader fixtures (the shader lane supplies them; the CLI accepts them as they are).
+- The executor and its native conformance run are implemented; see [EXECUTOR.md](EXECUTOR.md).
+- House-planner shader fixtures are not vendored. `compiler/corpus/corpus.mjs` replays the shader lane's captured corpus from `/tmp`.
 - Presentation under a transparent WKWebView, display-link pacing, `frameMode`, resize/DPR and occlusion; the surface
   probe uses a window-less layer.
 - Third-party notices for the statically linked Rust crates; runtime `dlopen` loading; any platform other than macOS
