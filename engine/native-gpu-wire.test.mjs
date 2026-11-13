@@ -59,7 +59,7 @@ function fakeNative({ holdPosts = false } = {}) {
   return { fetch, posts, held, polls, submissions, frames, answer };
 }
 
-function harness(engine = 3, native = fakeNative(), options = {}) {
+function harness(engine = 3, native = fakeNative(), options = {}, hostOptions = {}) {
   const memory = new ArrayBuffer(16 << 20);
   const events = [], failures = [], frames = [];
   const wire = createNativeGpuWire({ endpoint: "app://local/__ntgpu/", session: SESSION, engine, fetch: native.fetch, ...options });
@@ -68,7 +68,8 @@ function harness(engine = 3, native = fakeNative(), options = {}) {
     transport: wire.connect({ receive: (m) => host.receive(m), resume: () => host.resume(), fail: (e) => failures.push(e) }),
     getMemory: () => memory, engineGeneration: engine, chunkHeaderBytes: WIRE_CHUNK_RESERVE, chunkBytes: 1 << 20,
     createScheduler: (mode) => wire.createScheduler(mode),
-    onEvent: (event) => events.push(event), onFailure: (error) => failures.push(error), onFrame: (time) => frames.push(time),
+    onEvent: (event) => events.push(event), onFailure: (error) => failures.push(error), onFrame: (time) => { frames.push(time); hostOptions.onFrame?.(time); },
+    ...hostOptions.options,
   });
   const view = (at, length, seed) => { const v = new Uint8Array(memory, at, length); for (let i = 0; i < length; i++) v[i] = (i * 7 + seed) & 255; return v; };
   const apply = (commands, uploads = 0, seed = 1) => host.apply(view(0, commands, seed), view(4 << 20, uploads, seed + 1), new Uint8Array(memory, 15 << 20, 64));
@@ -80,7 +81,8 @@ test("header layout mirrors hosts/macos/NativeGPUWire.swift", () => {
   assert.match(swift, new RegExp(`magic: UInt32 = 0x${WIRE_MAGIC.toString(16).replace(/(....)$/, "_$1")}`, "i"));
   assert.match(swift, new RegExp(`headerBytes = ${WIRE_HEADER_BYTES}\\b`));
   for (const [name, value] of Object.entries({ open: WIRE.OPEN, submit: WIRE.SUBMIT, chunk: WIRE.CHUNK, frameMode: WIRE.FRAME_MODE, tickRequest: WIRE.TICK_REQUEST,
-    tickCancel: WIRE.TICK_CANCEL, close: WIRE.CLOSE, ack: WIRE.ACK, event: WIRE.EVENT, readback: WIRE.READBACK, frameRequest: WIRE.FRAME_REQUEST, failed: WIRE.FAILED, tick: WIRE.TICK })) {
+    tickCancel: WIRE.TICK_CANCEL, close: WIRE.CLOSE, frameEnd: WIRE.FRAME_END, ack: WIRE.ACK, event: WIRE.EVENT, readback: WIRE.READBACK, frameRequest: WIRE.FRAME_REQUEST,
+    failed: WIRE.FAILED, tick: WIRE.TICK, frameDone: WIRE.FRAME_DONE })) {
     assert.match(swift, new RegExp(`\\b${name} = ${value}\\b`), name);
   }
   const frame = encodeWireFrame(WIRE.SUBMIT, { engine: 9, sequence: 4, a: 1, b: 2, c: 3, payload: new Uint8Array([1, 2, 3]) });
@@ -163,6 +165,38 @@ test("downstream long-poll delivers acks, events, chunked readbacks and frame ti
   await tick(); await tick();
   assert.equal(frames.length, 1);
   assert.equal(failures.length, 0);
+});
+
+test("a multi-flush frame ends with FRAME_END after its last chunk; its credit returns only on FRAME_DONE", async () => {
+  let t;
+  t = harness(9, fakeNative(), {}, { options: { maxFramesInFlight: 1 }, onFrame: () => { t.apply(64, 16, 1); t.apply(32, 0, 2); } });
+  const { native, host, frames, failures } = t;
+  await tick();
+  native.answer(encodeWireFrame(WIRE.FRAME_REQUEST, { engine: 9, a: 0 }));
+  await tick(); await tick();
+  const request = () => native.frames.filter((f) => f.kind === WIRE.TICK_REQUEST).at(-1);
+  native.answer(encodeWireFrame(WIRE.TICK, { engine: 9, a: request().a }));
+  await tick(); await tick(); await tick();
+  assert.equal(frames.length, 1);
+  const kinds = native.frames.map((f) => f.kind).filter((k) => k !== WIRE.TICK_REQUEST && k !== WIRE.OPEN);
+  assert.deepEqual(kinds, [WIRE.SUBMIT, WIRE.CHUNK, WIRE.CHUNK, WIRE.SUBMIT, WIRE.CHUNK, WIRE.FRAME_END], "one frame end, after the frame's last flush");
+  const end = native.frames.find((f) => f.kind === WIRE.FRAME_END);
+  assert.deepEqual([end.a, end.sequence], [1, 2]);
+  // Both flushes consumed (CPU copies released) but the GPU is still busy: the next frame waits.
+  native.answer(encodeWireFrame(WIRE.ACK, { engine: 9, sequence: 2 }), encodeWireFrame(WIRE.FRAME_REQUEST, { engine: 9, a: 0 }));
+  await tick(); await tick();
+  assert.equal(host.queue.submissions, 0);
+  assert.equal(host.queue.framesInFlight, 1);
+  native.answer(encodeWireFrame(WIRE.TICK, { engine: 9, a: request().a }));
+  await tick(); await tick();
+  assert.equal(frames.length, 1, "deferred while the frame's GPU work is outstanding");
+  const ticksBefore = native.frames.filter((f) => f.kind === WIRE.TICK_REQUEST).length;
+  native.answer(encodeWireFrame(WIRE.FRAME_DONE, { engine: 9, a: 1, b: 0 }));
+  await tick(); await tick();
+  assert.equal(host.queue.framesInFlight, 0);
+  assert.equal(host.stats.framesCompleted, 1);
+  assert.equal(native.frames.filter((f) => f.kind === WIRE.TICK_REQUEST).length, ticksBefore + 1, "the credit re-requests the deferred frame");
+  assert.deepEqual(failures, []);
 });
 
 test("an empty poll answer or a refused poll fails the generation; close aborts the poll and posts CLOSE", async () => {

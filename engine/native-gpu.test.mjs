@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
-  createNativeGpuHost, nativeGpuChunks, NativeGpuError,
+  createNativeGpuHost, nativeGpuChunks, NativeGpuError, NATIVE_GPU_MAX_FRAMES_IN_FLIGHT,
   NATIVE_GPU_MAX_COMMAND_BYTES, NATIVE_GPU_MAX_UPLOAD_BYTES, NATIVE_GPU_MAX_READBACK_BYTES,
 } from "./native-gpu.js";
 
@@ -35,7 +35,9 @@ function fixture(overrides = {}) {
   const submissions = () => sent.map((entry) => entry.message).filter((message) => message.kind === "submit");
   const chunks = (sequence) => sent.map((entry) => entry.message).filter((message) => message.kind === "chunk" && message.sequence === sequence);
   const ack = (sequence) => host.receive({ type: "ack", engine: ENGINE, sequence });
-  return { memory, host, transport, sent, closed, events, failures, frames, scheduled, schedulers, timers, fireFrame, arenas, submissions, chunks, ack };
+  const frameDone = (frame, status = 0) => host.receive({ type: "frame-done", engine: ENGINE, frame, status });
+  const frameEnds = () => sent.map((entry) => entry.message).filter((message) => message.kind === "frame-end");
+  return { memory, host, transport, sent, closed, events, failures, frames, scheduled, schedulers, timers, fireFrame, arenas, submissions, chunks, ack, frameDone, frameEnds };
 }
 
 test("limits mirror gpu/ops.json and cannot be narrowed below one maximal guest flush", () => {
@@ -49,6 +51,10 @@ test("limits mirror gpu/ops.json and cannot be narrowed below one maximal guest 
   assert.throws(() => createNativeGpuHost({ ...base, maxReadbackBytes: 1 << 20 }), /readback arena/);
   assert.throws(() => createNativeGpuHost({ ...base, engineGeneration: 0 }), /engineGeneration/);
   assert.throws(() => createNativeGpuHost({ ...base, transport: {} }), /transport.send/);
+  // Frame credits cannot exceed what the executor can fence (NTGPU_EXECUTOR_MAX_FENCES).
+  assert.equal(NATIVE_GPU_MAX_FRAMES_IN_FLIGHT, 16);
+  assert.throws(() => createNativeGpuHost({ ...base, maxFramesInFlight: 17 }), /maxFramesInFlight must be in 1\.\.16/);
+  assert.ok(createNativeGpuHost({ ...base, maxFramesInFlight: 16 }));
   assert.ok(createNativeGpuHost({ ...base, maxQueuedBytes: 1 << 30 }));
 });
 
@@ -153,7 +159,7 @@ test("queue exhaustion is an explicit fatal failure, never a silent drop", async
   assert.equal(f.host.receive({ type: "ack", engine: ENGINE, sequence: 1 }), false);
 });
 
-test("frame credits gate frame callbacks; several flushes inside one frame share one credit", async () => {
+test("frame credits follow GPU completion: several flushes share one credit that acks do not return", async () => {
   const f = fixture({
     options: { maxFramesInFlight: 1 },
     onFrame: (_time, host) => { const a = f.arenas(16); host.apply(a.batch, a.uploads, a.readbacks); host.apply(a.batch, a.uploads, a.readbacks); },
@@ -164,17 +170,97 @@ test("frame credits gate frame callbacks; several flushes inside one frame share
   f.fireFrame(16);
   assert.deepEqual(f.frames, [16]);
   assert.equal(f.host.queue.framesInFlight, 1); assert.equal(f.host.queue.submissions, 2);
+  await tick();
+  // One frame end, after the frame's last flush, naming the frame and its last submission.
+  assert.deepEqual(f.sent.map(({ message }) => message.kind), ["open", "submit", "chunk", "submit", "chunk", "frame-end"]);
+  assert.deepEqual({ ...f.frameEnds()[0] }, { engine: ENGINE, kind: "frame-end", frame: 1, through: 2 });
   f.host.receive({ type: "frame-request", engine: ENGINE, device: 0 });
   f.fireFrame(32);
-  assert.deepEqual(f.frames, [16], "frame deferred while its predecessor is unacknowledged");
+  assert.deepEqual(f.frames, [16], "frame deferred while its predecessor is outstanding");
   assert.equal(f.host.idle, false); assert.equal(f.host.stats.frameDeferrals, 1);
-  await tick();
   f.ack(1);
-  assert.equal(f.scheduled.size, 0, "a partially consumed frame keeps its credit");
   f.ack(2);
+  // Fast CPU ack: both copies are released, but the GPU has not finished the frame, so the credit is held.
+  assert.deepEqual([f.host.queue.submissions, f.host.queue.bytes, f.host.queue.framesInFlight], [0, 0, 1]);
+  assert.equal(f.scheduled.size, 0, "a consumed but GPU-pending frame keeps its credit");
+  assert.equal(f.timers.size, 1, "the liveness timer stays armed while the frame awaits GPU completion");
+  assert.equal(f.frameDone(1), true);
+  assert.equal(f.host.queue.framesInFlight, 0);
   assert.equal(f.scheduled.size, 1, "the credit returns and the frame is paced on the next scheduler tick");
+  assert.equal(f.timers.size, 0, "no timer once nothing is outstanding");
   f.fireFrame(48);
   assert.deepEqual(f.frames, [16, 48]);
+  assert.equal(f.frameDone(1), false, "a duplicate completion is stale");
+  assert.deepEqual([f.host.stats.framesEnded, f.host.stats.framesCompleted, f.host.stats.staleRejected], [2, 1, 1]);
+  assert.equal(f.host.failure, null);
+});
+
+test("GPU completion can trail acknowledgement by several frames; credits bound the frames in flight", async () => {
+  const f = fixture({ options: { maxFramesInFlight: 2 }, onFrame: (_time, host) => { const a = f.arenas(16); host.apply(a.batch, a.uploads, a.readbacks); } });
+  const frame = (time) => { f.host.requestFrame(); f.fireFrame(time); };
+  frame(1); frame(2);
+  await tick();
+  f.ack(2);
+  f.host.requestFrame(); f.fireFrame(3);
+  assert.deepEqual(f.frames, [1, 2], "two frames on the GPU: the third waits although every flush was acknowledged");
+  assert.equal(f.frameDone(1, 1), true, "a lost frame returns its credit too");
+  assert.equal(f.scheduled.size, 1);
+  f.fireFrame(4);
+  assert.deepEqual(f.frames, [1, 2, 4]);
+  // Frames complete in order but the host only needs each one once.
+  await tick();
+  f.ack(3);
+  assert.equal(f.frameDone(2), true); assert.equal(f.frameDone(3), true);
+  assert.deepEqual([f.host.stats.framesCompleted, f.host.stats.framesLost, f.host.queue.framesInFlight], [2, 1, 0]);
+  // A frame callback that submitted nothing holds no credit and sends no frame end.
+  const idle = fixture();
+  idle.host.requestFrame(); idle.fireFrame(5);
+  await tick();
+  assert.deepEqual([idle.frameEnds().length, idle.host.queue.framesInFlight], [0, 0]);
+});
+
+test("frame completions are validated: before the frame ended or was acknowledged, for a future frame, malformed", async () => {
+  const early = fixture({ onFrame: (_time, host) => { const a = early.arenas(16); host.apply(a.batch, a.uploads, a.readbacks); } });
+  early.host.requestFrame(); early.fireFrame();
+  early.frameDone(1);
+  assert.match(early.host.failure?.message ?? "", /precedes its end or acknowledgement/);
+  const future = fixture();
+  assert.equal(future.frameDone(9), false);
+  assert.equal(future.host.failure.code, "protocol-violation");
+  const malformed = fixture();
+  assert.equal(malformed.host.receive({ type: "frame-done", engine: ENGINE, frame: 1, status: 7 }), false);
+  assert.equal(malformed.host.failure.code, "protocol-violation");
+  const other = fixture();
+  assert.equal(other.host.receive({ type: "frame-done", engine: ENGINE + 1, frame: 1, status: 0 }), false, "another engine generation");
+  assert.equal(other.host.failure, null);
+});
+
+test("a frame whose GPU completion never arrives fails the generation after the timeout; dispose and loss keep credits exact", async () => {
+  const f = fixture({ options: { ackTimeoutMs: 500 }, onFrame: (_time, host) => { const a = f.arenas(16); host.apply(a.batch, a.uploads, a.readbacks); } });
+  f.host.requestFrame(); f.fireFrame();
+  await tick();
+  f.ack(1);
+  const [timer] = [...f.timers.values()];
+  assert.equal(timer.ms, 500);
+  timer.fn();
+  assert.equal(f.host.failure.code, "frame-timeout");
+  assert.match(f.host.failure.message, /frame 1/);
+  assert.deepEqual(f.host.queue, { submissions: 0, bytes: 0, chunks: 0, unsent: 0, framesInFlight: 0, sentThrough: 1, ackedThrough: 1 });
+  // Device loss does not return a credit by itself: the executor completes the frame (as lost) exactly once.
+  const g = fixture({ onFrame: (_time, host) => { const a = g.arenas(16); host.apply(a.batch, a.uploads, a.readbacks); } });
+  g.host.requestFrame(); g.fireFrame();
+  await tick();
+  g.ack(1);
+  g.host.receive({ type: "event", engine: ENGINE, device: 0, event: { type: 5, requestId: 0, handle: 0, status: 1, reason: "unknown", message: "lost" } });
+  assert.equal(g.host.queue.framesInFlight, 1);
+  assert.equal(g.frameDone(1, 1), true, "completion is not stamped with the (now stale) device epoch");
+  assert.equal(g.host.queue.framesInFlight, 0);
+  // Dispose drops credits and later completions.
+  const h = fixture({ onFrame: (_time, host) => { const a = h.arenas(16); host.apply(a.batch, a.uploads, a.readbacks); } });
+  h.host.requestFrame(); h.fireFrame();
+  h.host.dispose();
+  assert.equal(h.host.queue.framesInFlight, 0);
+  assert.equal(h.frameDone(1), false);
 });
 
 test("submissions outside frame callbacks are bounded only by the hard queue limits", () => {

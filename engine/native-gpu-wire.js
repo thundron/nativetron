@@ -16,7 +16,9 @@ export const WIRE_MAX_DOWN_FRAME = WIRE_HEADER_BYTES + 8 + 4 * 1048576; // readb
 export const WIRE_MAX_PENDING_CONTROL = 65536;
 export const WIRE = Object.freeze({
   OPEN: 1, SUBMIT: 2, CHUNK: 3, FRAME_MODE: 4, TICK_REQUEST: 5, TICK_CANCEL: 6, CLOSE: 7,
+  FRAME_END: 8, // a = frame, sequence = its last submission: fence the GPU work of that frame
   ACK: 16, EVENT: 17, READBACK: 18, FRAME_REQUEST: 19, FAILED: 20, TICK: 21,
+  FRAME_DONE: 22, // a = frame, b = status (0 done, 1 lost, 2 cancelled): the GPU finished the frame's work
 });
 export const WIRE_FLAG_LAST = 1; // CHUNK: final chunk of the submission
 export const WIRE_FLAG_THROUGHPUT = 1; // OPEN: initial frame mode
@@ -100,7 +102,7 @@ export function createNativeGpuWire(options) {
   const stats = {
     bodies: 0, bodyBytes: 0, zeroCopyChunks: 0, copiedChunks: 0, transportCopiedBytes: 0, controlFrames: 0,
     peakInflight: 0, postMs: 0, postMaxMs: 0, polls: 0, pollBytes: 0, pollMaxBytes: 0, framesIn: 0,
-    acks: 0, ackMs: 0, ackMaxMs: 0, readbackBytes: 0, readbackCopiedBytes: 0, events: 0, ticks: 0, tickMs: 0, tickMaxMs: 0, staleFrames: 0,
+    acks: 0, ackMs: 0, ackMaxMs: 0, readbackBytes: 0, readbackCopiedBytes: 0, events: 0, ticks: 0, tickMs: 0, tickMaxMs: 0, staleFrames: 0, framesDone: 0,
   };
   const fail = (message, cause) => {
     if (closed) return;
@@ -152,6 +154,7 @@ export function createNativeGpuWire(options) {
         return queueControl(encodeWireFrame(WIRE.SUBMIT, { engine, sequence: message.sequence, a: message.commandBytes, b: message.uploadBytes, c: message.readbackBytes, payload }));
       }
       case "frame-mode": return queueControl(encodeWireFrame(WIRE.FRAME_MODE, { engine, a: MODES[message.mode] ?? 0 }));
+      case "frame-end": return queueControl(encodeWireFrame(WIRE.FRAME_END, { engine, sequence: message.through, a: message.frame }));
       case "chunk": {
         if (inflight >= maxInflight) return false;
         const { bytes } = message;
@@ -212,6 +215,7 @@ export function createNativeGpuWire(options) {
         break;
       }
       case WIRE.FRAME_REQUEST: receive({ type: "frame-request", engine, device: header.a }); break;
+      case WIRE.FRAME_DONE: stats.framesDone++; receive({ type: "frame-done", engine, frame: header.a, status: header.b }); break;
       case WIRE.FAILED: receive({ type: "failed", engine, message: decoder.decode(payload) }); break;
       case WIRE.TICK: {
         const requested = tickRequested.get(header.a);

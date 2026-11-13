@@ -63,6 +63,7 @@ export class Driver {
     this.child = child;
     this.events = [];   // every event, in delivery order
     this.frames = 0;
+    this.fences = []; // host fence completions { fence: token, status, at }, in delivery order
     this.lines = [];
     this.waiters = [];
     this.closed = false;
@@ -73,6 +74,7 @@ export class Driver {
         if (value.bytes !== undefined) Object.defineProperty(event, "payload", { value: { bytes: value.bytes, hash: value.hash, data: value.data ? Buffer.from(value.data, "base64") : null }, enumerable: false });
         this.events.push(event);
       } else if (value.frame) this.frames++;
+      else if (value.fence !== undefined) this.fences.push({ ...value, at: this.events.length }); // `at`: events delivered before it
       else if (this.waiters.length) this.waiters.shift()(value);
       else this.lines.push(value);
     });
@@ -96,6 +98,7 @@ export class Driver {
   }
   wait(ms = 10000) { return this.command(`wait ${ms}`); }
   process() { return this.command("process"); }
+  fence(token) { return this.command(`fence ${token}`); }
   resize(width, height, dpr) { return this.command(`resize ${width} ${height} ${dpr}`); }
   capture() { return this.command("capture"); }
   lose() { return this.command("lose"); }

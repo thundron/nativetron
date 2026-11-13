@@ -18,6 +18,7 @@
 #include <condition_variable>
 #include <cstdio>
 #include <cstring>
+#include <deque>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -756,6 +757,17 @@ struct NativeOp {
   uint64_t serial = 0;
   WGPUBuffer buffer = nullptr;  // owned reference (maps)
   bool capture = false;
+  uint64_t fence = 0;  // host fence id (ntgpu_executor_fence), 0 otherwise
+};
+
+// A host completion fence (ntgpu_executor_fence). Resolved fences are delivered from the front, in request order.
+struct HostFence {
+  uint64_t id = 0;
+  uint64_t token = 0;
+  NtGpuExecutorFenceFn done = nullptr;
+  void *user = nullptr;
+  uint64_t native = 0;  // natives token while the queue's work-done callback is awaited
+  int status = -1;      // NTGPU_EXECUTOR_FENCE_* once resolved
 };
 
 constexpr uint32_t kKnownFeatureBits = (1u << (sizeof(ng::kFeatures) / sizeof(ng::kFeatures[0]))) - 1u;
@@ -791,10 +803,10 @@ FeatureSet features_of(const NtGpuCapabilities &caps) {
 // ---------------------------------------------------------------------------------------------------------------
 
 struct NtGpuExecutor {
-  // Held by the waiter during its blocking native poll, and around every call that changes buffer map state or the
-  // device (map, unmap, mapped ranges, buffer release, device request/release). wgpu-core's poll-side mapping races
-  // with a concurrent unmap/map of the same buffer ("Buffer is already mapped"), so these never overlap a poll.
-  // The cost: such a call waits while the waiter blocks for already-submitted GPU work.
+  // Held by the waiter during its (non-blocking) native poll, and around every call that changes buffer map state
+  // or the device (map, unmap, mapped ranges, buffer release, device request/release). wgpu-core's poll-side mapping
+  // races with a concurrent unmap/map of the same buffer ("Buffer is already mapped"), so these never overlap a poll.
+  // The waiter never waits for the GPU while holding it (see wait_loop): such a call waits at most one short poll.
   std::mutex poll_mutex;
   NtGpuExecutorOptions options{};
   NtGpuContext *ctx = nullptr;
@@ -815,6 +827,10 @@ struct NtGpuExecutor {
   std::vector<std::pair<uint32_t, uint64_t>> deferred;
   std::unordered_map<uint64_t, NativeOp> natives;
   uint64_t next_token = 0;
+
+  // host fences: at most NTGPU_EXECUTOR_MAX_FENCES, owner thread only
+  std::deque<HostFence> fences;
+  uint64_t fence_ids = 0;
 
   // batch
   const uint8_t *uploads = nullptr;
@@ -846,7 +862,7 @@ struct NtGpuExecutor {
   uint32_t capture_w = 0, capture_h = 0, capture_row = 0;
   bool capture_bgra = false;
 
-  // waiter: blocks in the native poll only while native completions are awaited
+  // waiter: polls natively (never blocking on the GPU) only while native completions or host fences are awaited
   std::mutex wait_mutex;
   std::condition_variable wait_cv;
   bool wait_stop = false;
@@ -910,12 +926,18 @@ struct NtGpuExecutor {
     if (delta > 0 && !waiter.joinable()) waiter = std::thread([this] { wait_loop(); });
   }
 
+  // The waiter never blocks inside the native poll: wgpu-core's blocking poll holds the device fence lock for the
+  // whole GPU wait and wgpuQueueSubmit takes that lock exclusively, so a blocking poll would stall the owner's next
+  // submission until the GPU finished everything submitted so far (no CPU/GPU pipelining while a frame fence, a
+  // map or a work-done request is awaited). It polls without waiting instead, every 250 us backing off to at most
+  // 2 ms while nothing completes, and only while something is awaited (no idle polling).
   void wait_loop() {
+    using std::chrono::microseconds;
     std::unique_lock<std::mutex> lock(wait_mutex);
-    std::chrono::milliseconds backoff(0);
+    microseconds backoff(0);
     while (!wait_stop) {
       if (awaiting == 0) {
-        backoff = std::chrono::milliseconds(0);
+        backoff = microseconds(0);
         wait_cv.wait(lock);
         continue;
       }
@@ -926,17 +948,17 @@ struct NtGpuExecutor {
         std::lock_guard<std::mutex> poll(poll_mutex);
         if (ntgpu_device(ctx)) {
           polls.fetch_add(1);
-          ntgpu_process(ctx, 1);
+          ntgpu_process(ctx, 0);
         }
         queued = ntgpu_queued_events(ctx);
       }
       lock.lock();
       if (queued > 0) {
         // The owner drains through process(); wait for it instead of polling again.
-        backoff = std::chrono::milliseconds(0);
+        backoff = microseconds(0);
         wait_cv.wait(lock, [&] { return wait_stop || version != seen; });
       } else {
-        backoff = std::min(std::chrono::milliseconds(64), backoff.count() ? backoff * 2 : std::chrono::milliseconds(1));
+        backoff = std::min(microseconds(2000), backoff.count() ? backoff * 2 : microseconds(250));
         wait_cv.wait_for(lock, backoff, [&] { return wait_stop || version != seen; });
       }
     }
@@ -950,7 +972,8 @@ struct NtGpuExecutor {
     explicit CallScope(NtGpuExecutor *s) : self(s) { self->in_call.store(true); }
     ~CallScope() {
       self->in_call.store(false);
-      if (!self->stopped && self->ctx && ntgpu_queued_events(self->ctx) > 0 && self->options.wake) {
+      if (!self->stopped && self->ctx && (ntgpu_queued_events(self->ctx) > 0 || self->fences_ready()) &&
+          self->options.wake) {
         self->options.wake(self->options.user);
       }
     }
@@ -1056,8 +1079,44 @@ struct NtGpuExecutor {
   }
 
   void release_native_device() {
+    // Defensive: fences awaiting this device's queue can no longer be observed (lose_device normally resolved them).
+    resolve_unresolved_fences(NTGPU_EXECUTOR_FENCE_LOST);
     std::lock_guard<std::mutex> poll(poll_mutex);
     if (ntgpu_device(ctx)) ntgpu_device_release(ctx);
+  }
+
+  // -------------------------------------------------------------------------------------------------------------
+  // host fences
+
+  bool fences_ready() const { return !fences.empty() && fences.front().status >= 0; }
+  void resolve_fence(HostFence &fence, int status) {
+    if (fence.status >= 0) return;
+    fence.status = status;
+    if (fence.native) {
+      natives.erase(fence.native);  // a later native completion for it is ignored
+      fence.native = 0;
+      await_native(-1);
+    }
+  }
+  void resolve_fence_id(uint64_t id, int status) {
+    for (HostFence &fence : fences) {
+      if (fence.id == id) {
+        resolve_fence(fence, status);
+        return;
+      }
+    }
+  }
+  void resolve_unresolved_fences(int status) {
+    for (HostFence &fence : fences) resolve_fence(fence, status);
+  }
+  // Owner thread, from process(): resolved fences in request order. A fence resolved out of order (never expected:
+  // queue work-done callbacks fire in submission order) waits for its predecessors.
+  void deliver_fences() {
+    while (!stopped && fences_ready()) {
+      const HostFence fence = fences.front();
+      fences.pop_front();
+      fence.done(fence.user, fence.token, fence.status);
+    }
   }
 
   void lose_device(const char *reason, const std::string &message) {
@@ -1072,6 +1131,8 @@ struct NtGpuExecutor {
         settle(item.first, item.second, record->type, S_LOST, Json().str("message", "GPU device lost"));
       }
     }
+    // Host fences of the lost device never complete on the GPU: resolved LOST (delivered by process()).
+    resolve_unresolved_fences(NTGPU_EXECUTOR_FENCE_LOST);
     handles.lose();
     release_surface_state();
     emit(E_DEVICE_LOST, 0, 0, S_ERROR, Json().str("reason", reason).str("message", message));
@@ -1126,6 +1187,13 @@ struct NtGpuExecutor {
         wgpuBufferRelease(buffer);
       }
     } release{this, op.buffer};
+    if (op.fence) {
+      if (event.status != NTGPU_OK && device && event.generation == device_generation && !ntgpu_device_alive(ctx)) {
+        lose_device("unknown", "GPU device lost");
+      }
+      resolve_fence_id(op.fence, event.status == NTGPU_OK ? NTGPU_EXECUTOR_FENCE_DONE : NTGPU_EXECUTOR_FENCE_LOST);
+      return;
+    }
     if (op.capture) {
       capture_done = true;
       capture_ok = event.status == NTGPU_OK && finish_capture(op.buffer);
@@ -2945,6 +3013,12 @@ void dispose(NtGpuExecutor *x) {
   }
   x->wait_cv.notify_all();
   if (x->waiter.joinable()) x->waiter.join();
+  // Exactly once, on the owner thread: unresolved host fences complete CANCELLED, resolved ones keep their status.
+  while (!x->fences.empty()) {
+    const HostFence fence = x->fences.front();
+    x->fences.pop_front();
+    fence.done(fence.user, fence.token, fence.status >= 0 ? fence.status : NTGPU_EXECUTOR_FENCE_CANCELLED);
+  }
   x->stopped = true;
   x->pending.clear();
   x->deferred.clear();
@@ -3034,11 +3108,43 @@ void ntgpu_executor_process(NtGpuExecutor *executor) {
     }
   }
   x.drain();
+  x.deliver_fences();
 }
 
 size_t ntgpu_executor_pending(const NtGpuExecutor *executor) {
   if (!executor || executor->stopped) return 0;
-  return executor->pending.size() + (executor->ctx ? ntgpu_queued_events(executor->ctx) : 0);
+  return executor->pending.size() + executor->fences.size() +
+         (executor->ctx ? ntgpu_queued_events(executor->ctx) : 0);
+}
+
+int ntgpu_executor_fence(NtGpuExecutor *executor, uint64_t token, NtGpuExecutorFenceFn done, void *user) {
+  if (!executor || executor->stopped || !done || !executor->ctx) return 0;
+  NtGpuExecutor &x = *executor;
+  if (x.fences.size() >= NTGPU_EXECUTOR_MAX_FENCES) return 0;
+  NtGpuExecutor::CallScope scope(&x);  // wakes the owner when the fence is already resolved
+  HostFence fence;
+  fence.id = ++x.fence_ids;
+  fence.token = token;
+  fence.done = done;
+  fence.user = user;
+  if (!x.device || !ntgpu_device(x.ctx)) {
+    // No device: nothing can be queued on the GPU (a lost device's fences were resolved by the loss).
+    fence.status = NTGPU_EXECUTOR_FENCE_DONE;
+    x.fences.push_back(fence);
+    return 1;
+  }
+  NativeOp op;
+  op.fence = fence.id;
+  fence.native = x.start_native(op);
+  x.fences.push_back(fence);
+  x.await_native(1);
+  const NtGpuStatus status = ntgpu_work_done(x.ctx, x.fences.back().native);
+  if (status != NTGPU_OK) {
+    // Refused synchronously (normally the facade saw the device die; its loss event is drained by process()):
+    // the completion can never be observed.
+    x.resolve_fence(x.fences.back(), NTGPU_EXECUTOR_FENCE_LOST);
+  }
+  return 1;
 }
 
 void ntgpu_executor_resize(NtGpuExecutor *executor, uint32_t width, uint32_t height, double pixel_ratio) {

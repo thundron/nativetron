@@ -7,6 +7,7 @@
 //   claim <commandBytes> <uploadClaim> <readbackClaim>       submit with arena sizes claimed but not backed (limits)
 //   wait <timeoutMs>      process() whenever woken until pending()==0 (no polling here: blocks on the wake signal)
 //   process | resize <w> <h> <dpr> | capture | lose | stats | sleep <ms> | quit
+//   fence <token>         ntgpu_executor_fence; its completion is written as {"fence":token,"status":s}
 // Options: --width W --height H --dpr R (headless canvas size), --metal-layer (lease a window-less CAMetalLayer).
 // stdout: {"event":{...},"bytes":N,"hash":"fnv1a32","data":"base64 (<=64 KiB)"} lines, {"frame":1} lines, then one
 // result line per command ({"submit":rc,...}, {"wait":"idle"|"timeout",...}, ...).
@@ -79,6 +80,10 @@ void on_frame(void *user) {
   auto *e = static_cast<Embedding *>(user);
   ++e->frames;
   e->queue.push_back("{\"frame\":1}");
+}
+void on_fence(void *user, uint64_t token, int status) {
+  auto *e = static_cast<Embedding *>(user);
+  e->queue.push_back("{\"fence\":" + std::to_string(token) + ",\"status\":" + std::to_string(status) + "}");
 }
 void on_wake(void *user) {
   auto *e = static_cast<Embedding *>(user);
@@ -183,6 +188,12 @@ int main(int argc, char **argv) {
       }
       flush(embedding, std::string("{\"wait\":\"") + (idle ? "idle" : "timeout") + "\",\"pending\":" +
                            std::to_string(ntgpu_executor_pending(executor)) + ",\"wakes\":" + std::to_string(seen) + "}");
+    } else if (command == "fence") {
+      uint64_t token = 0;
+      in >> token;
+      const int rc = ntgpu_executor_fence(executor, token, on_fence, &embedding);
+      flush(embedding, "{\"fenced\":" + std::to_string(rc) + ",\"pending\":" +
+                           std::to_string(ntgpu_executor_pending(executor)) + "}");
     } else if (command == "process") {
       ntgpu_executor_process(executor);
       flush(embedding, "{\"process\":1,\"pending\":" + std::to_string(ntgpu_executor_pending(executor)) + "}");

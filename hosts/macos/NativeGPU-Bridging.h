@@ -21,6 +21,7 @@ size_t nt_recorder_executor_pending(const NtGpuExecutor *executor);
 void nt_recorder_executor_resize(NtGpuExecutor *executor, uint32_t width, uint32_t height, double pixel_ratio);
 int nt_recorder_executor_capture_rgba(NtGpuExecutor *executor, uint8_t *rgba, size_t capacity,
                                       uint32_t *width, uint32_t *height);
+int nt_recorder_executor_fence(NtGpuExecutor *executor, uint64_t token, NtGpuExecutorFenceFn done, void *user);
 #ifdef __cplusplus
 }
 #endif

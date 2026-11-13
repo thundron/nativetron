@@ -58,8 +58,14 @@ MacSchemeRouter (WKURLSchemeHandler, app://) ─ NativeGPUBridge ┴────
   borrowed) followed by their MAP_READY event; DEVICE_LOST bumps the device epoch stamped on later frames.
 - **Frames**: executor `frame_requested` → `FRAME_REQUEST` → the JS host's scheduler sends `TICK_REQUEST` → the
   surface display link (presentation) or a one-shot main-queue turn (headless: ~16.7 ms in `display`, next turn in
-  `throughput`) answers with `TICK`. Nothing is armed without a request. JS frame credits (acks) gate frames; the
-  surface credit is returned on the next turn.
+  `throughput`) answers with `TICK`. Nothing is armed without a request. JS frame credits gate frames and follow
+  GPU completion: after a frame export that submitted work, `FRAME_END` (frame, last sequence) reaches the engine
+  queue behind the frame's last flush and becomes `ntgpu_executor_fence`; the executor completes it from
+  `process()` once the GPU finished every flush of that frame (`LOST` on device loss, `CANCELLED` on destroy), and
+  the bridge answers `FRAME_DONE`, which returns the credit. Acks still release the Worker's copies right after
+  consumption. At most `NTGPU_EXECUTOR_MAX_FENCES` (16) frames await the GPU per generation (refused beyond: the
+  generation fails). The surface scheduler's tick credit only paces ticks and is returned on the next turn: the
+  GPU-completion bound is the JS credit (`maxFramesInFlight`, default 2).
 - **Resize**: the bridge is the single RESIZE source (page geometry headless, surface plan with presentation; every
   new generation first gets the current size, like `gpu/host.js`). Executor RESIZE events are dropped and counted
   (`executorResizeFiltered`).
@@ -122,14 +128,28 @@ No public macOS API made the web view transparent. Therefore:
 
 - JS (`wire.stats`): `bodies`, `bodyBytes`, `zeroCopyChunks`, `copiedChunks`, `transportCopiedBytes` (control frames
   only), `peakInflight`, `postMs/postMaxMs`, `polls`, `pollBytes`, `acks`, `ackMs/ackMaxMs` (SUBMIT queued → ACK),
-  `readbackBytes`, `readbackCopiedBytes`, `ticks`, `tickMs/tickMaxMs`; core `stats.copiedBytes` (Wasm → owned).
+  `readbackBytes`, `readbackCopiedBytes`, `ticks`, `tickMs/tickMaxMs`, `framesDone`; core `stats.copiedBytes` (Wasm → owned),
+  `framesEnded/framesCompleted/framesLost`, `frameDeferrals`.
 - Native (`GET /__ntgpu/stats`, self-test output): `bodies`, `bodyBytes`, `maxBodyBytes`, `bodyQueueMs/MaxMs`,
   `submissions`, `submitMs/submitMaxMs`, `commandBytes`, `uploadBytes`, `zeroCopySections`, `reassemblyCopies/Bytes`,
-  `acks`, `downBytes/downWrites/downMaxWrite`, `polls`, `readbacks/readbackBytes/readbackCopyBytes`, `events`,
+  `acks`, `frameFences`, `framesCompleted/framesLost`, `framesAwaitingGPUMax`, `downBytes/downWrites/downMaxWrite`, `polls`, `readbacks/readbackBytes/readbackCopyBytes`, `events`,
   `ticks/tickMs`, `executorCreateMs`, `executorResizeFiltered`, `deviceLost`, `engineFailures`, `leaseWaitTimeouts`.
 - Copies per upload byte: 1 (Wasm → owned, JS) + WebKit's request-body handling (not observable here) + 0 or 1
   native (0 for a single-chunk section). Per readback byte: 1 native (borrowed callback data) + WebKit's response
   handling + 1 JS (poll answer → owned) + the guest's `readback` export copy.
+
+## Frame credit hardening (GPU completion)
+
+- `--native-gpu-selftest=wire`: a frame of two flushes whose recorded GPU work is held (`HOLD` until `RELS`)
+  keeps its credit after both flushes were acknowledged; the next frame is deferred until `FRAME_DONE`; native
+  counters show one fence completed after its work. `--native-gpu-selftest=e2e` (linked executor, real wgpu-native):
+  the demo's frames are fenced and complete (`frameFences` = `framesCompleted` = 2, at most 1 awaiting).
+- `gpu/native/executor.test.mjs`: a fence after a long GPU job plus a second flush stays pending while a later
+  submit is accepted (no stall behind a GPU wait), completes after the last flush's work-done, with the job's
+  results final; ordering, the 16-fence bound, `DONE` without a device, `LOST` exactly once on loss, `CANCELLED`
+  on destroy, no idle polls (also under ASan and TSan).
+- `--native-gpu-selftest=composition` fails identically on the unmodified baseline in this environment (window
+  pixel samples are empty), so it is not evidence either way here.
 
 ## Self-test evidence (this lane)
 
@@ -155,6 +175,4 @@ No public macOS API made the web view transparent. Therefore:
   self-tests after merging the executor lane.
 - Presentation fallback (`.presentation(_, fallback:)`) is logged only; switching an executing generation back to
   WebGPU is not implemented. Transparent composition needs private SPI on macOS (see above).
-- Frame credit uses JS acknowledgement (executor consumption), not GPU completion; the executor C API has no
-  per-frame completion callback.
 - No packaging/signing, no GPU timings (deferred until other agents finish).

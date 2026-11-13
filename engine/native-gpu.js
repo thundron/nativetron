@@ -16,6 +16,9 @@ export const NATIVE_GPU_MAX_READBACK_BYTES = 16777216;
 export const NATIVE_GPU_DEFAULT_CHUNK_BYTES = 4 * 1048576;
 export const NATIVE_GPU_DEFAULT_SUBMISSIONS = 8;
 export const NATIVE_GPU_DEFAULT_FRAMES_IN_FLIGHT = 2;
+// Frames awaiting GPU completion are fenced natively (ntgpu_executor_fence: NTGPU_EXECUTOR_MAX_FENCES); a host
+// cannot hold more credits than the executor can fence.
+export const NATIVE_GPU_MAX_FRAMES_IN_FLIGHT = 16;
 export const NATIVE_GPU_DEFAULT_ACK_TIMEOUT_MS = 30000;
 const MAX_SUBMISSION_BYTES = NATIVE_GPU_MAX_COMMAND_BYTES + NATIVE_GPU_MAX_UPLOAD_BYTES;
 const FRAME_MODES = new Set(["display", "throughput"]);
@@ -63,7 +66,7 @@ export function createNativeGpuHost(options) {
   if (!Number.isSafeInteger(maxQueuedSubmissions) || maxQueuedSubmissions < 1) throw new NativeGpuError("invalid-options", "maxQueuedSubmissions must be positive");
   if (!Number.isSafeInteger(maxQueuedChunks) || maxQueuedChunks < nativeGpuChunks(NATIVE_GPU_MAX_COMMAND_BYTES, NATIVE_GPU_MAX_UPLOAD_BYTES, chunkBytes)) throw new NativeGpuError("invalid-options", "maxQueuedChunks must admit one maximal flush");
   if (!Number.isSafeInteger(maxReadbackBytes) || maxReadbackBytes < NATIVE_GPU_MAX_READBACK_BYTES) throw new NativeGpuError("invalid-options", "maxReadbackBytes must admit the guest readback arena");
-  if (!Number.isSafeInteger(maxFramesInFlight) || maxFramesInFlight < 1) throw new NativeGpuError("invalid-options", "maxFramesInFlight must be positive");
+  if (!Number.isSafeInteger(maxFramesInFlight) || maxFramesInFlight < 1 || maxFramesInFlight > NATIVE_GPU_MAX_FRAMES_IN_FLIGHT) throw new NativeGpuError("invalid-options", `maxFramesInFlight must be in 1..${NATIVE_GPU_MAX_FRAMES_IN_FLIGHT}`);
   if (!(ackTimeoutMs > 0)) throw new NativeGpuError("invalid-options", "ackTimeoutMs must be positive");
   const setTimer = options.setTimer ?? ((fn, ms) => (scope.setTimeout ?? globalThis.setTimeout)(fn, ms));
   const clearTimer = options.clearTimer ?? ((token) => (scope.clearTimeout ?? globalThis.clearTimeout)(token));
@@ -77,12 +80,15 @@ export function createNativeGpuHost(options) {
   let queuedBytes = 0, queuedChunks = 0, readbackBytes = 0;
   let device = 0, frameToken = null, frameWaiting = false, frameNumber = 0, currentFrame = 0, ackTimer = null;
   const outbox = [];        // messages not yet accepted by transport.send, in wire order
-  const unacked = [];       // { sequence, bytes, chunks, frame } until the executor acknowledges consumption
-  const frames = new Map(); // frame number -> unacknowledged submissions produced by that frame callback
+  const unacked = [];       // { sequence, bytes, chunks } until the executor acknowledges consumption (CPU copies)
+  // Frame credits, separate from the copy bounds above: frame number -> { through, ended } for every frame callback
+  // that submitted work, held until the executor reports the GPU finished all of it (frame-done), not on ack.
+  const frames = new Map();
   const readbacks = new Map(); // requestId -> { offset, length, received, data } while chunks arrive
   const stats = {
     batches: 0, frames: 0, uploadedBytes: 0, copiedBytes: 0, chunksSent: 0, acknowledged: 0,
     staleRejected: 0, frameDeferrals: 0, rejectedBatches: 0, peakQueuedBytes: 0, peakQueuedSubmissions: 0,
+    framesEnded: 0, framesCompleted: 0, framesLost: 0,
   };
 
   const emit = (event) => {
@@ -116,10 +122,17 @@ export function createNativeGpuHost(options) {
     return failure;
   }
 
+  // Liveness: armed only while a submission awaits its ack or an ended frame awaits GPU completion; any progress
+  // re-arms it. No timer while idle.
+  const awaitingFrame = () => { for (const [frame, state] of frames) if (state.ended) return frame; return 0; };
   const armAckTimer = () => {
     if (ackTimer !== null) { clearTimer(ackTimer); ackTimer = null; }
-    if (!unacked.length || stopped) return;
-    ackTimer = setTimer(() => { ackTimer = null; fail("ack-timeout", `native GPU executor did not acknowledge submission ${unacked[0]?.sequence} within ${ackTimeoutMs} ms`); }, ackTimeoutMs);
+    if (stopped || (!unacked.length && !awaitingFrame())) return;
+    ackTimer = setTimer(() => {
+      ackTimer = null;
+      if (unacked.length) fail("ack-timeout", `native GPU executor did not acknowledge submission ${unacked[0]?.sequence} within ${ackTimeoutMs} ms`);
+      else fail("frame-timeout", `native GPU executor did not complete frame ${awaitingFrame()} on the GPU within ${ackTimeoutMs} ms`);
+    }, ackTimeoutMs);
   };
   const schedulePump = () => { if (!pumping && !blocked && !stopped && outbox.length) { pumping = true; queueMicrotask(pump); } };
   function pump() {
@@ -147,8 +160,17 @@ export function createNativeGpuHost(options) {
     frameNumber++; currentFrame = frameNumber; stats.frames++;
     try { options.onFrame?.(time); }
     catch (error) { errorEvent(text(error)); }
-    finally { currentFrame = 0; }
+    finally { currentFrame = 0; endFrame(frameNumber); }
   };
+  // After the frame export returned (every flush of the frame is queued): the executor fences the GPU work
+  // through `through` and answers frame-done when it completed. A frame that submitted nothing holds no credit.
+  function endFrame(frame) {
+    const state = frames.get(frame);
+    if (stopped || !state || state.ended) return;
+    state.ended = true; stats.framesEnded++;
+    control({ kind: "frame-end", frame, through: state.through });
+    if (ackTimer === null) armAckTimer();
+  }
   const requestFrame = () => {
     if (stopped || frameToken !== null || frameWaiting) return;
     try { frameToken = scheduler.request(tick); }
@@ -162,9 +184,24 @@ export function createNativeGpuHost(options) {
     while (unacked.length && unacked[0].sequence <= through) {
       const done = unacked.shift();
       queuedBytes -= done.bytes; queuedChunks -= done.chunks; stats.acknowledged++;
-      if (done.frame) { const left = frames.get(done.frame) - 1; if (left) frames.set(done.frame, left); else frames.delete(done.frame); }
     }
     ackedThrough = through;
+    armAckTimer();
+    if (frameWaiting && canFrame()) { frameWaiting = false; requestFrame(); }
+    return true;
+  };
+  // GPU completion of an ended frame (status 0 done, 1 lost, 2 cancelled): returns its credit. Not stamped with a
+  // device epoch: credits belong to the engine generation and a lost device's frames complete as lost.
+  const frameDone = (frame, status) => {
+    if (!isU32(frame) || frame === 0 || !Number.isInteger(status) || status < 0 || status > 2) { fail("protocol-violation", "malformed native GPU frame completion"); return false; }
+    const state = frames.get(frame);
+    if (!state) {
+      if (frame > frameNumber) { fail("protocol-violation", `native GPU completion of frame ${frame} that never ran`); return false; }
+      stats.staleRejected++; return false;
+    }
+    if (!state.ended || state.through > ackedThrough) { fail("protocol-violation", `native GPU completion of frame ${frame} precedes its end or acknowledgement`); return false; }
+    frames.delete(frame);
+    if (status === 0) stats.framesCompleted++; else stats.framesLost++;
     armAckTimer();
     if (frameWaiting && canFrame()) { frameWaiting = false; requestFrame(); }
     return true;
@@ -263,8 +300,11 @@ export function createNativeGpuHost(options) {
       try { copy(batch, "commands"); copy(uploads, "uploads"); }
       catch (error) { sequence--; throw fail("copy-failed", `native GPU staging copy failed: ${text(error)}`, error); }
       messages[messages.length - 1].last = true;
-      unacked.push({ sequence: seq, bytes, chunks, frame: currentFrame });
-      if (currentFrame) frames.set(currentFrame, (frames.get(currentFrame) ?? 0) + 1);
+      unacked.push({ sequence: seq, bytes, chunks });
+      if (currentFrame) {
+        const state = frames.get(currentFrame);
+        if (state) state.through = seq; else frames.set(currentFrame, { through: seq, ended: false });
+      }
       queuedBytes += bytes; queuedChunks += chunks;
       stats.batches++; stats.uploadedBytes += uploadBytes; stats.copiedBytes += bytes;
       stats.peakQueuedBytes = Math.max(stats.peakQueuedBytes, queuedBytes);
@@ -286,6 +326,7 @@ export function createNativeGpuHost(options) {
           case "event": return currentDevice(message.device) && deliverEvent(message.event);
           case "readback": return currentDevice(message.device) && readbackChunk(message);
           case "frame-request": if (!currentDevice(message.device)) return false; requestFrame(); return true;
+          case "frame-done": return frameDone(message.frame, message.status);
           case "failed": fail("executor-failed", `native GPU executor failed: ${String(message.message ?? "unknown")}`); return false;
           default: fail("protocol-violation", `unknown native GPU message ${String(message.type)}`); return false;
         }
