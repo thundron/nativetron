@@ -21,6 +21,7 @@ Apple pickers also accept `extensions` and Apple-specific UTI identifiers in `ty
 | Page API | Result and behavior |
 |---|---|
 | `capabilities()` | Version, feature availability, PDF output mode and storage bounds. |
+| `powerState()` / `watchPowerState(callback)` | Native power/thermal snapshot and revision-ordered change observation. |
 | `pickDocument(options)` | Up to 16 selected documents, copied into native-owned file leases. |
 | `pickGallery(options)` | System photo/media picker; returns the same file descriptors. |
 | `saveAs({file,name,mime})` | Save/export a leased file through the native document UI. |
@@ -51,7 +52,7 @@ try {
 }
 ```
 
-Committed archives live in native application storage, not WebKit website storage. iOS keeps its nonpersistent website-data policy. Keys must match `[A-Za-z0-9][A-Za-z0-9._-]{0,127}` and cannot contain `..`. Limits are 256 MiB per file, 1 GiB of native archive/staging storage, 128 archive names, 16 staged writes and 32 file leases. Reads/writes use at most 192 KiB per chunk. Readers pin the committed version across atomic replacement. Incomplete writes are aborted on page teardown; abandoned staging files are removed when the exclusive archive store reopens.
+Committed archives live in native application storage, not WebKit website storage. iOS keeps its nonpersistent website-data policy. Keys must match `[A-Za-z0-9][A-Za-z0-9._-]{0,127}` and cannot contain `..`. Limits are 256 MiB per file, 1 GiB of native archive/staging storage, 128 archive names, 16 staged writes and 32 file leases. Reads/writes use at most 192 KiB per chunk. Readers copy the committed version under the store lock and retain that immutable lease across atomic replacement. Hard-link support is not required. Snapshot copies count towards the staging quota and fail explicitly when that quota is full. Incomplete writes are aborted on page teardown; abandoned staging files are removed when the exclusive archive store reopens.
 
 These are application-private archives. User-requested export and system backup/uninstall behavior are separate. The Android reference manifest disables backup; deleting application data or uninstalling the application removes its archive.
 
@@ -61,13 +62,36 @@ Read `capabilities.pdfOutput` before assuming a PDF result is a file descriptor.
 
 | Host | `pdfOutput` | Layout |
 |---|---|---|
-| iOS | `file` | UIKit print formatter, A4 paper with margins. |
+| iOS | `file` | Print-media snapshot normalized from CSS reference pixels (96/in) to PDF points (72/in), clipped into A4 pages with 24-point margins. |
 | macOS | `file` | Asynchronous WebKit PDF capture with `mediaType = "print"`; continuous layout. Printing paginates that snapshot onto paper. |
 | Android | `system-dialog` | Public WebView printing API; choose **Save as PDF** in the system destination UI. The result is a submitted job, not PDF bytes. |
 
 Android's public SDK does not expose constructors for the callbacks needed to drive a WebView print adapter as a headless PDF writer. The host does not use hidden-API reflection or a debug-only DevTools endpoint. Callers needing headless PDF bytes on Android must supply their own supported PDF producer; this service does not claim that capability.
 
-Supplied HTML is bounded and rendered in a separate view with no host bridge, scripts or remote resources. Bundled styles/fonts and data images are allowed. Apple waits for fonts/images before rendering and restores the page's original media override. macOS continuous export does not promise browser paged-media or `break-*` pagination parity. System print dialogs, printer behavior and mobile Photos/share flows still need device-level validation.
+Supplied HTML is bounded and rendered in a separate view with no host bridge, scripts or remote resources. Bundled styles/fonts and data images are allowed. Apple waits for fonts/images before rendering and restores the page's original media override. iOS uses an explicit print-width viewport for supplied HTML, not Retina device pixels or the phone's mobile viewport. Snapshot export does not promise browser paged-media, widow/orphan, or `break-*` pagination parity: iOS clips the continuous layout into A4 pages; macOS returns continuous layout. Physical printing still uses the platform UI. System print dialogs, printer behavior and mobile Photos/share flows still need device-level validation.
+
+## Photos resource types
+
+Private archive/import URLs retain a validated extension where available. Apple gallery export additionally prepares an owned typed URL before passing it to PhotoKit: images use their ImageIO-detected type, and movie resources retain a provider container extension or use the declared concrete MIME type. This covers older extensionless leases too. Temporary media copies are removed on completion/failure; the original lease is not renamed. PhotoKit still controls supported codecs and permissions; preserving an extension does not imply every image/video format can be added to Photos.
+
+## Native power and thermal state
+
+```js
+const observation = host.watchPowerState(state => {
+  // Host facts, application policy. Forward to the engine using STATE,
+  // not a per-frame reliable command or navigator.getBattery().
+  updateEnginePowerBudget(state);
+});
+await observation.ready;
+// On page/component teardown:
+observation.dispose();
+```
+
+`powerState()` returns `{ platform, lowPowerMode, thermalState, nativeThermalState, revision }`. `thermalState` is `nominal`, `fair`, `serious`, `critical` or `unknown`; the native numeric status remains available rather than asserting equivalent thermal thresholds across platforms. `watchPowerState` subscribes before querying the initial snapshot and ignores stale/duplicate revisions, so a late initial response cannot overwrite a newer event. It returns `{ready,dispose}`. Raw consumers can use `onEvent` with `power-state`.
+
+Apple observes ProcessInfo Low Power Mode and thermal notifications, and refreshes on application activation. Android reads PowerManager power saving, observes its change broadcast and thermal status where available, and refreshes on activity resume. Android exposes notification-availability flags when a device does not support listener registration. No browser battery API, polling loop or additional manifest permission is used. Native observers/listeners are removed when the host service is disposed. The host reports facts; it does not silently change rendering quality or scheduling.
+
+Wait for `lane.ready` before forwarding a snapshot through `lane.sendLatest` on an application-owned power topic. Replay the latest power facts after an engine restart along with camera/scene state. Application policy can reduce samples, resolution or work budgets, but should not treat Low Power Mode and thermal pressure as the same condition.
 
 ## Incoming files and associations
 
@@ -92,4 +116,6 @@ Registrations are page-scoped and replaced as a set; navigation/disposal removes
 
 `hosts/apple/` contains the shared Apple service/storage/PDF code. `hosts/macos/build.sh` builds an unsigned WKWebView application using the same offline assets and services as iOS. `HostServices` on Android accepts an `Activity`, a `WebView` and the host's asset-serving callback; it does not require the compiled UI framework. The new client is not yet an adapter for the legacy Windows desktop service surface.
 
-Focused checks include `node --test host/services.test.mjs`, the native archive tests, and the opt-in macOS `--host-selftest` probe. The latter requires a private `NT_HOST_ARCHIVE_ROOT` and tests a real WKWebView archive round-trip, shortcut registration and PDF print CSS without opening pickers or asking for Photos permission. Cross-build success is not execution evidence for mobile permission, picker, sharing, file-association or printer flows.
+Focused checks include `node --test host/services.test.mjs`, `hosts/apple/test.sh`, `hosts/android/test-native.sh`, and the opt-in macOS `--host-selftest` probe. The latter requires a private `NT_HOST_ARCHIVE_ROOT` and tests a real WKWebView archive round-trip, shortcut registration and PDF print CSS without opening pickers or asking for Photos permission. Cross-build success is not execution evidence for mobile permission, picker, sharing, file-association or printer flows.
+
+The opt-in iOS `--nt-service-probe` checks native power snapshot delivery and PDF physical geometry without accessing Photos. On the tested iOS 26.2 simulator (JIT compatibility mode), a 96-CSS-pixel square exports as 72×72 PDF points; native synthetic tests also cover 1x/2x/3x snapshot coordinates and multipage output. Photos typed-resource tests exercise type preservation and cleanup, not permission dialogs or codec acceptance on a physical device.

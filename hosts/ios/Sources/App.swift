@@ -128,6 +128,7 @@ final class HostController: UIViewController, WKNavigationDelegate, WKUIDelegate
 
   weak var observer: HostObserver?
   private let library = ControlLibrary.shared
+  private var serviceProbeStarted = false
   private var web: WKWebView?
   private(set) var hostServices: HostServices?
   private var assets: AssetSchemeHandler?
@@ -313,6 +314,15 @@ final class HostController: UIViewController, WKNavigationDelegate, WKUIDelegate
   func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
     Evidence.emit("NT_IOS_PAGE_LOADED", webView.url?.absoluteString ?? "")
     observer?.hostDidLoadPage(self)
+    if ServiceProbe.enabled && !serviceProbeStarted {
+      serviceProbeStarted = true
+      ServiceProbe.run(webView) { [weak self] ok, text in
+        Evidence.emit(ok ? "NT_IOS_SERVICES_PASS" : "NT_IOS_SERVICES_FAIL", text)
+        self?.dispose()
+        try? FileManager.default.removeItem(at: FileManager.default.temporaryDirectory.appendingPathComponent("nt-service-probe"))
+        exit(ok ? 0 : 1)
+      }
+    }
     webView.evaluateJavaScript("typeof window.__nt_engine_receive === \"function\"") { [weak self] result, _ in
       if result as? Bool == true { self?.markReady() }
     }

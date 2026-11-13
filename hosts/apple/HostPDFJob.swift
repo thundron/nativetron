@@ -8,8 +8,9 @@ import WebKit
   import PDFKit
 #endif
 
-// Uses the platform print formatter/operation, not a screen snapshot. That is
-// important for @media print, pagination and page-break CSS.
+// Export uses explicit print media and bounded PDF geometry. iOS normalizes
+// CSS reference pixels to PDF points instead of inheriting WebKit formatter
+// shrink-to-fit or a phone's display scale. Physical printing remains native.
 final class HostPDFJob: NSObject, WKNavigationDelegate {
   private weak var source: WKWebView?
   private weak var presenter: HostPresenter?
@@ -47,6 +48,11 @@ final class HostPDFJob: NSObject, WKNavigationDelegate {
       }
       let view = WKWebView(
         frame: CGRect(x: 0, y: 0, width: 595.28, height: 841.89), configuration: config)
+      #if os(iOS)
+        // Give supplied HTML a print-width CSS viewport; don't inherit a
+        // phone's 980px mobile layout viewport or its Retina device scale.
+        view.frame.size.width = HostPDFLayout.printable.width / HostPDFLayout.pointsPerCSSPixel
+      #endif
       hidden = view
       view.navigationDelegate = self
       #if os(iOS)
@@ -88,8 +94,13 @@ final class HostPDFJob: NSObject, WKNavigationDelegate {
     let originalMedia = web.mediaType
     web.mediaType = "print"
     restoreMedia = { [weak web] in web?.mediaType = originalMedia }
+    let viewport =
+      hidden === web
+      ? "document.querySelectorAll('meta[name=viewport]').forEach(x=>x.remove());const v=document.createElement('meta');v.name='viewport';v.content='width=device-width, initial-scale=1';document.head.append(v);"
+      : ""
     web.callAsyncJavaScript(
-      "await document.fonts.ready; await Promise.all(Array.from(document.images).map(i => i.complete ? Promise.resolve() : new Promise(r => { i.onload = r; i.onerror = r; }))); return true;",
+      viewport
+        + "await document.fonts.ready; await Promise.all(Array.from(document.images).map(i => i.complete ? Promise.resolve() : new Promise(r => { i.onload = r; i.onerror = r; }))); return true;",
       arguments: [:], in: nil, in: .page
     ) { [weak self] result in
       guard let self, self.completion != nil else { return }
@@ -119,27 +130,49 @@ final class HostPDFJob: NSObject, WKNavigationDelegate {
           }
         }
       } else {
-        let renderer = HostPrintRenderer()
-        renderer.addPrintFormatter(web.viewPrintFormatter(), startingAtPageAt: 0)
-        renderer.prepare(forDrawingPages: NSRange(location: 0, length: 1))
-        let pages = renderer.numberOfPages
-        guard pages > 0, pages <= 4096 else {
-          finish(.failure(hostError("invalid PDF page count", "quota")))
-          return
-        }
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent(
-          UUID().uuidString + ".pdf")
-        do {
-          try UIGraphicsPDFRenderer(bounds: renderer.paperRect).writePDF(to: url) { context in
-            for page in 0..<pages {
-              context.beginPage()
-              renderer.drawPage(at: page, in: renderer.paperRect)
+        web.evaluateJavaScript(
+          "({width:Math.max(document.documentElement.scrollWidth,document.body?.scrollWidth||0),height:Math.max(document.documentElement.scrollHeight,document.body?.scrollHeight||0)})"
+        ) { [weak self] value, error in
+          guard let self, self.completion != nil else { return }
+          if let error {
+            self.finish(.failure(error))
+            return
+          }
+          guard let bounds = value as? [String: Double], let width = bounds["width"],
+            let height = bounds["height"], width.isFinite, height.isFinite, width > 0, height > 0,
+            width <= 16384, height <= 1_000_000
+          else {
+            self.finish(.failure(hostError("PDF dimensions exceed bounds", "quota")))
+            return
+          }
+          let zoom = web.scrollView.zoomScale
+          guard zoom.isFinite, zoom > 0 else {
+            self.finish(.failure(hostError("invalid document zoom")))
+            return
+          }
+          let config = WKPDFConfiguration()
+          config.rect = CGRect(x: 0, y: 0, width: width * zoom, height: height * zoom)
+          web.createPDF(configuration: config) { [weak self] result in
+            guard let self, self.completion != nil else { return }
+            switch result {
+            case .failure(let error): self.finish(.failure(error))
+            case .success(let data):
+              guard data.count <= ArchiveStore.maxFile else {
+                self.finish(.failure(hostError("PDF exceeds size bound", "quota")))
+                return
+              }
+              let url = FileManager.default.temporaryDirectory.appendingPathComponent(
+                "nt-document-" + UUID().uuidString + ".pdf")
+              do {
+                try HostPDFLayout.write(
+                  snapshot: data, cssSize: CGSize(width: width, height: height), to: url)
+                self.finish(.success(url))
+              } catch {
+                try? FileManager.default.removeItem(at: url)
+                self.finish(.failure(error))
+              }
             }
           }
-          finish(.success(url))
-        } catch {
-          try? FileManager.default.removeItem(at: url)
-          finish(.failure(error))
         }
       }
     #else
@@ -234,12 +267,6 @@ final class HostPDFJob: NSObject, WKNavigationDelegate {
     finish(.failure(hostError("document render cancelled", "cancelled")))
   }
 }
-#if os(iOS)
-  private final class HostPrintRenderer: UIPrintPageRenderer {
-    override var paperRect: CGRect { CGRect(x: 0, y: 0, width: 595.28, height: 841.89) }
-    override var printableRect: CGRect { paperRect.insetBy(dx: 24, dy: 24) }
-  }
-#endif
 
 #if os(macOS)
   // Print a finite snapshot, not WKPrintingView's potentially unbounded range.

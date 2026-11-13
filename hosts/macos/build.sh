@@ -27,7 +27,7 @@ cat > "$OUT/Contents/Info.plist" <<'PLIST'
 </dict></plist>
 PLIST
 swiftc -swift-version 5 -O -target "$(uname -m)-apple-macos14.0" \
-  hosts/macos/{Main,SelfTest}.swift hosts/apple/{ArchiveStore,HostServices,HostPDFJob}.swift \
+  hosts/macos/{Main,SelfTest}.swift hosts/apple/{ArchiveStore,HostFileNames,HostMediaResource,HostPowerState,HostPDFLayout,HostServices,HostPDFJob}.swift \
   hosts/ios/Sources/{AssetCatalog,AssetSchemeHandler,BundledAssets.generated,EngineProtocol.generated,Evidence}.swift \
   -o "$OUT/Contents/MacOS/Nativetron"
 printf '%s\n' "$OUT"

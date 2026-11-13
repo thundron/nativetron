@@ -48,6 +48,7 @@ public final class HostServices {
   private final Activity activity;
   private final BiFunction<String, Uri, WebResourceResponse> assets;
   private final WebView web;
+  private final HostPowerState power;
   private final ThreadPoolExecutor io =
       new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(32), r -> {
         Thread t = new Thread(r, "nt-host-io");
@@ -66,6 +67,7 @@ public final class HostServices {
     this.web = web;
     this.assets = assets;
     web.addJavascriptInterface(new Bridge(), "ntHost");
+    power = new HostPowerState(activity, value -> event("power-state", value));
   }
   public final class Bridge {
     @JavascriptInterface
@@ -98,6 +100,7 @@ public final class HostServices {
     io.execute(() -> cleanup(old));
     activity.invalidateOptionsMenu();
   }
+  public void refreshPowerState() { if (!closed) power.refresh(); }
   public void pageFinished() {
     if (closed || !trusted)
       return;
@@ -219,11 +222,13 @@ public final class HostServices {
                       .put("print", true)
                       .put("archive", true)
                       .put("shortcuts", true)
+                      .put("powerState", true)
                       .put("maxFileBytes", HostArchive.MAX_FILE)
                       .put("chunkBytes", HostArchive.CHUNK),
           null);
       return;
     }
+    if (method.equals("power.state")) { done.finish(power.snapshot(), null); return; }
     if (method.equals("files.incoming")) {
       JSONArray result = new JSONArray();
       synchronized (incoming) {
@@ -794,6 +799,7 @@ public final class HostServices {
     if (closed)
       return;
     closed = true;
+    power.dispose();
     if (cancelPDF != null)
       cancelPDF.run();
     if (pickerDone != null) {

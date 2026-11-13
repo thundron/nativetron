@@ -1,6 +1,9 @@
 import Foundation
 
 @main struct ArchiveStoreTests {
+  static func tryURLSuffix(_ store: ArchiveStore, _ token: String) -> String {
+    (try? store.url(token).pathExtension) ?? ""
+  }
   static func main() throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(
       "nt-archive-test-" + UUID().uuidString)
@@ -22,6 +25,13 @@ import Foundation
     _ = try store!.commit(transaction)
     let snapshot = try store!.snapshot("project.ntproject")
     let token = snapshot["file"] as! String
+    let originalInfo = try FileManager.default.attributesOfItem(
+      atPath: root.appendingPathComponent("archives/project.ntproject").path)
+    let snapshotInfo = try FileManager.default.attributesOfItem(atPath: store!.url(token).path)
+    precondition(
+      (originalInfo[.systemFileNumber] as! NSNumber)
+        != (snapshotInfo[.systemFileNumber] as! NSNumber), "snapshot must not require a hard link")
+    precondition(tryURLSuffix(store!, token) == "ntproject")
     let replacement = try store!.begin(key: "project.ntproject", size: 3)
     try store!.write(replacement, offset: 0, data: Data([4, 5, 6]))
     _ = try store!.commit(replacement)
@@ -45,6 +55,16 @@ import Foundation
     let finalList = try store!.list()
     precondition(finalList.isEmpty)
     store = nil
+    let limitedRoot = root.appendingPathComponent("limited")
+    let limited = try ArchiveStore(root: limitedRoot, quota: 6)
+    let write = try limited.begin(key: "project", size: 3)
+    try limited.write(write, offset: 0, data: Data([1, 2, 3]))
+    _ = try limited.commit(write)
+    let lease = try limited.snapshot("project")["file"] as! String
+    rejected { _ = try limited.snapshot("project") }
+    limited.release(lease)
+    let retry = try limited.snapshot("project")["file"] as! String
+    limited.release(retry)
     print(
       "Apple archive: atomic replacement, stable snapshots, persistence, bounds and cleanup passed")
   }

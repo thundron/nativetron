@@ -11,6 +11,9 @@ import WebKit
     const client=window.nativetronHost;
     if (!client) throw Error('host client not installed');
     const capabilities=await client.capabilities();
+    const observed=[];const watch=client.watchPowerState(s=>observed.push(s));
+    const power=await watch.ready;watch.dispose();
+    if(typeof power.lowPowerMode!=='boolean'||!Number.isSafeInteger(power.revision)||observed.length!==1)throw Error('native power snapshot failed');
     const data=new TextEncoder().encode('archive round trip: \\u03bb \\ud83d\\ude80');
     try {
       await client.archive.put(key,data);
@@ -43,7 +46,9 @@ import WebKit
           let text = pdf.string, text.contains("NT_PRINT_SENTINEL"),
           !text.contains("NT_SCREEN_SENTINEL")
         else { throw hostError("PDF did not apply print CSS") }
-        finish(true, "archive round-trip, lease release, shortcuts and print-CSS PDF passed")
+        finish(
+          true,
+          "archive round-trip, lease release, shortcuts, power snapshot and print-CSS PDF passed")
       } catch { finish(false, String(describing: error)) }
     }
   }

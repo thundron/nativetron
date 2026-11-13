@@ -46,3 +46,26 @@ test("host request capacity is bounded and disposal rejects outstanding promises
   await assert.rejects(client.capabilities(), /capacity/); client.dispose();
   assert.ok((await Promise.all(results)).every(value => /disposed/.test(value)));
 });
+
+test("native power watch subscribes before querying and rejects stale/duplicate snapshots", async () => {
+  const sent = [], seen = [];
+  const client = createHostServices({ random: () => "power", send: message => sent.push(message) });
+  const watch = client.watchPowerState(state => seen.push(state));
+  assert.equal(sent[0].method, "power.state");
+  const facts = revision => ({ platform: "ios", lowPowerMode: true, thermalState: "serious", nativeThermalState: 2, revision });
+  client.receive({ ntHost: 1, event: "power-state", value: facts(2) });
+  client.receive({ ntHost: 1, session: "power", id: sent[0].id, ok: true, value: facts(1) });
+  assert.equal((await watch.ready).revision, 2); assert.deepEqual(seen.map(s => s.revision), [2]);
+  client.receive({ ntHost: 1, event: "power-state", value: facts(2) });
+  client.receive({ ntHost: 1, event: "power-state", value: facts(3) });
+  assert.deepEqual(seen.map(s => s.revision), [2, 3]);
+  watch.dispose(); client.receive({ ntHost: 1, event: "power-state", value: facts(4) });
+  assert.equal(seen.length, 2); client.dispose();
+});
+test("unsupported power observation rejects cleanly and releases its listener", async () => {
+  const client = createHostServices({ random: () => "power", send: () => { throw new Error("unsupported"); } });
+  let count = 0; const watch = client.watchPowerState(() => count++);
+  await assert.rejects(watch.ready, /unsupported/);
+  client.receive({ ntHost: 1, event: "power-state", value: { revision: 1, lowPowerMode: false, thermalState: "nominal" } });
+  assert.equal(count, 0); client.dispose();
+});

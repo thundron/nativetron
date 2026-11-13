@@ -21,6 +21,7 @@ final class HostServices: NSObject, WKScriptMessageHandler {
   private var active = Set<String>(), transactions = Set<String>(), leases = Set<String>()
   private var cancelInteraction: (() -> Void)?
   private var pdfJob: HostPDFJob?
+  private var power: HostPowerState?
   private var shortcuts: [[String: Any]] = []
   private static var incoming: [[String: Any]] = []
   private static var observers: [UUID: (String, Any) -> Void] = [:]
@@ -36,6 +37,7 @@ final class HostServices: NSObject, WKScriptMessageHandler {
     self.host = host
     super.init()
     web.configuration.userContentController.add(self, name: "ntHost")
+    power = HostPowerState { [weak self] value in self?.event("power-state", value) }
     Self.observers[observerID] = { [weak self] event, value in self?.event(event, value) }
   }
   static func open(_ url: URL) {
@@ -153,8 +155,13 @@ final class HostServices: NSObject, WKScriptMessageHandler {
         .success([
           "version": 1, "files": true, "share": true, "gallery": true, "pdf": true,
           "pdfOutput": "file", "pdfLayout": layout, "print": true, "archive": true,
-          "shortcuts": true, "maxFileBytes": ArchiveStore.maxFile, "chunkBytes": ArchiveStore.chunk,
+          "shortcuts": true, "powerState": true, "maxFileBytes": ArchiveStore.maxFile,
+          "chunkBytes": ArchiveStore.chunk,
         ]))
+      return
+    }
+    if method == "power.state" {
+      done(.success(power?.snapshot() ?? [:]))
       return
     }
     if method == "files.incoming" {
@@ -556,26 +563,42 @@ final class HostServices: NSObject, WKScriptMessageHandler {
   private func saveGallery(
     _ source: URL, _ args: [String: Any], _ done: @escaping (Result<Any, Error>) -> Void
   ) {
+    guard let mime = args["mime"] as? String, let type = UTType(mimeType: mime),
+      type.conforms(to: .image) || type.conforms(to: .movie)
+    else {
+      done(.failure(hostError("gallery requires a concrete image/video MIME type")))
+      return
+    }
     PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
       guard status == .authorized || status == .limited else {
         done(.failure(hostError("photo library permission denied", "permission-denied")))
         return
       }
-      var created = false
-      PHPhotoLibrary.shared().performChanges({
-        if (args["mime"] as? String)?.hasPrefix("video/") == true {
-          created = PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: source) != nil
-        } else {
-          created = PHAssetChangeRequest.creationRequestForAssetFromImage(atFileURL: source) != nil
-        }
-      }) { ok, error in
-        if let error {
-          done(.failure(error))
-        } else if ok && created {
-          done(.success(true))
-        } else {
-          done(.failure(hostError("photo import failed", "io")))
-        }
+      DispatchQueue.global(qos: .userInitiated).async {
+        do {
+          let resource = try HostMediaResource.prepare(source, mime: mime)
+          var created = false
+          PHPhotoLibrary.shared().performChanges({
+            if resource.isVideo {
+              created =
+                PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: resource.url)
+                != nil
+            } else {
+              created =
+                PHAssetChangeRequest.creationRequestForAssetFromImage(atFileURL: resource.url)
+                != nil
+            }
+          }) { ok, error in
+            defer { resource.dispose() }
+            if let error {
+              done(.failure(error))
+            } else if ok && created {
+              done(.success(true))
+            } else {
+              done(.failure(hostError("photo import failed", "io")))
+            }
+          }
+        } catch { done(.failure(error)) }
       }
     }
   }
@@ -656,6 +679,8 @@ final class HostServices: NSObject, WKScriptMessageHandler {
     guard !disposed else { return }
     reset()
     disposed = true
+    power?.dispose()
+    power = nil
     Self.observers.removeValue(forKey: observerID)
     web?.configuration.userContentController.removeScriptMessageHandler(forName: "ntHost")
   }
@@ -683,31 +708,49 @@ final class HostServices: NSObject, WKScriptMessageHandler {
       }
       let group = DispatchGroup()
       let lock = NSLock()
-      var urls: [URL] = []
+      var urls = [URL?](repeating: nil, count: results.count)
       var failure: Error?
-      for result in results {
+      for (index, result) in results.enumerated() {
         let provider = result.itemProvider
-        guard let type = provider.registeredTypeIdentifiers.first else { continue }
+        let types = provider.registeredTypeIdentifiers.compactMap { UTType($0) }
+        guard
+          let type = types.first(where: { $0.conforms(to: .movie) })
+            ?? types.first(where: { $0.conforms(to: .image) })
+        else {
+          lock.lock()
+          failure = hostError("selected item has no image/video representation")
+          lock.unlock()
+          continue
+        }
         group.enter()
-        provider.loadFileRepresentation(forTypeIdentifier: type) { source, error in
+        provider.loadFileRepresentation(forTypeIdentifier: type.identifier) { source, error in
           defer { group.leave() }
           lock.lock()
           defer { lock.unlock() }
           do {
             guard let source else { throw error ?? hostError("photo unavailable", "io") }
+            let ext =
+              HostFileNames.suffix(source.lastPathComponent) ?? type.preferredFilenameExtension
+            guard let ext, HostFileNames.suffix("resource." + ext) != nil else {
+              throw hostError("selected media type has no extension")
+            }
             let target = FileManager.default.temporaryDirectory.appendingPathComponent(
-              UUID().uuidString)
-            try FileManager.default.copyItem(at: source, to: target)
-            urls.append(target)
+              UUID().uuidString
+            ).appendingPathExtension(ext)
+            do { try FileManager.default.copyItem(at: source, to: target) } catch {
+              try? FileManager.default.removeItem(at: target)
+              throw error
+            }
+            urls[index] = target
           } catch { failure = error }
         }
       }
       group.notify(queue: .main) {
         if let failure {
-          for url in urls { try? FileManager.default.removeItem(at: url) }
+          for url in urls.compactMap({ $0 }) { try? FileManager.default.removeItem(at: url) }
           self.done(.failure(failure))
         } else {
-          self.done(.success(urls))
+          self.done(.success(urls.compactMap { $0 }))
         }
       }
     }

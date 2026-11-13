@@ -22,7 +22,9 @@ final class ArchiveStore {
       CommandLine.arguments.contains("--host-selftest")
       ? ProcessInfo.processInfo.environment["NT_HOST_ARCHIVE_ROOT"] : nil
     let root =
-      probe.map { URL(fileURLWithPath: $0, isDirectory: true) }
+      (CommandLine.arguments.contains("--nt-service-probe")
+        ? FileManager.default.temporaryDirectory.appendingPathComponent("nt-service-probe") : nil)
+      ?? probe.map { URL(fileURLWithPath: $0, isDirectory: true) }
       ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
       .appendingPathComponent("dev.nativetron.documents")
     return try ArchiveStore(root: root)
@@ -30,6 +32,7 @@ final class ArchiveStore {
   static let maxFile = 256 * 1024 * 1024
   static let chunk = 192 * 1024
   private let root: URL, archives: URL, staging: URL
+  private let quota: Int
   private let lock = NSRecursiveLock()
   private var lockFD: Int32 = -1
   private var files: [String: URL] = [:]
@@ -41,7 +44,9 @@ final class ArchiveStore {
     var offset: Int
   }
   private var writes: [String: Write] = [:]
-  init(root: URL) throws {
+  init(root: URL, quota: Int = 1024 * 1024 * 1024) throws {
+    guard quota >= 0 else { throw hostError("invalid archive quota") }
+    self.quota = quota
     self.root = root
     archives = root.appendingPathComponent("archives")
     staging = root.appendingPathComponent("staging")
@@ -80,7 +85,7 @@ final class ArchiveStore {
       if info.isRegularFile == true { used += info.fileSize ?? 0 }
     }
     used += writes.values.reduce(0) { $0 + $1.expected - $1.offset }
-    guard extra >= 0, used <= 1024 * 1024 * 1024 - extra else {
+    guard extra >= 0, extra <= quota, used <= quota - extra else {
       throw hostError("native archive quota exceeded", "quota")
     }
   }
@@ -170,9 +175,15 @@ final class ArchiveStore {
     let source = archives.appendingPathComponent(try key(name))
     guard files.count < 32 else { throw hostError("file lease capacity exceeded", "busy") }
     let id = UUID().uuidString
-    let url = staging.appendingPathComponent(UUID().uuidString)
-    // A hard link pins the version across atomic replacement without copying it.
-    try FileManager.default.linkItem(at: source, to: url)
+    let bytes = try size(source)
+    try capacity(bytes)
+    let url = HostFileNames.stagingURL(in: staging, name: name)
+    // Snapshot under the store lock. Copies work on mobile filesystems that
+    // deny hard links and still pin a version across atomic replacement.
+    do { try FileManager.default.copyItem(at: source, to: url) } catch {
+      try? FileManager.default.removeItem(at: url)
+      throw error
+    }
     files[id] = url
     return ["file": id, "name": name, "size": try size(url)]
   }
@@ -196,7 +207,9 @@ final class ArchiveStore {
     let bytes = Int(metadata.st_size)
     try capacity(bytes)
     let id = UUID().uuidString
-    let url = staging.appendingPathComponent(UUID().uuidString)
+    let typedName =
+      name.flatMap { HostFileNames.suffix($0) != nil ? $0 : nil } ?? source.lastPathComponent
+    let url = HostFileNames.stagingURL(in: staging, name: typedName)
     guard
       FileManager.default.createFile(
         atPath: url.path, contents: nil, attributes: [.posixPermissions: 0o600])

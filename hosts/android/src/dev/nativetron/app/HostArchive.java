@@ -33,11 +33,18 @@ final class HostArchive implements Closeable {
     }
   }
   private final File root, archives, staging;
+  private final long quota;
   private final RandomAccessFile lockFile;
   private final FileLock processLock;
   private final Map<String, Write> writes = new HashMap<>();
   private final Map<String, File> files = new HashMap<>();
   HostArchive(File root) throws IOException {
+    this(root, QUOTA);
+  }
+  HostArchive(File root, long quota) throws IOException {
+    if (quota < 0)
+      throw new IOException("invalid archive quota");
+    this.quota = quota;
     this.root = root;
     archives = new File(root, "archives");
     staging = new File(root, "staging");
@@ -82,7 +89,7 @@ final class HostArchive implements Closeable {
     return size;
   }
   private void capacity(long extra) throws IOException {
-    if (extra < 0 || used() > QUOTA - extra)
+    if (extra < 0 || extra > quota || used() > quota - extra)
       throw new IOException("archive quota exceeded");
   }
   synchronized String begin(String name, long size) throws IOException {
@@ -144,7 +151,13 @@ final class HostArchive implements Closeable {
       throw new IOException("archive not found");
     String id = UUID.randomUUID().toString();
     File file = new File(staging, id);
-    Files.createLink(file.toPath(), source.toPath());
+    capacity(source.length());
+    try {
+      Files.copy(source.toPath(), file.toPath());
+    } catch (IOException | RuntimeException error) {
+      file.delete();
+      throw error;
+    }
     files.put(id, file);
     return new Info(id, name, file.length());
   }

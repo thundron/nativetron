@@ -315,6 +315,7 @@ public final class MainActivity extends Activity implements NativeControl.Listen
   @Override protected void onResume() {
     super.onResume();
     if (web != null) { web.onResume(); web.resumeTimers(); }
+    if (hostServices != null) hostServices.refreshPowerState();
     lifecycle("resume");
   }
   @Override protected void onPause() {

@@ -16,6 +16,7 @@ python3 -c "import ast, sys; ast.parse(open(sys.argv[1]).read())" "$HERE/summari
 node --test "$HERE/verify.mjs"
 
 SOURCES=("$HERE"/Sources/*.swift)
+for source in "$ROOT"/hosts/apple/*.swift; do [[ "$source" == *.test.swift ]] || SOURCES+=("$source"); done
 for sdk in iphonesimulator iphoneos; do
   target=arm64-apple-ios18.6; [[ "$sdk" == iphonesimulator ]] && target+=-simulator
   xcrun swiftc -typecheck -sdk "$(xcrun --sdk $sdk --show-sdk-path)" -target "$target" -swift-version 5 \
@@ -39,4 +40,5 @@ xcrun swiftc -O -target arm64-apple-macos14 -swift-version 5 -import-objc-header
 STATUS=0
 "$OUT/ios-host-harness" >"$OUT/harness.log" 2>&1 || STATUS=$?
 grep -E '^(FAIL|ios host harness)' "$OUT/harness.log" || tail -20 "$OUT/harness.log"
+if [[ "$STATUS" == 0 ]]; then "$ROOT/hosts/apple/test.sh"; fi
 exit "$STATUS"

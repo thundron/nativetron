@@ -33,6 +33,19 @@ export function createHostServices({ send, timeoutMs = 120000, random = () => cr
       if (message.ok) request.resolve(message.value); else request.reject(Object.assign(new Error(message.error?.message ?? "host service failed"), { code: message.error?.code ?? "host-error" }));
     },
     capabilities: () => call("capabilities"),
+    powerState: () => call("power.state"),
+    watchPowerState(callback) {
+      let live = true, latest = null;
+      const accept = state => {
+        if (!live) return;
+        if (!state || typeof state.lowPowerMode !== "boolean" || !["nominal", "fair", "serious", "critical", "unknown"].includes(state.thermalState) || !Number.isSafeInteger(state.revision) || state.revision < 1) throw new Error("invalid native power state");
+        if (latest && state.revision <= latest.revision) return;
+        latest = Object.freeze({ ...state }); callback(latest);
+      };
+      const unsubscribe = client.onEvent((event, value) => { if (event === "power-state") accept(value); });
+      const ready = client.powerState().then(state => { accept(state); return latest; }).catch(error => { live = false; unsubscribe(); throw error; });
+      return { ready, dispose() { live = false; unsubscribe(); } };
+    },
     pickDocument: options => call("files.pick", options),
     pickGallery: options => call("gallery.pick", options),
     saveAs: options => call("files.save", options),

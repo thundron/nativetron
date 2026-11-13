@@ -29,6 +29,9 @@ public final class HostArchiveTest {
         store.write(id, 0, new byte[] {1, 2, 3});
         store.commit(id);
         HostArchive.Info snapshot = store.snapshot("project.ntproject");
+        if (Files.isSameFile(
+                root.resolve("archives/project.ntproject"), store.file(snapshot.file).toPath()))
+          throw new AssertionError("snapshot must not require a hard link");
         String replace = store.begin("project.ntproject", 3);
         store.write(replace, 0, new byte[] {4, 5, 6});
         store.commit(replace);
@@ -51,6 +54,16 @@ public final class HostArchiveTest {
         store.remove("project.ntproject");
         if (!store.list().isEmpty())
           throw new AssertionError("delete failed");
+      }
+      try (HostArchive limited = new HostArchive(root.resolve("limited").toFile(), 6)) {
+        String write = limited.begin("project", 3);
+        limited.write(write, 0, new byte[] {1, 2, 3});
+        limited.commit(write);
+        HostArchive.Info lease = limited.snapshot("project");
+        rejected(() -> limited.snapshot("project"));
+        limited.release(lease.file);
+        HostArchive.Info retry = limited.snapshot("project");
+        limited.release(retry.file);
       }
       System.out.println(
           "Android archive: atomic replacement, snapshots, persistence, bounds and cleanup passed");
