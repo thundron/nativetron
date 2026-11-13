@@ -144,14 +144,18 @@ node gpu/native/executor-corpus.mjs --corpus <dir with manifest.json and wgsl/> 
   786 ready; no uncaught errors, no loss. The 24 failures are exactly the shader lane's Naga 29 results: 12
   `gi.insert` modules ("Function 'insertKey' is invalid: Returning None where Some is expected") and the 12
   `gi.merge` pipelines with override `0 = 4` ("ConstantEvaluatorError(InvalidAccessIndex)"). Both are front-end
-  issues of the consumer's shaders on Naga, not executor issues; `NTGPU_WGPU_LIB` links a fixed wgpu-native.
+  issues of the consumer's shaders on Naga, not executor issues. Linked through `NTGPU_WGPU_LIB` against the
+  Naga-fix lane's build in the shared cache (`wgpu-native/v29.0.1.1+naga-wgsl-compat.1`, same `webgpu.h`), the same
+  run gives 199/199 modules and 810/810 pipelines, and the conformance reactor still passes.
 
 - house-planner engine smoke (outside the repository, `/tmp/nt-native-gpu-executor-1/hp`): the reactor lane's
   native `hp-engine.lib.a` linked with `libntgpu-executor.a`, fed that lane's recorded inputs (T_DEVICE, one-triangle
   scene bulk, camera) and the executor's real events in `engine/reactor.js`'s delivery order: 288 presents, 285 frames,
   no protocol `ERROR`, no abort, and a 640×400 capture showing the shaded triangle. Every frame's GI command buffer
   holds the Naga-rejected `gi.insert` pipeline, so those submissions are refused (190 `UNCAUGHT_ERROR`s, the engine
-  reports them as `ENGINE_GPU_ERROR`); without the submission guard the first one aborted the process.
+  reports them as `ENGINE_GPU_ERROR`); without the submission guard the first one aborted the process. With the
+  Naga-fix wgpu-native: 209 presents, 206 frames, zero `ERROR`/`UNCAUGHT_ERROR`, the engine stops requesting frames
+  once settled, and the capture shows the GI-lit triangle.
 
 ## Not done / not claimed
 
