@@ -1,45 +1,135 @@
 # Platform hosts
 
-Offline shells run independently compiled UI and GPU engine wasm **inside the page**. Native code never runs the GPU engine or carries geometry/per-frame GPU commands. All hosts consume the single generated `engine/assets.json` allowlist and packaged `build/engine-assets` bundle, with correct JavaScript/wasm MIME, bounded generated control IPC and external-navigation/resource refusal. Packaging records sizes and SHA-256 hashes. A successful cross-build is not execution evidence.
+Offline shells serve the generated `engine/assets.json` allowlist with bounded IPC and external-navigation/resource checks. UI and GPU reactors normally run inside the page. The macOS native GPU backend is an explicit experiment; build success is not platform acceptance.
 
-## iOS
+| Host | Instructions | Notes |
+| --- | --- | --- |
+| iOS | [README](ios/README.md) | WKWebView, unsigned simulator/device compile paths, explicit signing/device selection |
+| Android | [README](android/README.md) | SDK/NDK build, JNI control archive, explicit device selection |
+| Windows | [README](windows/README.md) | WebView2 offline assets, native commands and DPI/lifecycle handling |
+| macOS | [README](macos/README.md) | WKWebView services and optional native GPU integration |
 
-See [build and acceptance instructions](ios/README.md). UIKit/WKWebView serves `app://local` through a streaming scheme handler, with allowlisted regular files, MIME, COOP/COEP/nosniff, traversal/symlink refusals and cancelled-task ownership. The **actual scriptc static control archive** is linked into both simulator and device builds; the Swift adapter copies read-only callbacks, queues delivery outside the callback, and owns collection/disposal on one thread. No outbound library FFI, promises or timers.
+Mobile dialogs, Photos/codecs, physical printing and GPU execution need appropriate device validation. Cross-compilation does not establish those behaviors. Use the iOS simulator launch helper for its documented JIT compatibility settings.
 
-```sh
-hosts/ios/test.sh                     # both SDK typechecks and real compiled-library harness
-hosts/ios/accept.sh sim               # iOS 18.6 simulator: assets, control, lifecycle and teardown
-hosts/ios/build.sh device-compile     # unsigned iphoneos compile/link; not installable
+## Page-facing services
+
+
+The iOS, Android and macOS reference hosts expose OS services independently of the compiled UI framework. Import `installHostServices` from `host/services.js`, or use `window.nativetronHost` in the engine example. A normal browser has no native broker and rejects calls with `unsupported`.
+
+```js
+const host = window.nativetronHost;
+const capabilities = await host.capabilities();
+const picked = await host.pickDocument({
+  mimeTypes: ["application/json"],
+  multiple: false,
+});
+// A file descriptor contains {file, name, size}; `file` is an opaque lease.
+const bytes = await host.readFileChunk(picked[0].file, 0, Math.min(picked[0].size, 192 * 1024));
+await host.releaseFile(picked[0].file);
 ```
 
-Physical builds require an authorised own `NT_IOS_TEAM` and explicit `NT_IOS_DEVICE`. Prohibited identities are rejected before any toolchain action. On macOS 27 the selector refuses the crashing iOS 26 simulator; use physical iOS 26 for WebGPU or iOS 18.6 for honest unavailable-GPU fallback evidence. The current simulator passes two page/control cycles, real asset-response probes, background/foreground and release; `navigator.gpu` is absent. COOP/COEP response headers do not make its custom origin cross-origin isolated. **Physical iOS 26 GPU execution remains unverified.**
+Apple pickers also accept `extensions` and Apple-specific UTI identifiers in `types`. Android accepts MIME filters in `mimeTypes` (or the legacy `types` field); document providers ultimately control their chooser UI. Applications must validate imported formats. External content cannot select native filesystem paths through this API.
 
-## Android
+### Service surface
 
-See [build and acceptance instructions](android/README.md). Bare SDK/NDK tooling (no Gradle) packages a real scriptc Android control archive behind JNI. The Java/C adapters use bounded copied queues and one library-owner thread, validate full frames, and close/reopen safely. Virtual HTTPS assets are intercepted offline; file/content access, permissions, external navigation and network loads are refused. The APK requests no permissions. Readback data stays in the in-page engine.
+| Page API | Result and behavior |
+|---|---|
+| `capabilities()` | Version, feature availability, PDF output mode and storage bounds. |
+| `powerState()` / `watchPowerState(callback)` | Native power/thermal snapshot and revision-ordered change observation. |
+| `pickDocument(options)` | Up to 16 selected documents, copied into native-owned file leases. |
+| `pickGallery(options)` | System photo/media picker; returns the same file descriptors. |
+| `saveAs({file,name,mime})` | Save/export a leased file through the native document UI. |
+| `share({file,name,mime})` | Share a named snapshot. Android reports presentation, not recipient delivery. |
+| `saveToGallery({file,name,mime})` | Save an image/video to Photos or MediaStore. Apple asks for permission; Android uses app-owned MediaStore insertion. |
+| `pdf({html?,name?})` | Render supplied HTML or the current page with print styles; platform output differences are described below. |
+| `print({html?,name?})` | Open the platform print UI. Submission does not prove physical printing. |
+| `openFiles()` | Pending incoming file descriptors, retained until explicitly released. |
+| `registerShortcuts(shortcuts)` | Atomically replace this page's shortcut registrations. |
+| `onEvent(callback)` | Subscribe to `open-file`, `open-file-error` and `shortcut`; returns an unsubscribe function. |
+| `archive.put(key, bytes)` | Chunked, acknowledged write followed by atomic commit. |
+| `archive.get(key)` | Read a stable snapshot and release its lease. |
+| `archive.list()` / `archive.remove(key)` | List or delete committed archives. |
+| `readFileChunk(file,offset,length)` / `releaseFile(file)` | Read or release an opaque file lease. |
 
-```sh
-hosts/android/test.sh
-hosts/android/build.sh               # production-style signed APK, no test intents/inspection
-hosts/android/build.sh --debuggable
-NT_ANDROID_SERIAL=<serial> hosts/android/run.sh
+Cancellation is an error, not an empty successful selection. File leases should be retained while a save/share/gallery operation is outstanding and released afterwards. No file token is a path or a promise of lifetime across application termination.
+
+### Persistent project archives
+
+```js
+await host.archive.put("project.ntproject", projectBytes);
+const restored = await host.archive.get("project.ntproject");
+const snapshot = await host.call("archive.stat", { key: "project.ntproject" });
+try {
+  await host.saveAs({ file: snapshot.file, name: "project.ntproject", mime: "application/vnd.nativetron.project" });
+} finally {
+  await host.releaseFile(snapshot.file);
+}
 ```
 
-The runner never chooses a device or starts an emulator implicitly. An explicitly selected emulator also requires `NT_ANDROID_ALLOW_EMULATOR=1`. It tests native command delivery, pause/resume, disposal/reopen and real WebView MIME/headers/offline probes. GPU errors fail; only unavailable WebGPU yields host-only exit 3.
+Committed archives live in native application storage, not WebKit website storage. iOS keeps its nonpersistent website-data policy. Keys must match `[A-Za-z0-9][A-Za-z0-9._-]{0,127}` and cannot contain `..`. Limits are 256 MiB per file, 1 GiB of native archive/staging storage, 128 archive names, 16 staged writes and 32 file leases. Reads/writes use at most 192 KiB per chunk. Readers copy the committed version under the store lock and retain that immutable lease across atomic replacement. Hard-link support is not required. Snapshot copies count towards the staging quota and fail explicitly when that quota is full. Incomplete writes are aborted on page teardown; abandoned staging files are removed when the exclusive archive store reopens.
 
-## Windows
+These are application-private archives. User-requested export and system backup/uninstall behavior are separate. The Android reference manifest disables backup; deleting application data or uninstalling the application removes its archive.
 
-See [WebView2 build and acceptance instructions](windows/README.md). `WEBVIEW2_SDK=/path/to/sdk hosts/windows/build.sh --check` cross-links an x64 PE using Zig and the SDK as build input only. No WebView2Loader DLL, renderer or GPU runtime is shipped.
+### PDF and printing
 
-The host serves `https://nativetron.localhost/` directly from WebResourceRequested for page/worker requests, rather than virtual-folder mapping. Generated allowlists, link/real-path checks, MIME, optional COOP/COEP, CSP and offline interception are enforced. Native menu commands preserve the generated envelope. Window DPI/minimise, renderer recovery, event-token teardown and bounded self-test exit codes are implemented. Cmd/Ctrl+R changes colour; Cmd/Ctrl+K remains available to the command palette.
+Read `capabilities.pdfOutput` before assuming a PDF result is a file descriptor.
 
-Run `hosts/windows/acceptance.ps1 -Package build` on Windows with WebView2/WebGPU to check worker interception, isolation, menu, DPI, lifecycle and GPU behaviour. Cross-building does not exercise those runtime paths. WebView2's own browser-level background services are not a network sandbox; application page/worker requests are blocked outside the bundle origin.
+| Host | `pdfOutput` | Layout |
+|---|---|---|
+| iOS | `file` | Print-media snapshot normalized from CSS reference pixels (96/in) to PDF points (72/in), clipped into A4 pages with 24-point margins. |
+| macOS | `file` | Asynchronous WebKit PDF capture with `mediaType = "print"`; continuous layout. Printing paginates that snapshot onto paper. |
+| Android | `system-dialog` | Public WebView printing API; choose **Save as PDF** in the system destination UI. The result is a submitted job, not PDF bytes. |
 
+Android's public SDK does not expose constructors for the callbacks needed to drive a WebView print adapter as a headless PDF writer. The host does not use hidden-API reflection or a debug-only DevTools endpoint. Callers needing headless PDF bytes on Android must supply their own supported PDF producer; this service does not claim that capability.
 
-## macOS WKWebView and page services
+Supplied HTML is bounded and rendered in a separate view with no host bridge, scripts or remote resources. Bundled styles/fonts and data images are allowed. Apple waits for fonts/images before rendering and restores the page's original media override. iOS uses an explicit print-width viewport for supplied HTML, not Retina device pixels or the phone's mobile viewport. Snapshot export does not promise browser paged-media, widow/orphan, or `break-*` pagination parity: iOS clips the continuous layout into A4 pages; macOS returns continuous layout. Physical printing still uses the platform UI. System print dialogs, printer behavior and mobile Photos/share flows still need device-level validation.
 
-`hosts/macos/build.sh` builds an unsigned WKWebView application at `build/macos/Nativetron.app`; `NT_MACOS_SKIP_ENGINE=1` reuses the staged web bundle. The host uses the same offline asset policy and [page-facing service contract](SERVICES.md) as iOS/Android. No Dawn or bundled browser is added. The legacy desktop entry remains available. `NT_MACOS_BUILD_DIR` moves the output (for example under `/tmp`), `NT_MACOS_WASM_ROOT` stages the engine assets from a read-only tree's prebuilt Wasm, and `NT_GPU_EXECUTOR_LIBS` links a native GPU executor; `--native-gpu` opts into running the engine Worker's GPU stream natively (see [macos/NATIVE-GPU-APP.md](macos/NATIVE-GPU-APP.md)). WebView WebGPU stays the default.
+### Photos resource types
 
-## Cross-platform checks
+Private archive/import URLs retain a validated extension where available. Apple gallery export additionally prepares an owned typed URL before passing it to PhotoKit: images use their ImageIO-detected type, and movie resources retain a provider container extension or use the declared concrete MIME type. This covers older extensionless leases too. Temporary media copies are removed on completion/failure; the original lease is not renamed. PhotoKit still controls supported codecs and permissions; preserving an extension does not imply every image/video format can be added to Photos.
 
-`node scripts/verify-house-planner.mjs --quick` runs the portable checks. The runner writes logs and `build/acceptance/report.json`; exit 0 means all selected checks passed, 1 means a failure, and 2 means an external prerequisite is unavailable. Use the platform-specific runners above to exercise device and operating-system behaviour.
+### Native power and thermal state
+
+```js
+const observation = host.watchPowerState(state => {
+  // Host facts, application policy. Forward to the engine using STATE,
+  // not a per-frame reliable command or navigator.getBattery().
+  updateEnginePowerBudget(state);
+});
+await observation.ready;
+// On page/component teardown:
+observation.dispose();
+```
+
+`powerState()` returns `{ platform, lowPowerMode, thermalState, nativeThermalState, revision }`. `thermalState` is `nominal`, `fair`, `serious`, `critical` or `unknown`; the native numeric status remains available rather than asserting equivalent thermal thresholds across platforms. `watchPowerState` subscribes before querying the initial snapshot and ignores stale/duplicate revisions, so a late initial response cannot overwrite a newer event. It returns `{ready,dispose}`. Raw consumers can use `onEvent` with `power-state`.
+
+Apple observes ProcessInfo Low Power Mode and thermal notifications, and refreshes on application activation. Android reads PowerManager power saving, observes its change broadcast and thermal status where available, and refreshes on activity resume. Android exposes notification-availability flags when a device does not support listener registration. No browser battery API, polling loop or additional manifest permission is used. Native observers/listeners are removed when the host service is disposed. The host reports facts; it does not silently change rendering quality or scheduling.
+
+Wait for `lane.ready` before forwarding a snapshot through `lane.sendLatest` on an application-owned power topic. Replay the latest power facts after an engine restart along with camera/scene state. Application policy can reduce samples, resolution or work budgets, but should not treat Low Power Mode and thermal pressure as the same condition.
+
+### Incoming files and associations
+
+The reference hosts declare `.ntproject` / `application/vnd.nativetron.project` / `dev.nativetron.project`. Applications should substitute their own document declarations in the iOS project settings, Android manifest and macOS bundle metadata. The runtime handling is format-independent: iOS accepts cold-start URL contexts and later open events; Android accepts cold/warm `ACTION_VIEW` content URI grants; macOS accepts application open events. Selected/incoming content is copied into an owned file lease before the page reads it. Android does not use incoming `file://` paths or broad storage permissions.
+
+Subscribe to `open-file` for live notifications and call `openFiles()` after startup to recover files received before the page was ready. Release each incoming file after importing it into the project archive. Native queues are bounded; failures are reported through `open-file-error`.
+
+### Keyboard shortcuts
+
+```js
+await host.registerShortcuts([
+  { id: "save", title: "Save project", key: "s", modifiers: ["meta"] },
+]);
+const unsubscribe = host.onEvent((event, value) => {
+  if (event === "shortcut" && value.id === "save") saveProject();
+});
+```
+
+Registrations are page-scoped and replaced as a set; navigation/disposal removes them. Up to 32 unique IDs/chords are accepted. Keys are lowercase ASCII letters/digits; modifiers are `meta`, `ctrl`, `alt`, `shift`. System close/quit and standard editing chords are reserved. Apple exposes registrations through native menus/key commands; Android uses the activity shortcut/menu surface. The reference engine also reserves its native clear-colour shortcut. Applications should register/unregister shortcuts as their own editing context changes rather than intercept unmodified text input.
+
+### Embedding and validation
+
+`hosts/apple/` contains the shared Apple service/storage/PDF code. `hosts/macos/build.sh` builds an unsigned WKWebView application using the same offline assets and services as iOS. `HostServices` on Android accepts an `Activity`, a `WebView` and the host's asset-serving callback; it does not require the compiled UI framework. The new client is not yet an adapter for the legacy Windows desktop service surface.
+
+Focused checks include `node --test host/services.test.mjs`, `hosts/apple/test.sh`, `hosts/android/test-native.sh`, and the opt-in macOS `--host-selftest` probe. The latter requires a private `NT_HOST_ARCHIVE_ROOT` and tests a real WKWebView archive round-trip, shortcut registration and PDF print CSS without opening pickers or asking for Photos permission. Cross-build success is not execution evidence for mobile permission, picker, sharing, file-association or printer flows.
+
+The opt-in iOS `--nt-service-probe` checks native power snapshot delivery and PDF physical geometry without accessing Photos. On the tested iOS 26.2 simulator (JIT compatibility mode), a 96-CSS-pixel square exports as 72×72 PDF points; native synthetic tests also cover 1x/2x/3x snapshot coordinates and multipage output. Photos typed-resource tests exercise type preservation and cleanup, not permission dialogs or codec acceptance on a physical device.

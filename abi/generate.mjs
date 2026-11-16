@@ -131,7 +131,7 @@ function operationConstants() {
 
 const targets = [
   {
-    path: join(here, "DOM_HOST_ABI.md"),
+    path: join(here, "README.md"),
     render(previous) {
       const properties = ["| property | kind | bounds | application |", "|---|---|---|---|", ...Object.entries(operations.properties).map(([name, rule]) => `| ${name} | ${rule.kind} | ${rule.kind === "boolean" ? "true/false" : rule.minimum === undefined ? `length ≤ ${rule.maximum}` : `${rule.minimum}–${rule.maximum}`} | ${rule.deferred ? "after batch insertion/layout" : "immediate"} |`)].join("\n");
       const operationsBody = `${operationTable}\n\nWire layout:\n\n\`\`\`\n${operationLayout}\n\`\`\`\n\nMutable properties (strict bounds; unsupported values fail):\n\n${properties}`;

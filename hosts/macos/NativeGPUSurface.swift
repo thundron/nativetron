@@ -18,7 +18,7 @@ import QuartzCore
 // - Callbacks only enqueue events to the reactor sink; nothing reenters the
 //   guest synchronously from requestFrame/retire/geometry calls.
 //
-// See hosts/macos/NATIVE-GPU-PRESENTATION.md for ownership and integration.
+// See hosts/macos/README.md#experimental-native-gpu for ownership and integration.
 
 // MARK: - Shared value types
 

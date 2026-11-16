@@ -6,8 +6,8 @@ import {
 
 // Transport core for executing the reactor's GPU op stream outside this JavaScript realm (a native
 // WebGPU executor). It keeps the reactor's synchronous `gpuPresent(batch, uploads, readbacks)` import
-// contract while delivery to the executor is asynchronous. See engine/NATIVE-GPU.md for the wire
-// contract and what a platform bridge must provide. Nothing here decodes or executes GPU operations.
+// contract while delivery to the executor is asynchronous. native-gpu-wire.js owns the binary wire;
+// platform integration is described in ../gpu/native/README.md. This core does not execute GPU operations.
 
 // Guest staging limits (gpu/ops.json maxBatchBytes/maxUploadBytes/maxReadbackBytes; checked by the test).
 export const NATIVE_GPU_MAX_COMMAND_BYTES = GPU_MAX_BATCH_BYTES;

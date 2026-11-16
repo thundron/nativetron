@@ -21,7 +21,7 @@ const layout = spec.kinds
 
 const targets = [
   {
-    path: join(here, "IPC.md"),
+    path: join(here, "README.md"),
     render: (prev) =>
       prev.replace(/<!-- generated:kinds -->[\s\S]*?<!-- \/generated:kinds -->/,
         `<!-- generated:kinds -->\n${table}\n\nFrame: ${spec.header}. Maximum frame body: ${spec.maxFrameBytes} bytes.\n\n\`\`\`\n${layout}\n\`\`\`\n<!-- /generated:kinds -->`),

@@ -121,14 +121,14 @@ ${modRows}
 ${missingNode}
 `;
 
-const path = join(here, "COMPATIBILITY.md");
+const path = join(here, "README.md");
 const prev = (() => { try { return readFileSync(path, "utf8"); } catch { return ""; } })();
 if (body === prev) {
   console.log("compat: up to date");
 } else if (check) {
-  console.error("compat: COMPATIBILITY.md out of date — run: node compat/generate.mjs");
+  console.error("compat: README.md out of date — run: node compat/generate.mjs");
   process.exit(1);
 } else {
   writeFileSync(path, body);
-  console.log(`compat: wrote COMPATIBILITY.md (${react.hooks.length + react.api.length + react.jsx.length} react rows, ${nodeEntries.length} node members)`);
+  console.log(`compat: wrote README.md (${react.hooks.length + react.api.length + react.jsx.length} react rows, ${nodeEntries.length} node members)`);
 }

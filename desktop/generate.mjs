@@ -31,15 +31,15 @@ for (const row of surface.capabilities) {
 }
 out += "\nGenerated from `desktop/surface.json`; do not edit directly.\n";
 
-const path = join(here, "COMPATIBILITY.md");
+const path = join(here, "README.md");
 if (process.argv.includes("--check")) {
   const current = readFileSync(path, "utf8");
   if (current !== out) {
-    console.error("desktop: COMPATIBILITY.md out of date — run: node desktop/generate.mjs");
+    console.error("desktop: README.md out of date — run: node desktop/generate.mjs");
     process.exit(1);
   }
   console.log("desktop: up to date");
 } else {
   writeFileSync(path, out);
-  console.log(`desktop: wrote COMPATIBILITY.md (${surface.capabilities.length} rows)`);
+  console.log(`desktop: wrote README.md (${surface.capabilities.length} rows)`);
 }

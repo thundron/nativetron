@@ -88,7 +88,7 @@ listeners, and refs.
 | `app/`, `web/` | desktop and browser entry points |
 | `bench/` | benchmarks against React and Electron |
 
-See [ARCHITECTURE.md](./ARCHITECTURE.md) for how the pieces fit together, [compat/COMPATIBILITY.md](./compat/COMPATIBILITY.md) for the compiled React/Node surface, and [desktop/COMPATIBILITY.md](./desktop/COMPATIBILITY.md) for native desktop capabilities.
+See [README.md#architecture](./README.md#architecture) for how the pieces fit together, [compat/README.md](./compat/README.md) for the compiled React/Node surface, and [desktop/README.md](./desktop/README.md) for native desktop capabilities.
 
 ## In-page GPU engines
 
@@ -100,4 +100,12 @@ node engine/browser-test.mjs
 node framework/components.test.mjs
 ```
 
-The engine never runs in native code. WebGPU commands/uploads stay inside the page, with Worker/OffscreenCanvas preferred and detected main-thread fallback. Native handles windows, menus and coarse bounded control messages. Bundled assets work offline. See [GPU API](gpu/README.md), [engine lane](engine/README.md), [platform hosts](hosts/README.md), [virtual lists/tables](framework/VIRTUAL.md), and [BVH benchmark harness](bench/engine-bvh/README.md).
+The engine never runs in native code. WebGPU commands/uploads stay inside the page, with Worker/OffscreenCanvas preferred and detected main-thread fallback. Native handles windows, menus and coarse bounded control messages. Bundled assets work offline. See [GPU API](gpu/README.md), [engine lane](engine/README.md), [platform hosts](hosts/README.md), [virtual lists/tables](framework/README.md), and [BVH benchmark harness](bench/engine-bvh/README.md).
+
+## Architecture
+
+Components and signals feed the reconciler in `framework/`, which emits the [DOM host ABI](abi/README.md). Native hosts carry bounded batches across the webview boundary; browser reactors use linear memory. Component scopes own listeners, effects and references and dispose them with their nodes.
+
+`canvas/` provides a batched 2D surface. `gpu/` provides the WebGPU protocol; `engine/` runs a separate reactor in a Worker or on the main thread. GPU data normally stays in the page. The optional macOS native GPU executor is experimental and disabled by default.
+
+Protocol and compatibility tables are generated from their JSON schemas. See the READMEs in `abi/`, `ipc/`, `compat/` and `desktop/` for the contracts and regeneration commands.

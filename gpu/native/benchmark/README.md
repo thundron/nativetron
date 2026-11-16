@@ -1,6 +1,6 @@
 # Native GPU benchmark (`gpu/native/benchmark/`)
 
-Measures the house-planner engine on the real Bresso scene along three kinds of path, with one fixed procedure, and records raw JSON/CSV with provenance. Results and the go/no-go are in [`RESULTS.md`](RESULTS.md).
+Measures the house-planner engine on the real Bresso scene along three kinds of path, with one fixed procedure, and records raw JSON/CSV with provenance. Keep raw results and analysis outside the source tree.
 
 | path id | what runs | GPU API | crossing | presentation |
 | --- | --- | --- | --- | --- |
