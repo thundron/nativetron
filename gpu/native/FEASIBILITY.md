@@ -6,7 +6,7 @@ Keep native GPU execution experimental and opt-in. Do not make it the default ma
 
 The default remains the existing JS WebGPU host. No Dawn runtime was added. Tint was built only as an external, offline shader-validation tool. Experimental native rendering uses pinned wgpu-native with two documented, generic Naga fixes; house-planner needs no source or shader edits.
 
-See [measurements and exclusions](benchmark/RESULTS.md) for raw-data locations, reproduction commands and the full per-run validity rules. Other users' GPU workloads were observed; affected runs were excluded, not silently called uncontended.
+See [measurements and exclusions](benchmark/RESULTS.md) for raw-data locations, reproduction commands and the full per-run validity rules. Other users' GPU workloads were observed; affected runs were excluded, not silently called uncontended. The [draft engineering plan](ENGINEERING-PLAN.md) proposes repairs and larger architectural alternatives; those proposals are not implemented or approved by this result.
 
 ## What runs end to end
 
